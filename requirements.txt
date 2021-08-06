@@ -1,0 +1,8 @@
+numpy
+pydantic
+fastapi
+tensorflow==1.5
+mpi4py
+gym
+requests
+stable-baselines[mpi]
