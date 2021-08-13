@@ -2,27 +2,36 @@
 
 ## Installation instructions 
 
-1. `conda activate scheduler`
+1. `conda create --name scheduler python=3.7.7`
 
-2. `sudo yum install openmpi-devel`
+2. `conda activate scheduler`
 
-3. `source /etc/profile.d/modules.sh`
-
-4. `module load mpi`
-
-5. `pip install -r requirements`
+3. `pip install -r requirements.txt`
 
 ## Architecture
 
-The scheduler makes decision using reinforcement learning (RL)-based agent that has been trained using a simulation environment. The simulation environment captures the scheduling-related events in BLIS and replays a trace of events to the scheduling agent that is then trained on this trace.
+The scheduler makes decisions using a reinforcement learning (RL)-based agent that has been trained using a simulation environment. The simulation environment captures the scheduling-related events in BLIS and replays a trace of events to the scheduling agent that is then trained on this trace.
 
-The simulation environment consists of four main files:
+The RL learning environment consists of four main files:
 
-1. `simulator.py`: responsible for simulating the BLIS events for the scheduler
+1. `train.py`: this is the file that is called to train the RL agent. After training, it saves the trained model under `saved_models/`
 
-2. `scheduling_agent.py`: the core part of the scheduling logic, responsible for learning and then making the scheduling decisions for BLIS
+2. `test.py`: loads a model from `saved_models/` and tests it on a trace. The model architecture that is loaded must be the same as used in `train.py`
 
-3. `profiler.py`: responsible for communicating the profiled information of various models on the different hardware in BLIS to help the `scheduling_agent` make its scheduling decision
+3. `scheduling_env.py`: the core part of the scheduling logic, responsible for learning and then making the scheduling decisions for BLIS. Interacts with `simulator.py` to make 
 
-4. `resource_monitor.py`: responsible for simulating the resources within BLIS
+4. `simulator.py`: responsible for simulating the BLIS events for the scheduler. Uses the `Executor` class from `executor.py`
+
+5. `executor.py`: contains the code to simulate BLIS executors. Also contains the logic for the local scheduler. Uses the `Predictor` class from `predictor.py`
+
+6. `predictor.py`: contains the code to simulate BLIS predictors
+
+6. `generate_synthetic_trace.py`: generates synthetic traces using a Poisson arrival process
+
+# List of To-dos:
+This is a list of general to-dos. Apart from this, every code file has to-dos at specific points for things that might need to be changed.
+
+1. Make `train.py`, `test.py` and `generate_synthetic_trace.py` parameterized with argparse
+
+2. Sparse ISIs when max limit on number of ISIs is large
 

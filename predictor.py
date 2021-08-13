@@ -2,6 +2,8 @@ import uuid
 from enum import Enum
 
 
+# TODO: the number of accelerator types should be parameterizable
+#       we will potentially have 6 accelerator types, but it should be changeable
 class AccType(Enum):
     CPU = 1
     GPU = 2
@@ -10,10 +12,11 @@ class AccType(Enum):
 
 
 class Predictor:
-    def __init__(self, acc_type=AccType.CPU):
+    def __init__(self, acc_type=AccType.CPU, qos_level=0):
         # attributes related to predictor hardware
         self.id = uuid.uuid4().hex
         self.acc_type = acc_type
+        self.qos_level = qos_level
 
         # attributes related to current status
         self.busy = False

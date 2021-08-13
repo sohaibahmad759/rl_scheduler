@@ -1,8 +1,7 @@
 numpy
 pydantic
 fastapi
-tensorflow==1.5
-mpi4py
+torch
 gym
 requests
-stable-baselines[mpi]
+stable-baselines3
