@@ -1,6 +1,7 @@
 import itertools
 import logging
 import random
+import time
 import uuid
 import numpy as np
 from enum import Enum
@@ -12,8 +13,16 @@ class Behavior(Enum):
     STRICT = 2
 
 
+class TaskAssignment(Enum):
+    RANDOM = 1
+    ROUND_ROBIN = 2
+    EARLIEST_FINISH_TIME = 3
+    LATEST_FINISH_TIME = 4
+
+
 class Executor:
-    def __init__(self, isi, n_qos_levels=1, behavior=Behavior.BESTEFFORT):
+    def __init__(self, isi, n_qos_levels=1, behavior=Behavior.BESTEFFORT,
+                    task_assignment=TaskAssignment.LATEST_FINISH_TIME):
         self.id = uuid.uuid4().hex
         self.isi = isi
         self.n_qos_levels = n_qos_levels
@@ -22,12 +31,14 @@ class Executor:
         self.assigned_requests = {}
         self.iterator = itertools.cycle(self.predictors)
         self.behavior = behavior
+        self.task_assignment = task_assignment
         # EITHER: do we want a separate event queue for each executor? then we would need to
         # have another clock and interrupt when request ends
         # OR: a better way would be to just have predictors in the executor that we mark
         # busy when a request comes to them
         # if all predictors are busy, then the request either waits or has to fail
-        # 3 ways to do this: round robin, earliest start time, earliest finish time (EFT)
+        # 4 ways to do this: round robin, earliest start time, earliest finish time (EFT), latest finish time
+
 
     def add_predictor(self, acc_type=AccType.CPU, qos_level=0):
         # print('acc_type: {}'.format(acc_type.value))
@@ -76,6 +87,8 @@ class Executor:
         # filter out predictors that match the request's QoS level
         filtered_predictors = list(filter(lambda key: self.predictors[key].qos_level == event.qos_level, self.predictors))
         
+        # TODO: is this the implementation of behavior we want? If there is any matching QoS level,
+        #       it will be used regardless of finish time or any other metric
         # TODO: what to do if there are no predictors matching QoS level?
         if len(filtered_predictors) == 0:
             qos_met = False
@@ -85,8 +98,38 @@ class Executor:
                 filtered_predictors = list(self.predictors.keys())
             # TODO: increment missed QoS counter (histogram)
 
-        # for now, we use random
-        predictor = self.predictors[random.choice(filtered_predictors)]
+        if self.task_assignment == TaskAssignment.RANDOM:
+            predictor = self.predictors[random.choice(filtered_predictors)]
+        elif self.task_assignment == TaskAssignment.EARLIEST_FINISH_TIME or self.task_assignment == TaskAssignment.LATEST_FINISH_TIME:
+            finish_times = []
+            for key in filtered_predictors:
+                candidate = self.predictors[key]
+                potential_runtime = runtimes[candidate.acc_type][(event.desc, event.qos_level)]
+                if candidate.busy:
+                    finish_time = candidate.busy_till + potential_runtime
+                else:
+                    finish_time = clock + potential_runtime
+
+                # finish_time has to be within the request's deadline
+                if finish_time > clock + event.deadline:
+                    # set it to an invalid value
+                    if self.task_assignment == TaskAssignment.EARLIEST_FINISH_TIME:
+                        finish_time = np.inf
+                    elif self.task_assignment == TaskAssignment.LATEST_FINISH_TIME:
+                        finish_time = -1
+                finish_times.append(finish_time)
+            logging.debug('filtered_predictors: {}'.format(filtered_predictors))
+            logging.debug('finish_times: {}'.format(finish_times))
+            if self.task_assignment == TaskAssignment.EARLIEST_FINISH_TIME:
+                idx = finish_times.index(min(finish_times))
+            elif self.task_assignment == TaskAssignment.LATEST_FINISH_TIME:
+                idx = finish_times.index(max(finish_times))
+            logging.debug('idx: {}'.format(idx))
+            predictor = self.predictors[filtered_predictors[idx]]
+            logging.debug('filtered_predictors[idx]: {}'.format(filtered_predictors[idx]))
+            logging.debug('predictor: {}'.format(predictor))
+            # time.sleep(2)
+
 
         # round-robin:
         # predictor = self.predictors[next(self.iterator)]

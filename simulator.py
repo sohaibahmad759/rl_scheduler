@@ -13,7 +13,7 @@ from executor import Executor, AccType
 
 
 class Simulator:
-    def __init__(self, trace_path=None, mode='training', predictors_max=[10,10,10,10], n_qos_levels=1):
+    def __init__(self, trace_path=None, mode='training', predictors_max=[10,10,10,10], n_qos_levels=1, random_runtimes=True):
         self.clock = 0
         self.event_queue = []
         self.executors = {}
@@ -60,8 +60,8 @@ class Simulator:
                 self.failed_requests_arr.append(0)
                 self.total_requests_arr.append(0)
                 idx += 1
-            
-                self.initialize_random_runtimes(isi_name)
+
+                self.initialize_runtimes(isi_name, random_runtimes=random_runtimes)
                 
                 if self.store_file_pointers:
                     readfile = open(os.path.join(trace_path, file), mode='r')
@@ -141,13 +141,18 @@ class Simulator:
         return False
 
     
-    def initialize_random_runtimes(self, isi_name):
+    def initialize_runtimes(self, isi_name, random_runtimes=True):
         for qos_level in range(self.n_qos_levels):
-            self.cpu_runtimes[isi_name, qos_level] = random.randint(100, 350)
-            self.gpu_runtimes[isi_name, qos_level] = random.randint(100, 350)
-            self.vpu_runtimes[isi_name, qos_level] = random.randint(100, 350)
-            self.fpga_runtimes[isi_name, qos_level] = random.randint(100, 350)
-        print
+            if random_runtimes:
+                self.cpu_runtimes[isi_name, qos_level] = random.randint(100, 350)
+                self.gpu_runtimes[isi_name, qos_level] = random.randint(100, 350)
+                self.vpu_runtimes[isi_name, qos_level] = random.randint(100, 350)
+                self.fpga_runtimes[isi_name, qos_level] = random.randint(100, 350)
+            else:
+                self.cpu_runtimes[isi_name, qos_level] = 250
+                self.gpu_runtimes[isi_name, qos_level] = 225
+                self.vpu_runtimes[isi_name, qos_level] = 200
+                self.fpga_runtimes[isi_name, qos_level] = 175
         return
 
     

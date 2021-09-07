@@ -12,7 +12,7 @@ class SchedulingEnv(gym.Env):
     """Scheduling Environment that follows gym interface"""
     metadata = {'render.modes': ['human']}
 
-    def __init__(self, trace_dir, action_group_size, reward_window_length=10):
+    def __init__(self, trace_dir, action_group_size, reward_window_length=10, random_runtimes=True):
         super(SchedulingEnv, self).__init__()
 
         logging.basicConfig(level=logging.INFO)
@@ -38,7 +38,8 @@ class SchedulingEnv(gym.Env):
         # simulator environment that our RL agent will interact with
         self.simulator = Simulator(trace_path=trace_dir, mode='debugging', 
                                    predictors_max=self.total_predictors,
-                                   n_qos_levels=self.n_qos_levels)
+                                   n_qos_levels=self.n_qos_levels,
+                                   random_runtimes=random_runtimes)
 
         # number of steps that we play into the future to get reward
         # Note: this is a tunable parameter

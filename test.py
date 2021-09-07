@@ -1,5 +1,6 @@
 import time
 import sys
+import argparse
 import random
 import numpy as np
 from stable_baselines3 import PPO
@@ -10,16 +11,23 @@ if __name__=='__main__':
 
     # TODO: should be able to fix seed for random, so that results are reproducible (local scheduler)
 
+    parser = argparse.ArgumentParser(description='Test scheduler on the simulated BLIS environment.')
+    parser.add_argument('--static_runtimes', dest='random_runtimes', action='store_false', help='Initializes static runtimes if used. Otherwise, uses random runtimes.')
+    parser.set_defaults(random_runtimes='True')
+
+    args = parser.parse_args()
+    print(args)
+
     model_training_steps = 8000
     testing_steps = 1000
-    action_group_size = 10
+    action_group_size = 15
     reward_window_length = 10
 
     modes = ['random', 'static', 'rl', 'lfu']
-    mode = modes[3]
+    mode = modes[1]
 
     env = SchedulingEnv(trace_dir='traces/synthetic/', action_group_size=action_group_size,
-                        reward_window_length=reward_window_length)
+                        reward_window_length=reward_window_length, random_runtimes=args.random_runtimes)
 
     policy_kwargs = dict(net_arch=[128, 128, dict(pi=[128, 128, 128],
                                         vf=[128, 128, 128])])
@@ -60,7 +68,7 @@ if __name__=='__main__':
             action = env.action_space.sample()
             for j in range(1,5):
                 action[j] = 1
-            for j in range(5,9):
+            for j in range(5,len(action)):
                 action[j] = 0
             action[0] = i % 5
         elif mode == 'rl':
