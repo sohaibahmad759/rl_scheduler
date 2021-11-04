@@ -13,7 +13,8 @@ from executor import Executor, AccType
 
 
 class Simulator:
-    def __init__(self, trace_path=None, mode='training', predictors_max=[10, 10, 10, 10], n_qos_levels=1, random_runtimes=True):
+    def __init__(self, job_sched_algo, trace_path=None, mode='training', 
+                 predictors_max=[10, 10, 10, 10], n_qos_levels=1, random_runtimes=False):
         self.clock = 0
         self.event_queue = []
         self.executors = {}
@@ -24,6 +25,7 @@ class Simulator:
         self.total_requests_arr = []
         self.mode = mode
 
+        self.job_sched_algo = job_sched_algo
         self.n_qos_levels = n_qos_levels
 
         self.store_file_pointers = True
@@ -54,7 +56,7 @@ class Simulator:
                 if not extension == 'txt':
                     continue
                 logging.info('Filename: ' + file)
-                self.add_executor(isi_name)
+                self.add_executor(isi_name, self.job_sched_algo)
                 self.idx_to_executor[idx] = isi_name
                 self.isi_to_idx[isi_name] = idx
                 self.failed_requests_arr.append(0)
@@ -144,22 +146,22 @@ class Simulator:
             # print(self.requests_added)
         return False
 
-    def initialize_runtimes(self, isi_name, random_runtimes=True):
+    def initialize_runtimes(self, isi_name, random_runtimes=False):
         for qos_level in range(self.n_qos_levels):
             if random_runtimes:
                 self.cpu_runtimes[isi_name,
-                                  qos_level] = random.randint(100, 350)
+                                  qos_level] = random.randint(20, 100)
                 self.gpu_runtimes[isi_name,
-                                  qos_level] = random.randint(100, 350)
+                                  qos_level] = random.randint(20, 100)
                 self.vpu_runtimes[isi_name,
-                                  qos_level] = random.randint(100, 350)
+                                  qos_level] = random.randint(20, 100)
                 self.fpga_runtimes[isi_name,
-                                   qos_level] = random.randint(100, 350)
+                                   qos_level] = random.randint(20, 100)
             else:
-                self.cpu_runtimes[isi_name, qos_level] = 250
-                self.gpu_runtimes[isi_name, qos_level] = 225
-                self.vpu_runtimes[isi_name, qos_level] = 200
-                self.fpga_runtimes[isi_name, qos_level] = 175
+                self.cpu_runtimes[isi_name, qos_level] = 50
+                self.gpu_runtimes[isi_name, qos_level] = 25
+                self.vpu_runtimes[isi_name, qos_level] = 35
+                self.fpga_runtimes[isi_name, qos_level] = 30
         return
 
     def get_runtimes(self, isi_index):
@@ -204,7 +206,8 @@ class Simulator:
                 file_finished = self.add_requests_from_trace_pointer(isi_name, readfile,
                                                                      read_until=self.clock + 10000)
                 if file_finished:
-                    logging.info('Trace file {} finished'.format(isi_name))
+                    logging.debug('Trace file {} finished'.format(isi_name))
+                    # time.sleep(5000)
                 finished = finished and file_finished
             return finished
         return False
@@ -449,7 +452,7 @@ class Simulator:
                 'Starting event {}. (Time: {})'.format(event.desc, clock))
             isi = event.desc
             if isi not in self.executors:
-                self.add_executor(isi)
+                self.add_executor(isi, self.job_sched_algo)
             # call executor.process_request() on relevant executor
             executor = self.executors[isi]
             end_time, qos_met = executor.process_request(
@@ -492,8 +495,8 @@ class Simulator:
 
         return None
 
-    def add_executor(self, isi):
-        executor = Executor(isi, self.n_qos_levels)
+    def add_executor(self, isi, job_sched_algo):
+        executor = Executor(isi, job_sched_algo, self.n_qos_levels)
         self.executors[executor.isi] = executor
         return executor.id
 

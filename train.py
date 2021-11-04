@@ -17,7 +17,7 @@ if __name__=='__main__':
 
     random = False
 
-    env = SchedulingEnv(trace_dir='traces/synthetic/', action_group_size=action_group_size,
+    env = SchedulingEnv(trace_dir='traces/twitter/', action_group_size=action_group_size,
                         reward_window_length=reward_window_length)
 
                     #                    / 128 - 128 - 128 - policy (pi)

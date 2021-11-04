@@ -12,7 +12,8 @@ class SchedulingEnv(gym.Env):
     """Scheduling Environment that follows gym interface"""
     metadata = {'render.modes': ['human']}
 
-    def __init__(self, trace_dir, action_group_size, reward_window_length=10, random_runtimes=True):
+    def __init__(self, trace_dir, job_sched_algo, action_group_size,
+                 reward_window_length=10, random_runtimes=False):
         super(SchedulingEnv, self).__init__()
 
         logging.basicConfig(level=logging.INFO)
@@ -22,13 +23,13 @@ class SchedulingEnv(gym.Env):
         self.logfile = open(logfile_name, mode='w')
         
         # TODO: move all parameters to a config file or cmd line argument, train.py should read that
-        self.n_executors = 5
+        self.n_executors = len(glob.glob(os.path.join(os.getcwd(), trace_dir, '*.txt')))
         self.n_accelerators = 4
         self.n_qos_levels = 1
         self.action_group_size = action_group_size
         
         # if we make this a vector, can have heterogeneous no. of accelerators for each type
-        self.max_no_of_accelerators = 10
+        self.max_no_of_accelerators = 30
         self.max_runtime = 1000
 
         # max total predictors for each accelerator type (CPU, GPU, VPU, FPGA) respectively
@@ -36,7 +37,8 @@ class SchedulingEnv(gym.Env):
         self.total_predictors = self.max_no_of_accelerators * np.ones(self.n_accelerators)
         
         # simulator environment that our RL agent will interact with
-        self.simulator = Simulator(trace_path=trace_dir, mode='debugging', 
+        self.simulator = Simulator(trace_path=trace_dir, mode='debugging',
+                                   job_sched_algo=job_sched_algo,
                                    predictors_max=self.total_predictors,
                                    n_qos_levels=self.n_qos_levels,
                                    random_runtimes=random_runtimes)

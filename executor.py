@@ -21,8 +21,7 @@ class TaskAssignment(Enum):
 
 
 class Executor:
-    def __init__(self, isi, n_qos_levels=1, behavior=Behavior.BESTEFFORT,
-                    task_assignment=TaskAssignment.LATEST_FINISH_TIME):
+    def __init__(self, isi, task_assignment, n_qos_levels=1, behavior=Behavior.BESTEFFORT):
         self.id = uuid.uuid4().hex
         self.isi = isi
         self.n_qos_levels = n_qos_levels
@@ -31,7 +30,8 @@ class Executor:
         self.assigned_requests = {}
         self.iterator = itertools.cycle(self.predictors)
         self.behavior = behavior
-        self.task_assignment = task_assignment
+        self.task_assignment = TaskAssignment(task_assignment)
+        
         # EITHER: do we want a separate event queue for each executor? then we would need to
         # have another clock and interrupt when request ends
         # OR: a better way would be to just have predictors in the executor that we mark

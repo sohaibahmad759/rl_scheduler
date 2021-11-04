@@ -7,27 +7,43 @@ from stable_baselines3 import PPO
 from scheduling_env import SchedulingEnv
 
 
-if __name__=='__main__':
-
-    # TODO: should be able to fix seed for random, so that results are reproducible (local scheduler)
-
+def getargs():
     parser = argparse.ArgumentParser(description='Test scheduler on the simulated BLIS environment.')
-    parser.add_argument('--static_runtimes', dest='random_runtimes', action='store_false', help='Initializes static runtimes if used. Otherwise, uses random runtimes.')
-    parser.set_defaults(random_runtimes='True')
+    parser.add_argument('--random_runtimes', '-r', required=False,
+                        dest='random_runtimes', action='store_true',
+                        help='Initializes random runtimes if used. Otherwise, uses static runtimes.')
+    # parser.add_argument('--random_runtimes', required=False, default=False, type=bool,
+    #                     dest='random_runtimes', help='Whether to randomize runtimes. If not, uses static runtimes.')
+    parser.add_argument('--test_steps', '-t', required=False, default=1000,
+                        dest='test_steps', help='Number of steps to test for. Default value is 1000')
+    parser.add_argument('--action_size', '-a', required=False, default=15,
+                        dest='action_size', help='Number of scheduling changes to make in each iteration. ' +
+                        'Default value is 15')
+    parser.add_argument('--window_length', '-w', required=False, default=10,
+                        dest='window_length', help='The number of steps to look out into the future to ' +
+                        'calculate the reward of an action. Default value is 10')
+    parser.add_argument('--job_scheduling', '-js', required=True, choices=['1', '2', '3', '4'],
+                        dest='job_sched_algo', help='The job scheduling algorithm. Select a number:\n' +
+                        '1 - Random. 2 - Round robin. 3 - Earliest Finish Time with FIFO. ' +
+                        '4 - Latest Finish Time with FIFO')
+    parser.set_defaults(random_runtimes=False)
 
-    args = parser.parse_args()
-    print(args)
+    return parser.parse_args()
 
+
+def main(args):
+    # TODO: should be able to fix seed for random, so that results are reproducible (local scheduler)
     model_training_steps = 8000
-    testing_steps = 1000
-    action_group_size = 15
-    reward_window_length = 10
+    testing_steps = args.test_steps
+    action_group_size = args.action_size
+    reward_window_length = args.window_length
 
     modes = ['random', 'static', 'rl', 'lfu']
     mode = modes[1]
 
-    env = SchedulingEnv(trace_dir='traces/synthetic/', action_group_size=action_group_size,
-                        reward_window_length=reward_window_length, random_runtimes=args.random_runtimes)
+    env = SchedulingEnv(trace_dir='traces/twitter/', job_sched_algo=int(args.job_sched_algo),
+                        action_group_size=action_group_size, reward_window_length=reward_window_length,
+                        random_runtimes=args.random_runtimes)
 
     policy_kwargs = dict(net_arch=[128, 128, dict(pi=[128, 128, 128],
                                         vf=[128, 128, 128])])
@@ -70,13 +86,13 @@ if __name__=='__main__':
                 action[j] = 1
             for j in range(5,len(action)):
                 action[j] = 0
-            action[0] = i % 5
+            action[0] = i % env.n_executors
         elif mode == 'rl':
             if i < 5:
                 action = env.action_space.sample()
                 for j in range(len(action)):
                     action[j] = 1
-                action[0] = i % 5
+                action[0] = i % env.n_executors
             else:
                 action, _states = model.predict(observation)
         elif mode == 'lfu':
@@ -86,7 +102,7 @@ if __name__=='__main__':
                     action[j] = 1
                 for j in range(5,len(action)):
                     action[j] = 0
-                action[0] = i % 5
+                action[0] = i % env.n_executors
             else:
                 # there are actually 2 sub-actions:
                 # (i) stealing from an ISI, (ii) giving to another ISI
@@ -124,6 +140,7 @@ if __name__=='__main__':
         if i % 100 == 0:
             print('Testing step: {} of {}'.format(i, testing_steps))
             print('Action taken: {}'.format(action))
+            # print('State: {}'.format(env.state))
         observation, reward, done, info = env.step(action)
         # read failed and total requests once every 5 actions
         if (i-1) % action_group_size == 0:
@@ -140,3 +157,7 @@ if __name__=='__main__':
     print('Test time: {} seconds'.format(end-start))
     print('Requests added: {}'.format(env.simulator.requests_added))
     logfile.close()
+
+
+if __name__=='__main__':
+    main(getargs())
