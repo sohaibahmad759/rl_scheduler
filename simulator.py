@@ -46,7 +46,7 @@ class Simulator:
 
         idx = 0
         if not trace_path is None:
-            trace_files = os.listdir(trace_path)
+            trace_files = sorted(os.listdir(trace_path))
             for file in trace_files:
                 filename = file.split('/')[-1]
                 if len(filename.split('.')) == 1:
@@ -112,8 +112,13 @@ class Simulator:
                 # also, if n_qos_levels is 1, ignore qos info from trace
                 if self.n_qos_levels == 1:
                     qos_level = 0
+
+                if len(request_description) >= 3:
+                    deadline = request_description[2]
+                else:
+                    deadline = 500
                 self.insert_event(start_time, EventType.START_REQUEST, isi_name, runtime=None,
-                                  deadline=500, qos_level=qos_level)
+                                  deadline=deadline, qos_level=qos_level)
         return
 
     def add_requests_from_trace_pointer(self, isi_name, readfile, read_until=500):
@@ -138,6 +143,11 @@ class Simulator:
             # also, if n_qos_levels is 1, ignore qos info from trace
             if self.n_qos_levels == 1:
                 qos_level = 0
+
+            if len(request_description) >= 3:
+                deadline = request_description[2]
+            else:
+                deadline = 500
             self.insert_event(start_time, EventType.START_REQUEST, isi_name, runtime=None,
                               deadline=500, qos_level=qos_level)
             self.requests_added += 1
@@ -158,9 +168,13 @@ class Simulator:
                 self.fpga_runtimes[isi_name,
                                    qos_level] = random.randint(20, 100)
             else:
-                self.cpu_runtimes[isi_name, qos_level] = 50
+                # self.cpu_runtimes[isi_name, qos_level] = 50
+                # self.gpu_runtimes[isi_name, qos_level] = 25
+                # self.vpu_runtimes[isi_name, qos_level] = 35
+                # self.fpga_runtimes[isi_name, qos_level] = 30
+                self.cpu_runtimes[isi_name, qos_level] = 100
                 self.gpu_runtimes[isi_name, qos_level] = 25
-                self.vpu_runtimes[isi_name, qos_level] = 35
+                self.vpu_runtimes[isi_name, qos_level] = 65
                 self.fpga_runtimes[isi_name, qos_level] = 30
         return
 

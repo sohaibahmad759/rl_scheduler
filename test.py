@@ -12,8 +12,6 @@ def getargs():
     parser.add_argument('--random_runtimes', '-r', required=False,
                         dest='random_runtimes', action='store_true',
                         help='Initializes random runtimes if used. Otherwise, uses static runtimes.')
-    # parser.add_argument('--random_runtimes', required=False, default=False, type=bool,
-    #                     dest='random_runtimes', help='Whether to randomize runtimes. If not, uses static runtimes.')
     parser.add_argument('--test_steps', '-t', required=False, default=1000,
                         dest='test_steps', help='Number of steps to test for. Default value is 1000')
     parser.add_argument('--action_size', '-a', required=False, default=15,
@@ -22,6 +20,10 @@ def getargs():
     parser.add_argument('--window_length', '-w', required=False, default=10,
                         dest='window_length', help='The number of steps to look out into the future to ' +
                         'calculate the reward of an action. Default value is 10')
+    parser.add_argument('--model_assignment', '-ma', required=True, choices=['1', '2', '3', '4', '5', '6'],
+                        dest='model_asn_algo', help='The model assignment algorithm. Select a number:\n' +
+                        '1 - Random. 2 - Static. 3 - Least Frequently Used (LFU). 4 - Load proportional. ' +
+                        '5 - RL. 6 - RL with warm start (load proportional).')
     parser.add_argument('--job_scheduling', '-js', required=True, choices=['1', '2', '3', '4'],
                         dest='job_sched_algo', help='The job scheduling algorithm. Select a number:\n' +
                         '1 - Random. 2 - Round robin. 3 - Earliest Finish Time with FIFO. ' +
@@ -38,8 +40,8 @@ def main(args):
     action_group_size = args.action_size
     reward_window_length = args.window_length
 
-    modes = ['random', 'static', 'rl', 'lfu']
-    mode = modes[1]
+    model_asn_algos = ['random', 'static', 'lfu', 'load_proportional', 'rl', 'rl_warm']
+    model_assignment = model_asn_algos[int(args.model_asn_algo)-1]
 
     env = SchedulingEnv(trace_dir='traces/twitter/', job_sched_algo=int(args.job_sched_algo),
                         action_group_size=action_group_size, reward_window_length=reward_window_length,
@@ -55,21 +57,25 @@ def main(args):
 
     print()
     print('--------------------------')
-    if mode == 'random':
+    if model_assignment == 'random':
         print('Testing with random actions')
-    elif mode == 'static':
+    elif model_assignment == 'static':
         print('Testing with static allocation of 1 predictor for each type')
-    elif mode == 'rl':
-        print('Testing with trained model: {}'.format(model_name))
-    elif mode == 'lfu':
+    elif model_assignment == 'rl':
+        print('Testing with trained RL model (cold start): {}'.format(model_name))
+    elif model_assignment == 'rl_warm':
+        print('Testing with trained RL model (warm start): {}'.format(model_name))
+    elif model_assignment == 'lfu':
         print('Testing with LFU (Least Frequently Used) baseline')
+    elif model_assignment == 'load_proportional':
+        print('Testing with load proportional algorithm')
     else:
         print('Undefined mode, exiting')
         sys.exit(0)
     print('--------------------------')
     print()
 
-    logfile_name = 'log_' + mode + '.txt'
+    logfile_name = 'log_' + model_assignment + '.txt'
     logfile = open('logs/' + logfile_name, mode='w')
 
     rl_reward = 0
@@ -78,16 +84,45 @@ def main(args):
     total_requests = 0
     start = time.time()
     for i in range(testing_steps):
-        if mode == 'random':
+        if model_assignment == 'random':
             action = env.action_space.sample()
-        elif mode == 'static':
+        elif model_assignment == 'static':
             action = env.action_space.sample()
             for j in range(1,5):
                 action[j] = 1
             for j in range(5,len(action)):
                 action[j] = 0
             action[0] = i % env.n_executors
-        elif mode == 'rl':
+        elif model_assignment == 'load_proportional':
+            # we only need to apply the assignment once at the start
+            if i == 0:
+                proportions = np.array([0.30, 0.14, 0.091, 0.066, 0.051, 0.042, 0.035, 0.030, 0.027, \
+                               0.024, 0.022, 0.020, 0.018, 0.016, 0.015, 0.014, 0.013, 0.012, \
+                               0.012, 0.011, 0.010, 0.009])
+                # we calculate the shares for each model architecture (ISI) and round to integer
+                shares = np.rint(proportions * env.n_accelerators * env.max_no_of_accelerators)
+                # we use a counter to loop through the types of accelerators available, assigning
+                # them in round robin fashion
+                counter = 0
+                for model in range(len(shares)):
+                    action = env.action_space.sample()
+                    action[0] = model
+                    for j in range(1, len(action)):
+                        action[j] = 0
+
+                    to_assign = shares[model]
+                    while to_assign > 0:
+                        action[counter+1] += 1
+                        to_assign -= 1
+                        counter = (counter + 1) % 4
+                    observation, reward, done, info = env.step(action)
+                #     print(action)
+                #     print(np.sum(action[1:]))
+                # print(shares)
+                # time.sleep(5)
+                # print(np.sum(np.rint(acc_shares)))
+                # print(env.n_accelerators * env.max_no_of_accelerators)
+        elif model_assignment == 'rl':
             if i < 5:
                 action = env.action_space.sample()
                 for j in range(len(action)):
@@ -95,7 +130,32 @@ def main(args):
                 action[0] = i % env.n_executors
             else:
                 action, _states = model.predict(observation)
-        elif mode == 'lfu':
+        elif model_assignment == 'rl_warm':
+            if i == 0:
+                proportions = np.array([0.30, 0.14, 0.091, 0.066, 0.051, 0.042, 0.035, 0.030, 0.027, \
+                               0.024, 0.022, 0.020, 0.018, 0.016, 0.015, 0.014, 0.013, 0.012, \
+                               0.012, 0.011, 0.010, 0.009])
+                # proportions = np.array([0.49350343,0.16217454, 0.08506038, 0.05360479, 0.03783405, 0.02843459, 0.02187717, 0.01780384, 0.01448217, 0.01235602, 0.01037304, 0.0092348, 0.00851892, 0.0070657,  0.00659322, 0.00568406, 0.00491807, 0.004825, 0.00410913, 0.00432389, 0.00375835, 0.00346484])
+                # we calculate the shares for each model architecture (ISI) and round to integer
+                shares = np.rint(proportions * env.n_accelerators * env.max_no_of_accelerators)
+                # we use a counter to loop through the types of accelerators available, assigning
+                # them in round robin fashion
+                counter = 0
+                for idx in range(len(shares)):
+                    action = env.action_space.sample()
+                    action[0] = idx
+                    for j in range(1, len(action)):
+                        action[j] = 0
+
+                    to_assign = shares[idx]
+                    while to_assign > 0:
+                        action[counter+1] += 1
+                        to_assign -= 1
+                        counter = (counter + 1) % 4
+                    observation, reward, done, info = env.step(action)
+            else:
+                action, _states = model.predict(observation)
+        elif model_assignment == 'lfu':
             action = env.action_space.sample()
             if i < 5:
                 for j in range(1,5):
