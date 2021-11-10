@@ -1,3 +1,4 @@
+import argparse
 import time
 import numpy as np
 from stable_baselines3 import PPO
@@ -6,18 +7,28 @@ from stable_baselines3 import PPO
 from scheduling_env import SchedulingEnv
 
 
-if __name__=='__main__':
+def get_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--job_scheduling', '-js', required=True, choices=['1', '2', '3', '4'],
+                        dest='job_sched_algo', help='The job scheduling algorithm. Select a number:\n' +
+                        '1 - Random. 2 - Round robin. 3 - Earliest Finish Time with FIFO. ' +
+                        '4 - Latest Finish Time with FIFO')
+    return parser.parse_args()
+
+
+def main(args):
     print('Starting the training process')
 
     # TODO: move all these cmd line parameters
-    training_steps = 8000
+    training_steps = 80000
     testing_steps = 500
     action_group_size = 15
     reward_window_length = 10
 
     random = False
 
-    env = SchedulingEnv(trace_dir='traces/twitter/', action_group_size=action_group_size,
+    env = SchedulingEnv(trace_dir='traces/twitter/', job_sched_algo=int(args.job_sched_algo),
+                        action_group_size=action_group_size,
                         reward_window_length=reward_window_length)
 
                     #                    / 128 - 128 - 128 - policy (pi)
@@ -74,3 +85,7 @@ if __name__=='__main__':
     print('Percentage of requests failed: {}%'.format(failed_requests/total_requests*100))
     print('Test time: {} seconds'.format(end-start))
     print('Requests added: {}'.format(env.simulator.requests_added))
+
+
+if __name__=='__main__':
+    main(get_args())

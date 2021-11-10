@@ -94,8 +94,11 @@ class Simulator:
 
         self.sched_agent_uri = 'http://127.0.0.1:8000'
 
+
     def reset(self):
+        print('Resetting simulator')
         return
+
 
     def add_requests_from_trace(self, isi_name, file):
         ''' Completely read trace file into memory.
