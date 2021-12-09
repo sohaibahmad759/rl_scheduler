@@ -1,0 +1,7 @@
+*.bz2
+*.DS_Store
+
+logs/*
+saved_models/*
+
+
