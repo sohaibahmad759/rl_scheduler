@@ -32,6 +32,8 @@ class Predictor:
             end_time = self.busy_till + event.runtime
         else:
             end_time = clock + event.runtime
+        # print(event.start_time + event.deadline)
+        # print(event.deadline)
         if end_time <= event.start_time + event.deadline:
             self.busy = True
             self.busy_till = end_time
@@ -39,6 +41,7 @@ class Predictor:
             # self.request_queue.append(event.id)
             return end_time
         else:
+            print('could not assign request')
             return None
 
     

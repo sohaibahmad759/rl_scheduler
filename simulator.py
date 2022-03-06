@@ -148,11 +148,12 @@ class Simulator:
                 qos_level = 0
 
             if len(request_description) >= 3:
-                deadline = request_description[2]
+                deadline = float(request_description[2])
+                # print(deadline)
             else:
                 deadline = 500
             self.insert_event(start_time, EventType.START_REQUEST, isi_name, runtime=None,
-                              deadline=500, qos_level=qos_level)
+                              deadline=deadline, qos_level=qos_level)
             self.requests_added += 1
             if start_time >= read_until:
                 break

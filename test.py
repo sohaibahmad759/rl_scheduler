@@ -12,6 +12,8 @@ def getargs():
     parser.add_argument('--random_runtimes', '-r', required=False,
                         dest='random_runtimes', action='store_true',
                         help='Initializes random runtimes if used. Otherwise, uses static runtimes.')
+    parser.add_argument('--trace_path', '-p', required=False, default='traces/throughput/',
+                        dest='trace_path', help='Path for trace files. Default is traces/throughput/')
     parser.add_argument('--test_steps', '-t', required=False, default=1000,
                         dest='test_steps', help='Number of steps to test for. Default value is 1000')
     parser.add_argument('--action_size', '-a', required=False, default=15,
@@ -43,7 +45,7 @@ def main(args):
     model_asn_algos = ['random', 'static', 'lfu', 'load_proportional', 'rl', 'rl_warm']
     model_assignment = model_asn_algos[int(args.model_asn_algo)-1]
 
-    env = SchedulingEnv(trace_dir='traces/twitter/', job_sched_algo=int(args.job_sched_algo),
+    env = SchedulingEnv(trace_dir=args.trace_path, job_sched_algo=int(args.job_sched_algo),
                         action_group_size=action_group_size, reward_window_length=reward_window_length,
                         random_runtimes=args.random_runtimes)
 
