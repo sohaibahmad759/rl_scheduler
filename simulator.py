@@ -24,6 +24,7 @@ class Simulator:
         self.failed_requests_arr = []
         self.total_requests_arr = []
         self.mode = mode
+        self.completed_requests = 0
 
         self.job_sched_algo = job_sched_algo
         self.n_qos_levels = n_qos_levels
@@ -500,6 +501,7 @@ class Simulator:
             isi = event.desc
             executor = self.executors[isi]
             executor.finish_request(event, clock)
+            self.completed_requests += 1
 
         elif event.type == EventType.SCHEDULING:
             sched_decision = self.invoke_scheduling_agent()

@@ -38,7 +38,7 @@ def getargs():
 def main(args):
     # TODO: should be able to fix seed for random, so that results are reproducible (local scheduler)
     model_training_steps = 8000
-    testing_steps = args.test_steps
+    testing_steps = int(args.test_steps)
     action_group_size = args.action_size
     reward_window_length = args.window_length
 
@@ -52,10 +52,11 @@ def main(args):
     policy_kwargs = dict(net_arch=[128, 128, dict(pi=[128, 128, 128],
                                         vf=[128, 128, 128])])
     # model = PPO('MlpPolicy', env, verbose=2)
-    model_name = 'train_' + str(model_training_steps) + '_action_size_' + str(action_group_size) + \
-                    '_window_' + str(reward_window_length)
-    model = PPO.load('saved_models/' + model_name)
-    print(model)
+    if 'rl' in model_assignment:
+        model_name = 'train_' + str(model_training_steps) + '_action_size_' + str(action_group_size) + \
+                        '_window_' + str(reward_window_length)
+        model = PPO.load('saved_models/' + model_name)
+        print(model)
 
     print()
     print('--------------------------')
@@ -222,6 +223,13 @@ def main(args):
     print('Requests added: {}'.format(env.simulator.requests_added))
     logfile.close()
 
+    completed_requests = env.simulator.completed_requests
+    sim_time_elapsed = env.simulator.clock
+    overall_throughput = completed_requests/sim_time_elapsed
+    print()
+    print('Completed requests: {}'.format(completed_requests))
+    print('Simulator time elapsed: {}'.format(sim_time_elapsed))
+    print('Overall throughput (requests/sec): {}'.format(overall_throughput))
 
 if __name__=='__main__':
     main(getargs())
