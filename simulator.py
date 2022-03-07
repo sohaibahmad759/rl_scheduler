@@ -14,7 +14,8 @@ from executor import Executor, AccType
 
 class Simulator:
     def __init__(self, job_sched_algo, trace_path=None, mode='training', 
-                 predictors_max=[10, 10, 10, 10], n_qos_levels=1, random_runtimes=False):
+                 predictors_max=[10, 10, 10, 10], n_qos_levels=1, random_runtimes=False,
+                 fixed_seed=0):
         self.clock = 0
         self.event_queue = []
         self.executors = {}
@@ -25,6 +26,9 @@ class Simulator:
         self.total_requests_arr = []
         self.mode = mode
         self.completed_requests = 0
+
+        if fixed_seed != 0:
+            random.seed(fixed_seed)
 
         self.job_sched_algo = job_sched_algo
         self.n_qos_levels = n_qos_levels
@@ -47,6 +51,7 @@ class Simulator:
 
         idx = 0
         if not trace_path is None:
+            logging.info('Reading trace files from: ' + trace_path)
             trace_files = sorted(os.listdir(trace_path))
             for file in trace_files:
                 filename = file.split('/')[-1]
@@ -181,6 +186,10 @@ class Simulator:
                 self.gpu_runtimes[isi_name, qos_level] = 25
                 self.vpu_runtimes[isi_name, qos_level] = 65
                 self.fpga_runtimes[isi_name, qos_level] = 30
+            # print(self.cpu_runtimes)
+            # print(self.gpu_runtimes)
+            # print(self.vpu_runtimes)
+            # print(self.fpga_runtimes)
         return
 
     def get_runtimes(self, isi_index):

@@ -12,7 +12,10 @@ def getargs():
     parser.add_argument('--random_runtimes', '-r', required=False,
                         dest='random_runtimes', action='store_true',
                         help='Initializes random runtimes if used. Otherwise, uses static runtimes.')
-    parser.add_argument('--trace_path', '-p', required=False, default='traces/zipf_static/',
+    parser.add_argument('--fixed_seed', '-f', required=False,
+                        dest='fixed_seed', default=0,
+                        help='Fix a seed for random behavior.')
+    parser.add_argument('--trace_path', '-p', required=False, default='traces/zipf_static_deadlines/',
                         dest='trace_path', help='Path for trace files. Default is traces/zipf_static/')
     parser.add_argument('--test_steps', '-t', required=False, default=1000,
                         dest='test_steps', help='Number of steps to test for. Default value is 1000')
@@ -22,10 +25,10 @@ def getargs():
     parser.add_argument('--window_length', '-w', required=False, default=10,
                         dest='window_length', help='The number of steps to look out into the future to ' +
                         'calculate the reward of an action. Default value is 10')
-    parser.add_argument('--model_assignment', '-ma', required=True, choices=['1', '2', '3', '4', '5', '6'],
+    parser.add_argument('--model_assignment', '-ma', required=True, choices=['1', '2', '3', '4', '5', '6', '7'],
                         dest='model_asn_algo', help='The model assignment algorithm. Select a number:\n' +
                         '1 - Random. 2 - Static. 3 - Least Frequently Used (LFU). 4 - Load proportional. ' +
-                        '5 - RL. 6 - RL with warm start (load proportional).')
+                        '5 - RL. 6 - RL with warm start (load proportional). 7 - ILP.')
     parser.add_argument('--job_scheduling', '-js', required=True, choices=['1', '2', '3', '4'],
                         dest='job_sched_algo', help='The job scheduling algorithm. Select a number:\n' +
                         '1 - Random. 2 - Round robin. 3 - Earliest Finish Time with FIFO. ' +
@@ -36,18 +39,18 @@ def getargs():
 
 
 def main(args):
-    # TODO: should be able to fix seed for random, so that results are reproducible (local scheduler)
     model_training_steps = 8000
     testing_steps = int(args.test_steps)
+    fixed_seed = int(args.fixed_seed)
     action_group_size = args.action_size
     reward_window_length = args.window_length
 
-    model_asn_algos = ['random', 'static', 'lfu', 'load_proportional', 'rl', 'rl_warm']
+    model_asn_algos = ['random', 'static', 'lfu', 'load_proportional', 'rl', 'rl_warm', 'ilp']
     model_assignment = model_asn_algos[int(args.model_asn_algo)-1]
 
     env = SchedulingEnv(trace_dir=args.trace_path, job_sched_algo=int(args.job_sched_algo),
                         action_group_size=action_group_size, reward_window_length=reward_window_length,
-                        random_runtimes=args.random_runtimes)
+                        random_runtimes=args.random_runtimes, fixed_seed=fixed_seed)
 
     policy_kwargs = dict(net_arch=[128, 128, dict(pi=[128, 128, 128],
                                         vf=[128, 128, 128])])
@@ -72,6 +75,8 @@ def main(args):
         print('Testing with LFU (Least Frequently Used) baseline')
     elif model_assignment == 'load_proportional':
         print('Testing with load proportional algorithm')
+    elif model_assignment == 'ilp':
+        print('Testing with solution given by ILP')
     else:
         print('Undefined mode, exiting')
         sys.exit(0)
@@ -106,6 +111,7 @@ def main(args):
                                         0.05204432, 0.04448577, 0.03854691, 0.03237666, 0.02960862])
                 # we calculate the shares for each model architecture (ISI) and round to integer
                 shares = np.rint(proportions * env.n_accelerators * env.max_no_of_accelerators)
+                # print('this: {}'.format(env.n_accelerators * env.max_no_of_accelerators))
                 # we use a counter to loop through the types of accelerators available, assigning
                 # them in round robin fashion
                 counter = 0
@@ -202,6 +208,33 @@ def main(args):
                     continue
                 action[receiving_acc+1] += 1
                 # print(observation)
+        elif model_assignment == 'ilp':
+            action = env.action_space.sample()
+            for j in range(5, len(action)):
+                action[j] = 0
+            
+            action[0] = i % env.n_executors
+            if action[0] == 0:
+                action[1:5] = [0,2,0,1]
+            elif action[0] == 1:
+                action[1:5] = [0,2,2,0]
+            elif action[0] == 2:
+                action[1:5] = [0,0,0,0]
+            elif action[0] == 3:
+                action[1:5] = [0,0,0,0]
+            elif action[0] == 4:
+                action[1:5] = [0,0,1,0]
+            elif action[0] == 5:
+                action[1:5] = [1,0,0,1]
+            elif action[0] == 6:
+                action[1:5] = [1,0,1,0]
+            elif action[0] == 7:
+                action[1:5] = [0,0,0,1]
+            elif action[0] == 8:
+                action[1:5] = [1,0,0,0]
+            elif action[0] == 9:
+                action[1:5] = [1,0,0,1]
+
         if i % 100 == 0:
             print('Testing step: {} of {}'.format(i, testing_steps))
             print('Action taken: {}'.format(action))
@@ -224,8 +257,8 @@ def main(args):
     logfile.close()
 
     completed_requests = env.simulator.completed_requests
-    sim_time_elapsed = env.simulator.clock
-    overall_throughput = completed_requests/sim_time_elapsed
+    sim_time_elapsed = env.simulator.clock / 1000
+    overall_throughput = completed_requests / sim_time_elapsed
     print()
     print('Completed requests: {}'.format(completed_requests))
     print('Simulator time elapsed: {}'.format(sim_time_elapsed))

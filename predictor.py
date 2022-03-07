@@ -41,7 +41,7 @@ class Predictor:
             # self.request_queue.append(event.id)
             return end_time
         else:
-            print('could not assign request')
+            # print('could not assign request')
             return None
 
     

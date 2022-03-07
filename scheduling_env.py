@@ -13,7 +13,7 @@ class SchedulingEnv(gym.Env):
     metadata = {'render.modes': ['human']}
 
     def __init__(self, trace_dir, job_sched_algo, action_group_size,
-                 reward_window_length=10, random_runtimes=False):
+                 reward_window_length=10, random_runtimes=False, fixed_seed=0):
         super(SchedulingEnv, self).__init__()
 
         logging.basicConfig(level=logging.INFO)
@@ -29,7 +29,7 @@ class SchedulingEnv(gym.Env):
         self.action_group_size = action_group_size
         
         # if we make this a vector, can have heterogeneous no. of accelerators for each type
-        self.max_no_of_accelerators = 30
+        self.max_no_of_accelerators = 4
         self.max_runtime = 1000
 
         # max total predictors for each accelerator type (CPU, GPU, VPU, FPGA) respectively
@@ -41,7 +41,8 @@ class SchedulingEnv(gym.Env):
                                    job_sched_algo=job_sched_algo,
                                    predictors_max=self.total_predictors,
                                    n_qos_levels=self.n_qos_levels,
-                                   random_runtimes=random_runtimes)
+                                   random_runtimes=random_runtimes,
+                                   fixed_seed=fixed_seed)
 
         # number of steps that we play into the future to get reward
         # Note: this is a tunable parameter
