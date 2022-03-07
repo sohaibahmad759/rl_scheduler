@@ -12,8 +12,8 @@ def getargs():
     parser.add_argument('--random_runtimes', '-r', required=False,
                         dest='random_runtimes', action='store_true',
                         help='Initializes random runtimes if used. Otherwise, uses static runtimes.')
-    parser.add_argument('--trace_path', '-p', required=False, default='traces/throughput/',
-                        dest='trace_path', help='Path for trace files. Default is traces/throughput/')
+    parser.add_argument('--trace_path', '-p', required=False, default='traces/zipf_static/',
+                        dest='trace_path', help='Path for trace files. Default is traces/zipf_static/')
     parser.add_argument('--test_steps', '-t', required=False, default=1000,
                         dest='test_steps', help='Number of steps to test for. Default value is 1000')
     parser.add_argument('--action_size', '-a', required=False, default=15,
@@ -98,9 +98,11 @@ def main(args):
         elif model_assignment == 'load_proportional':
             # we only need to apply the assignment once at the start
             if i == 0:
-                proportions = np.array([0.30, 0.14, 0.091, 0.066, 0.051, 0.042, 0.035, 0.030, 0.027, \
-                               0.024, 0.022, 0.020, 0.018, 0.016, 0.015, 0.014, 0.013, 0.012, \
-                               0.012, 0.011, 0.010, 0.009])
+                # proportions = np.array([0.30, 0.14, 0.091, 0.066, 0.051, 0.042, 0.035, 0.030, 0.027, \
+                #                0.024, 0.022, 0.020, 0.018, 0.016, 0.015, 0.014, 0.013, 0.012, \
+                #                0.012, 0.011, 0.010, 0.009])
+                proportions = np.array([0.37089186, 0.17539785, 0.11117586, 0.08196145, 0.0635107, \
+                                        0.05204432, 0.04448577, 0.03854691, 0.03237666, 0.02960862])
                 # we calculate the shares for each model architecture (ISI) and round to integer
                 shares = np.rint(proportions * env.n_accelerators * env.max_no_of_accelerators)
                 # we use a counter to loop through the types of accelerators available, assigning
