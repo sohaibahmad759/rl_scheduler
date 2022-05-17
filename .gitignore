@@ -27,3 +27,5 @@ nohup.out
 org.eclipse.core.resources.prefs
 package-lock.json
 saved_models/*
+line_counter.py
+
