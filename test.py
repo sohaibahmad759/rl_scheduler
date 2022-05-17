@@ -1,9 +1,12 @@
+import os
 import time
 import sys
+import logging
 import argparse
 import random
 import numpy as np
 from stable_baselines3 import PPO
+import utils
 from scheduling_env import SchedulingEnv
 from algorithms.ilp import Ilp
 
@@ -88,6 +91,12 @@ def main(args):
 
     logfile_name = 'log_' + model_assignment + '.txt'
     logfile = open('logs/' + logfile_name, mode='w')
+
+    rate_logger = logging.getLogger('Rate logger')
+    rate_loggerfile = os.path.join('logs', 'throughput', str(time.time()) + '.csv')
+    rate_logger.addHandler(logging.FileHandler(rate_loggerfile, mode='w'))
+    rate_logger.setLevel(logging.DEBUG)
+    rate_logger.info('wallclock_time,simulation_time,demand,throughput')
 
     rl_reward = 0
     observation = env.reset()
@@ -271,6 +280,10 @@ def main(args):
             logfile.write(str(total_requests) + ',' + str(failed_requests) + '\n')
         rl_reward += reward
         env.render()
+
+        utils.log_throughput(rate_logger, observation, i)
+        print('observation:', observation)
+
     end = time.time()
     print('Reward from RL model: ' + str(rl_reward))
     print('Requests failed by RL model: ' + str(failed_requests))

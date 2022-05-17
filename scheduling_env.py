@@ -19,7 +19,7 @@ class SchedulingEnv(gym.Env):
         logging.basicConfig(level=logging.INFO)
         np.set_printoptions(threshold=sys.maxsize)
 
-        logfile_name = os.path.join('logs', str(time.time()) + '.txt')
+        logfile_name = os.path.join('logs', 'reward', str(time.time()) + '.txt')
         self.logfile = open(logfile_name, mode='w')
         
         # TODO: move all parameters to a config file or cmd line argument, train.py should read that
@@ -29,7 +29,7 @@ class SchedulingEnv(gym.Env):
         self.action_group_size = action_group_size
         
         # if we make this a vector, can have heterogeneous no. of accelerators for each type
-        self.max_no_of_accelerators = 4
+        self.max_no_of_accelerators = 10
         self.max_runtime = 1000
 
         # max total predictors for each accelerator type (CPU, GPU, VPU, FPGA) respectively

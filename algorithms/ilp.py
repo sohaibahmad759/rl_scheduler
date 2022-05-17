@@ -1,3 +1,5 @@
+import logging
+from re import M
 import numpy as np
 import gurobipy as gp
 from gurobipy import GRB
@@ -7,6 +9,16 @@ from algorithms.base import SchedulingAlgorithm
 class Ilp(SchedulingAlgorithm):
     def __init__(self):
         SchedulingAlgorithm.__init__(self, 'ILP')
+
+        self.log = logging.getLogger(__name__)
+
+        self.log.addHandler(logging.FileHandler('logs/ilp/output.log', mode='w'))
+        self.log.setLevel(logging.DEBUG)
+
+        # logging.basicConfig(filename='output.log',
+        #                     mode='w',
+        #                     format='%(asctime)s - %(message)s', datefmt='%d-%b-%y %H:%M:%S',
+        #                     level=logging.DEBUG)
 
     def run(self, observation, num_acc_types, num_max_acc):
         # print('observation shape:', observation.shape)
@@ -23,7 +35,7 @@ class Ilp(SchedulingAlgorithm):
 
         latencies = observation[0:num_isi, num_acc_types:2*num_acc_types]
 
-        models = range(num_isi)
+        # models = range(num_isi)
 
         # First generate the parameter variables from the isi_dict
         rtypes = []
@@ -34,7 +46,7 @@ class Ilp(SchedulingAlgorithm):
         # CPUs for OnnxRuntime and OpenVino overlap 100%
         # Just have a CPU type
         accelerators = []
-        for isi in range(num_isi):
+        for acc in range(num_max_acc):
             accelerators.append('CPU')
             accelerators.append('GPU_AMPERE')
             accelerators.append('VPU')
@@ -138,7 +150,16 @@ class Ilp(SchedulingAlgorithm):
         m.optimize()
 
         if m.status == GRB.OPTIMAL:
-            print('\nObjective: %g' % m.ObjVal)
+            self.log.info('\nObjective: %g' % m.ObjVal)
+
+            total_request_rate = sum(s.values())
+            self.log.debug(
+                'Total incoming requests per second:' + str(total_request_rate))
+
+            if alpha == 0.0:
+                throughput = m.ObjVal
+                self.log.debug('Percentage of requests met per second (theoretically):' + \
+                                str(throughput/total_request_rate*100))
             # print('\nx:')
             # for i in accelerators:
             #     for j in models:
@@ -148,7 +169,7 @@ class Ilp(SchedulingAlgorithm):
                                             accelerators=accelerators, models=models)
         else:
             actions = np.zeros(current_alloc.shape)
-            print('No solution')
+            self.log.error('No solution')
         
         return actions
 
@@ -166,7 +187,7 @@ class Ilp(SchedulingAlgorithm):
                     new_alloc[j, self.accelerator_dict[i]] += 1
 
         # print('new allocation:', new_alloc)
-        print('current_allocation:', current_alloc)
+        self.log.debug('current_allocation:' + str(current_alloc))
 
         # Take a difference with current_alloc
 
