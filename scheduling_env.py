@@ -51,10 +51,12 @@ class SchedulingEnv(gym.Env):
         # ----- with 1 QoS level -----
         # features = (CPU_predictors, GPU_predictors, VPU_predictors, FPGA_predictors,
         #             CPU_runtime,    GPU_runtime,    VPU_runtime,    FPGA_runtime,
+        #             qos_level_1_requests, qos_level_1_missed,
         #             total_requests, failed_requests)    --> 1d array
         # ----- with 10 QoS levels -----
         # features = (CPU_predictorsx10, GPU_predictorsx10, VPU_predictorsx10, FPGA_predictorsx10,
         #             CPU_runtimex10,    GPU_runtimex10,    VPU_runtimex10,    FPGA_runtimex10,
+        #             qos_level_1_requests, qos_level_1_missed, ..., qos_level_10_requests, qos_level_10_missed,
         #             QoS_total_requestsx10, QoS_failed_requestsx10, total_requests, failed_requests)    --> 1d array
         self.features = (self.n_accelerators * 2) * self.n_qos_levels + 2*self.n_qos_levels + 2
 

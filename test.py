@@ -5,6 +5,7 @@ import random
 import numpy as np
 from stable_baselines3 import PPO
 from scheduling_env import SchedulingEnv
+from algorithms.ilp import Ilp
 
 
 def getargs():
@@ -76,6 +77,8 @@ def main(args):
     elif model_assignment == 'load_proportional':
         print('Testing with load proportional algorithm')
     elif model_assignment == 'ilp':
+        ilp = Ilp()
+        ilp_applied = True
         print('Testing with solution given by ILP')
     else:
         print('Undefined mode, exiting')
@@ -209,31 +212,52 @@ def main(args):
                 action[receiving_acc+1] += 1
                 # print(observation)
         elif model_assignment == 'ilp':
-            action = env.action_space.sample()
-            for j in range(5, len(action)):
-                action[j] = 0
+            if ilp_applied == True:
+                actions = ilp.run(observation, env.n_accelerators, env.max_no_of_accelerators)
             
-            action[0] = i % env.n_executors
-            if action[0] == 0:
-                action[1:5] = [0,2,0,1]
-            elif action[0] == 1:
-                action[1:5] = [0,2,2,0]
-            elif action[0] == 2:
-                action[1:5] = [0,0,0,0]
-            elif action[0] == 3:
-                action[1:5] = [0,0,0,0]
-            elif action[0] == 4:
-                action[1:5] = [0,0,1,0]
-            elif action[0] == 5:
-                action[1:5] = [1,0,0,1]
-            elif action[0] == 6:
-                action[1:5] = [1,0,1,0]
-            elif action[0] == 7:
-                action[1:5] = [0,0,0,1]
-            elif action[0] == 8:
-                action[1:5] = [1,0,0,0]
-            elif action[0] == 9:
-                action[1:5] = [1,0,0,1]
+            if np.sum(actions) == 0:
+                # Apply null action
+                action = env.action_space.sample()
+                for j in range(len(action)):
+                    action[j] = 1
+                # print('null action applied')
+            else:
+                ilp_applied = False
+                # apply actions iteratively
+                action = env.action_space.sample()
+                isi = i % env.n_executors
+                action[0] = isi
+                action[1:5] = actions[isi]
+                print('action:', action)
+
+                if isi == env.n_executors - 1:
+                    ilp_applied = True
+
+            # action = env.action_space.sample()
+            # for j in range(5, len(action)):
+            #     action[j] = 0
+            
+            # action[0] = i % env.n_executors
+            # if action[0] == 0:
+            #     action[1:5] = [0,2,0,1]
+            # elif action[0] == 1:
+            #     action[1:5] = [0,2,2,0]
+            # elif action[0] == 2:
+            #     action[1:5] = [0,0,0,0]
+            # elif action[0] == 3:
+            #     action[1:5] = [0,0,0,0]
+            # elif action[0] == 4:
+            #     action[1:5] = [0,0,1,0]
+            # elif action[0] == 5:
+            #     action[1:5] = [1,0,0,1]
+            # elif action[0] == 6:
+            #     action[1:5] = [1,0,1,0]
+            # elif action[0] == 7:
+            #     action[1:5] = [0,0,0,1]
+            # elif action[0] == 8:
+            #     action[1:5] = [1,0,0,0]
+            # elif action[0] == 9:
+            #     action[1:5] = [1,0,0,1]
 
         if i % 100 == 0:
             print('Testing step: {} of {}'.format(i, testing_steps))
