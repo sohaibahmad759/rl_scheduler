@@ -9,6 +9,7 @@ from stable_baselines3 import PPO
 import utils
 from scheduling_env import SchedulingEnv
 from algorithms.ilp import Ilp
+from algorithms.ilp_throughput import IlpThroughput
 
 
 def getargs():
@@ -23,20 +24,22 @@ def getargs():
                         dest='trace_path', help='Path for trace files. Default is traces/zipf_static/')
     parser.add_argument('--test_steps', '-t', required=False, default=1000,
                         dest='test_steps', help='Number of steps to test for. Default value is 1000')
-    parser.add_argument('--action_size', '-a', required=False, default=15,
+    parser.add_argument('--action_size', '-a', required=False, default=10,
                         dest='action_size', help='Number of scheduling changes to make in each iteration. ' +
                         'Default value is 15')
-    parser.add_argument('--window_length', '-w', required=False, default=10,
-                        dest='window_length', help='The number of steps to look out into the future to ' +
+    parser.add_argument('--reward_window_length', '-l', required=False, default=10,
+                        dest='reward_window_length', help='The number of steps to look out into the future to ' +
                         'calculate the reward of an action. Default value is 10')
-    parser.add_argument('--model_assignment', '-ma', required=True, choices=['1', '2', '3', '4', '5', '6', '7'],
+    parser.add_argument('--model_assignment', '-ma', required=True, choices=['1', '2', '3', '4', '5', '6', '7', '8'],
                         dest='model_asn_algo', help='The model assignment algorithm. Select a number:\n' +
                         '1 - Random. 2 - Static. 3 - Least Frequently Used (LFU). 4 - Load proportional. ' +
-                        '5 - RL. 6 - RL with warm start (load proportional). 7 - ILP.')
+                        '5 - RL. 6 - RL with warm start (load proportional). 7 - ILP. 8 - ILP (Max throughput)')
     parser.add_argument('--job_scheduling', '-js', required=True, choices=['1', '2', '3', '4'],
                         dest='job_sched_algo', help='The job scheduling algorithm. Select a number:\n' +
                         '1 - Random. 2 - Round robin. 3 - Earliest Finish Time with FIFO. ' +
                         '4 - Latest Finish Time with FIFO')
+    parser.add_argument('--allocation_window', '-w', required=False, default=1000,
+                        dest='allocation_window', help='Milliseconds to wait before recalculating allocation. Default is 1000')
     parser.set_defaults(random_runtimes=False)
 
     return parser.parse_args()
@@ -47,14 +50,16 @@ def main(args):
     testing_steps = int(args.test_steps)
     fixed_seed = int(args.fixed_seed)
     action_group_size = args.action_size
-    reward_window_length = args.window_length
+    reward_window_length = args.reward_window_length
+    allocation_window = int(args.allocation_window)
 
-    model_asn_algos = ['random', 'static', 'lfu', 'load_proportional', 'rl', 'rl_warm', 'ilp']
+    model_asn_algos = ['random', 'static', 'lfu', 'load_proportional', 'rl', 'rl_warm', 'ilp', 'ilp_throughput']
     model_assignment = model_asn_algos[int(args.model_asn_algo)-1]
 
     env = SchedulingEnv(trace_dir=args.trace_path, job_sched_algo=int(args.job_sched_algo),
                         action_group_size=action_group_size, reward_window_length=reward_window_length,
-                        random_runtimes=args.random_runtimes, fixed_seed=fixed_seed)
+                        random_runtimes=args.random_runtimes, fixed_seed=fixed_seed,
+                        allocation_window=allocation_window)
 
     policy_kwargs = dict(net_arch=[128, 128, dict(pi=[128, 128, 128],
                                         vf=[128, 128, 128])])
@@ -80,9 +85,13 @@ def main(args):
     elif model_assignment == 'load_proportional':
         print('Testing with load proportional algorithm')
     elif model_assignment == 'ilp':
-        ilp = Ilp()
+        ilp = Ilp(allocation_window=allocation_window)
         ilp_applied = True
         print('Testing with solution given by ILP')
+    elif model_assignment == 'ilp_throughput':
+        ilp = IlpThroughput(allocation_window=allocation_window)
+        ilp_applied = True
+        print('Testing with solution given by ILP (Max throughput version)')
     else:
         print('Undefined mode, exiting')
         sys.exit(0)
@@ -93,10 +102,10 @@ def main(args):
     logfile = open('logs/' + logfile_name, mode='w')
 
     rate_logger = logging.getLogger('Rate logger')
-    rate_loggerfile = os.path.join('logs', 'throughput', str(time.time()) + '.csv')
+    rate_loggerfile = os.path.join('logs', 'throughput', str(time.time()) + '_' +  model_assignment + '.csv')
     rate_logger.addHandler(logging.FileHandler(rate_loggerfile, mode='w'))
     rate_logger.setLevel(logging.DEBUG)
-    rate_logger.info('wallclock_time,simulation_time,demand,throughput')
+    rate_logger.info('wallclock_time,simulation_time,demand,throughput,capacity')
 
     rl_reward = 0
     observation = env.reset()
@@ -220,7 +229,7 @@ def main(args):
                     continue
                 action[receiving_acc+1] += 1
                 # print(observation)
-        elif model_assignment == 'ilp':
+        elif model_assignment == 'ilp' or model_assignment == 'ilp_throughput':
             if ilp_applied == True:
                 actions = ilp.run(observation, env.n_accelerators, env.max_no_of_accelerators)
             
@@ -229,7 +238,6 @@ def main(args):
                 action = env.action_space.sample()
                 for j in range(len(action)):
                     action[j] = 1
-                # print('null action applied')
             else:
                 ilp_applied = False
                 # apply actions iteratively
@@ -245,28 +253,6 @@ def main(args):
             # action = env.action_space.sample()
             # for j in range(5, len(action)):
             #     action[j] = 0
-            
-            # action[0] = i % env.n_executors
-            # if action[0] == 0:
-            #     action[1:5] = [0,2,0,1]
-            # elif action[0] == 1:
-            #     action[1:5] = [0,2,2,0]
-            # elif action[0] == 2:
-            #     action[1:5] = [0,0,0,0]
-            # elif action[0] == 3:
-            #     action[1:5] = [0,0,0,0]
-            # elif action[0] == 4:
-            #     action[1:5] = [0,0,1,0]
-            # elif action[0] == 5:
-            #     action[1:5] = [1,0,0,1]
-            # elif action[0] == 6:
-            #     action[1:5] = [1,0,1,0]
-            # elif action[0] == 7:
-            #     action[1:5] = [0,0,0,1]
-            # elif action[0] == 8:
-            #     action[1:5] = [1,0,0,0]
-            # elif action[0] == 9:
-            #     action[1:5] = [1,0,0,1]
 
         if i % 100 == 0:
             print('Testing step: {} of {}'.format(i, testing_steps))
@@ -281,7 +267,7 @@ def main(args):
         rl_reward += reward
         env.render()
 
-        utils.log_throughput(rate_logger, observation, i)
+        utils.log_throughput(rate_logger, observation, i, allocation_window)
         print('observation:', observation)
 
     end = time.time()

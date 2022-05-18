@@ -29,6 +29,7 @@ class Simulator:
 
         if fixed_seed != 0:
             random.seed(fixed_seed)
+            np.random.seed(fixed_seed)
 
         self.job_sched_algo = job_sched_algo
         self.n_qos_levels = n_qos_levels
@@ -125,7 +126,7 @@ class Simulator:
                 if len(request_description) >= 3:
                     deadline = request_description[2]
                 else:
-                    deadline = 500
+                    deadline = 1000
                 self.insert_event(start_time, EventType.START_REQUEST, isi_name, runtime=None,
                                   deadline=deadline, qos_level=qos_level)
         return
@@ -157,7 +158,7 @@ class Simulator:
                 deadline = float(request_description[2])
                 # print(deadline)
             else:
-                deadline = 500
+                deadline = 1000
             self.insert_event(start_time, EventType.START_REQUEST, isi_name, runtime=None,
                               deadline=deadline, qos_level=qos_level)
             self.requests_added += 1
@@ -178,14 +179,14 @@ class Simulator:
                 self.fpga_runtimes[isi_name,
                                    qos_level] = random.randint(20, 100)
             else:
-                # self.cpu_runtimes[isi_name, qos_level] = 50
-                # self.gpu_runtimes[isi_name, qos_level] = 25
-                # self.vpu_runtimes[isi_name, qos_level] = 35
-                # self.fpga_runtimes[isi_name, qos_level] = 30
-                self.cpu_runtimes[isi_name, qos_level] = 100
+                self.cpu_runtimes[isi_name, qos_level] = 50
                 self.gpu_runtimes[isi_name, qos_level] = 25
-                self.vpu_runtimes[isi_name, qos_level] = 65
+                self.vpu_runtimes[isi_name, qos_level] = 35
                 self.fpga_runtimes[isi_name, qos_level] = 30
+                # self.cpu_runtimes[isi_name, qos_level] = random.randint(25, 100)
+                # self.gpu_runtimes[isi_name, qos_level] = random.randint(25, 100)
+                # self.vpu_runtimes[isi_name, qos_level] = random.randint(25, 100)
+                # self.fpga_runtimes[isi_name, qos_level] = random.randint(25, 100)
             # print(self.cpu_runtimes)
             # print(self.gpu_runtimes)
             # print(self.vpu_runtimes)
@@ -529,7 +530,7 @@ class Simulator:
         self.executors[executor.isi] = executor
         return executor.id
 
-    def insert_event(self, time, type, desc, runtime=None, id='', deadline=100, qos_level=0):
+    def insert_event(self, time, type, desc, runtime=None, id='', deadline=1000, qos_level=0):
         if type == EventType.END_REQUEST:
             event = Event(time, type, desc, runtime, id=id,
                           deadline=deadline, qos_level=qos_level)
@@ -607,7 +608,7 @@ class EventType(Enum):
 
 
 class Event:
-    def __init__(self, start_time, type, desc, runtime=None, deadline=100, id='', qos_level=0):
+    def __init__(self, start_time, type, desc, runtime=None, deadline=1000, id='', qos_level=0):
         self.id = id
         if self.id == '':
             self.id = uuid.uuid4().hex

@@ -13,7 +13,8 @@ class SchedulingEnv(gym.Env):
     metadata = {'render.modes': ['human']}
 
     def __init__(self, trace_dir, job_sched_algo, action_group_size,
-                 reward_window_length=10, random_runtimes=False, fixed_seed=0):
+                 reward_window_length=10, random_runtimes=False, fixed_seed=0,
+                 allocation_window=1000):
         super(SchedulingEnv, self).__init__()
 
         logging.basicConfig(level=logging.INFO)
@@ -27,6 +28,8 @@ class SchedulingEnv(gym.Env):
         self.n_accelerators = 4
         self.n_qos_levels = 1
         self.action_group_size = action_group_size
+
+        self.allocation_window = allocation_window
         
         # if we make this a vector, can have heterogeneous no. of accelerators for each type
         self.max_no_of_accelerators = 10
@@ -169,8 +172,8 @@ class SchedulingEnv(gym.Env):
 
         self.actions_taken += 1
         if self.actions_taken == self.action_group_size:
-            # after every 'group' of actions, wait 5 seconds before taking another action
-            self.clock += 5000
+            # after every 'group' of actions, wait `allocation_window` milliseconds before taking another action
+            self.clock += self.allocation_window
             self.simulator.reset_request_count()
             self.simulator.simulate_until(self.clock)
             self.actions_taken = 0
