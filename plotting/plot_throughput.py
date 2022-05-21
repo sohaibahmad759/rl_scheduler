@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 
 
 logfile_list = sorted(glob.glob(os.path.join('..', 'logs', 'throughput', '*.csv')))
-print(logfile_list)
+# print(logfile_list)
 # We want the latest log file
 logfile = logfile_list[-1]
 print(logfile)

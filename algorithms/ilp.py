@@ -1,3 +1,4 @@
+import time
 import logging
 import numpy as np
 import gurobipy as gp
@@ -6,13 +7,15 @@ from algorithms.base import SchedulingAlgorithm
 
 
 class Ilp(SchedulingAlgorithm):
-    def __init__(self):
+    def __init__(self, allocation_window):
         SchedulingAlgorithm.__init__(self, 'ILP')
 
         self.log = logging.getLogger(__name__)
 
         self.log.addHandler(logging.FileHandler('logs/ilp/output.log', mode='w'))
         self.log.setLevel(logging.DEBUG)
+
+        self.allocation_window = allocation_window
 
         # logging.basicConfig(filename='output.log',
         #                     mode='w',
@@ -29,7 +32,9 @@ class Ilp(SchedulingAlgorithm):
         
         current_alloc = observation[0:num_isi, 0:num_acc_types]
 
-        demand = observation[0:num_isi, -2]
+        demand_since_last = observation[0:num_isi, -2]
+        # divide demand by time elapsed since last measurement to get demand in units of requests per second
+        demand = demand_since_last / (self.allocation_window / 1000)
         missed_requests = observation[0:num_isi, -1]
 
         latencies = observation[0:num_isi, num_acc_types:2*num_acc_types]
@@ -121,30 +126,42 @@ class Ilp(SchedulingAlgorithm):
         z = m.addVars(jk_pairs, name='z')
 
         # Smaller value weighs throughput more, higher value weighs accuracy more
-        alpha = 0.0
+        alpha = 1.0
 
         # Set the objective
         m.setObjective(alpha * gp.quicksum(w) + (1-alpha) * gp.quicksum(y), GRB.MAXIMIZE)
 
         # Add constraints
-        m.addConstrs((w[k] == sum(sum(s[k]*b[j, k]*A[j]*z[j, k]*x[i, j] for j in models)
-                                  for i in accelerators) for k in rtypes), 'c1')
+        # m.addConstrs((w[k] == sum(sum(s[k]*b[j, k]*A[j]*z[j, k]*x[i, j] for j in models)
+        #                           for i in accelerators) for k in rtypes), 'c1')
+        for k in rtypes:
+            m.addConstr(w[k] == sum(sum(s[k]*b[j, k]*A[j]*z[j, k]*x[i, j] for j in models)
+                                    for i in accelerators), 'c1_' + str(k))
+            # m.addConstr(w[k] == sum(sum(y[j]*b[j, k]*A[j]*x[i, j] for j in models)
+            #                         for i in accelerators), 'c1_' + str(k))
+            m.addConstr(sum(b[j, k] * z[j, k] for j in models) <= 1, 'c3_' + str(k))
 
-        m.addConstrs((sum(x[i, j] for j in models) <=
-                     1 for i in accelerators), 'c2')
+        # m.addConstrs((sum(x[i, j] for j in models) <=
+        #              1 for i in accelerators), 'c2')
+        for i in accelerators:
+            m.addConstr(sum(x[i, j] for j in models) <= 1, 'c2_' + str(i))
 
         # * If infeasible, try setting this to =l= 1
         # ct3(k) .. sum(j, b(j,k) * z(j,k)) =e= 1;
-        m.addConstrs((sum(b[j, k] * z[j, k]
-                     for j in models) <= 1 for k in rtypes), 'c3')
+        # m.addConstrs((sum(b[j, k] * z[j, k]
+        #              for j in models) <= 1 for k in rtypes), 'c3')
 
-        # ct4(j) .. y(j) =l= sum(i, x(i,j) * p(i,j));
-        m.addConstrs((y[j] <= sum(p[i, j]*x[i, j]
-                     for i in accelerators) for j in models), 'c4')
+        for j in models:
+            m.addConstr(y[j] <= sum(p[i, j]*x[i, j] for i in accelerators), 'c4_' + str(j))
+            m.addConstr(y[j] <= sum(z[j, k]*s[k] for k in rtypes), 'c5_' + str(j))
 
-        # ct5(j) .. y(j) =l= sum(k, z(j,k) * s(k));
-        m.addConstrs((y[j] <= sum(z[j, k]*s[k] for k in rtypes)
-                     for j in models), 'c5')
+        # # ct4(j) .. y(j) =l= sum(i, x(i,j) * p(i,j));
+        # m.addConstrs((y[j] <= sum(p[i, j]*x[i, j]
+        #              for i in accelerators) for j in models), 'c4')
+
+        # # ct5(j) .. y(j) =l= sum(k, z(j,k) * s(k));
+        # m.addConstrs((y[j] <= sum(z[j, k]*s[k] for k in rtypes)
+        #              for j in models), 'c5')
 
         # Solve ILP
         m.optimize()
