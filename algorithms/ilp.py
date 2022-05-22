@@ -117,29 +117,42 @@ class Ilp(SchedulingAlgorithm):
         jk_pairs, _ = gp.multidict(b)
 
         # Set up the optimization model
-        m = gp.Model('Accuracy Throughput MINLP')
+        m = gp.Model('Accuracy Throughput MILP')
+
+        m.setParam('NonConvex', 2)
+        m.setParam('TimeLimit', 200)
 
         # Add optimization variables
         w = m.addVars(rtypes, name='x')
         x = m.addVars(ij_pairs, vtype=GRB.BINARY, name='x')
         y = m.addVars(models, name='y')
         z = m.addVars(jk_pairs, name='z')
+        aux = m.addVar(name='aux')
 
         # Smaller value weighs throughput more, higher value weighs accuracy more
-        alpha = 1.0
+        alpha = 0.1
 
         # Set the objective
-        m.setObjective(alpha * gp.quicksum(w) + (1-alpha) * gp.quicksum(y), GRB.MAXIMIZE)
+        m.setObjective(alpha * gp.quicksum(w) * aux + (1-alpha) * gp.quicksum(y), GRB.MAXIMIZE)
 
         # Add constraints
         # m.addConstrs((w[k] == sum(sum(s[k]*b[j, k]*A[j]*z[j, k]*x[i, j] for j in models)
         #                           for i in accelerators) for k in rtypes), 'c1')
         for k in rtypes:
-            m.addConstr(w[k] == sum(sum(s[k]*b[j, k]*A[j]*z[j, k]*x[i, j] for j in models)
-                                    for i in accelerators), 'c1_' + str(k))
+            # m.addConstr(w[k] <= sum(sum(s[k]*z[j, k]*b[j, k]*A[j]*x[i, j] for j in models)
+            #                         for i in accelerators), 'c1_1_' + str(k))
             # m.addConstr(w[k] == sum(sum(y[j]*b[j, k]*A[j]*x[i, j] for j in models)
-            #                         for i in accelerators), 'c1_' + str(k))
-            m.addConstr(sum(b[j, k] * z[j, k] for j in models) <= 1, 'c3_' + str(k))
+            #                         for i in accelerators), 'c1_2_' + str(k))
+            m.addConstr(w[k] == sum(s[k]*z[j,k]*b[j,k]*A[j] for j in models), 'c1_3' + str(k))
+            # m.addConstr(w[k] <= sum(sum(y[j]*A[j]*x[i, j] for j in models)
+            #                         for i in accelerators), 'c1_4_' + str(k))
+            # m.addConstr(sum(b[j, k] * z[j, k] for j in models) <= 1, 'c3_' + str(k))
+            # m.addConstr(sum(z[j, k] for j in models) <= 1, 'c3_2_' + str(k))
+            m.addConstr(sum(b[j, k] * z[j, k] for j in models) == sum(b[j, k] for j in models), 'c3_' + str(k))
+            m.addConstr(sum(z[j, k] for j in models) == 1, 'c3_2_' + str(k))
+
+        m.addConstr(aux * gp.quicksum(y) == 1, 'c_aux')
+        m.addConstr(gp.quicksum(y) >= 1, 'c_bound_1')
 
         # m.addConstrs((sum(x[i, j] for j in models) <=
         #              1 for i in accelerators), 'c2')
@@ -153,6 +166,9 @@ class Ilp(SchedulingAlgorithm):
 
         for j in models:
             m.addConstr(y[j] <= sum(p[i, j]*x[i, j] for i in accelerators), 'c4_' + str(j))
+            # TODO: z[j,k] summed over j is <= 1.
+            # this constraint here is summing z[j,k] over k
+            # This could still be correct, just need to make sure
             m.addConstr(y[j] <= sum(z[j, k]*s[k] for k in rtypes), 'c5_' + str(j))
 
         # # ct4(j) .. y(j) =l= sum(i, x(i,j) * p(i,j));
@@ -173,10 +189,16 @@ class Ilp(SchedulingAlgorithm):
             self.log.debug(
                 'Total incoming requests per second:' + str(total_request_rate))
 
-            if alpha == 0.0:
-                throughput = m.ObjVal
-                self.log.debug('Percentage of requests met per second (theoretically):' + \
-                               str(throughput/total_request_rate*100))
+            # throughput = m.ObjVal
+            throughput = gp.quicksum(y).getValue()
+            self.log.debug('Theoretical throughput (objective):' + str(throughput))
+            self.log.debug('Percentage of requests met per second (theoretically):' + \
+                            str(throughput/total_request_rate*100))
+
+            accuracy = gp.quicksum(w).getValue()
+            self.log.debug('Accuracy (objective):' + str(accuracy))
+            if throughput > 0:
+                self.log.debug('Effective accuracy:' + str(accuracy/throughput))
             # self.log.debug('\nx:')
             # for i in accelerators:
             #     for j in models:
