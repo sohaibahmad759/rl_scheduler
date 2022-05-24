@@ -34,10 +34,10 @@ def getargs():
                         dest='model_asn_algo', help='The model assignment algorithm. Select a number:\n' +
                         '1 - Random. 2 - Static. 3 - Least Frequently Used (LFU). 4 - Load proportional. ' +
                         '5 - RL. 6 - RL with warm start (load proportional). 7 - ILP. 8 - ILP (Max throughput)')
-    parser.add_argument('--job_scheduling', '-js', required=True, choices=['1', '2', '3', '4'],
+    parser.add_argument('--job_scheduling', '-js', required=True, choices=['1', '2', '3', '4', '5'],
                         dest='job_sched_algo', help='The job scheduling algorithm. Select a number:\n' +
                         '1 - Random. 2 - Round robin. 3 - Earliest Finish Time with FIFO. ' +
-                        '4 - Latest Finish Time with FIFO')
+                        '4 - Latest Finish Time with FIFO. 5 - INFAAS')
     parser.add_argument('--allocation_window', '-w', required=False, default=1000,
                         dest='allocation_window', help='Milliseconds to wait before recalculating allocation. Default is 1000')
     parser.set_defaults(random_runtimes=False)

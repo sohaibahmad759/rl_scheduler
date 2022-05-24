@@ -1,5 +1,6 @@
 import itertools
 import logging
+import math
 import random
 import time
 import uuid
@@ -45,7 +46,7 @@ class Executor:
     def add_predictor(self, acc_type=AccType.CPU, qos_level=0):
         # print('acc_type: {}'.format(acc_type.value))
         profiled_latencies = self.runtimes[acc_type.value]
-        predictor = Predictor(acc_type.value, qos_level=qos_level, profiled_accuracy=None,
+        predictor = Predictor(acc_type.value, qos_level=qos_level, profiled_accuracy=100.0,
                                 profiled_latencies=profiled_latencies)
         self.predictors[predictor.id] = predictor
         self.num_predictor_types[acc_type.value-1 + qos_level*4] += 1
@@ -112,7 +113,7 @@ class Executor:
             finish_times = []
             for key in filtered_predictors:
                 candidate = self.predictors[key]
-                potential_runtime = runtimes[candidate.acc_type][(event.desc, event.qos_level)]
+                potential_runtime = candidate.profiled_latencies[(event.desc, event.qos_level)]
                 if candidate.busy:
                     finish_time = candidate.busy_till + potential_runtime
                 else:
@@ -138,19 +139,60 @@ class Executor:
             logging.debug('predictor: {}'.format(predictor))
             # time.sleep(2)
         elif self.task_assignment == TaskAssignment.INFAAS:
-            accuracy_filtered_predictors = list(filter(lambda key: self.predictors[key].accuracy >= event.accuracy, self.predictors))
-
+            accuracy_filtered_predictors = list(filter(lambda key: self.predictors[key].profiled_accuracy >= event.accuracy, self.predictors))
+            predictor = None
+            infaas_candidates = []
+            not_found_reason = 'None'
+            print()
             # There is atleast one predictor that matches the accuracy requirement of the request
             if len(accuracy_filtered_predictors) > 0:
                 # If there is any predictor that can meet request
-                logging.debug('found')
-            # There is no predictor that even matches the accuracy requirement of the request
-            else:
-                logging.debug('not found')
+                for key in accuracy_filtered_predictors:
+                    _predictor = self.predictors[key]
+                    peak_throughput = math.floor(1000 /  _predictor.profiled_latencies[(event.desc, 
+                                                    event.qos_level)])
+                    queued_requests = len(_predictor.request_queue)
 
+                    print('Throughput:', peak_throughput)
+                    print('Queued requests:', queued_requests)
+                    if peak_throughput > queued_requests:
+                        _predictor.set_load(float(queued_requests)/peak_throughput)
+                        infaas_candidates.append(_predictor)
+                    else:
+                        continue
+                
+                # We have now found a list of candidate predictors that match both accuracy
+                # and deadline of the request, sorted by load
+                infaas_candidates.sort(key=lambda x: x.load)
+
+                # for candidate in infaas_candidates:
+                #     print('infaas candidate:' + str(candidate) + ', load:' + str(candidate.load))
+                # print('infaas candidates:' + str(infaas_candidates))
+                # time.sleep(5)
+
+                if len(infaas_candidates) > 0:
+                    # Select the least loaded candidate
+                    predictor = infaas_candidates[0]
+                    logging.debug('found')
+                else:
+                    # There is no candidate that meets deadline
+                    not_found_reason = 'latency_not_met'
+                    logging.debug('not found')
+            else:
+                # There is no predictor that even matches the accuracy requirement of the request
+                not_found_reason = 'accuracy_not_met'
+                logging.debug('not found')
+            
+            # No predictor has been found yet, either because accuracy not met or deadline not met
+            if predictor is None:
+                print()
+                # Now we try to find an inactive model variant that can meet accuracy+deadline
 
         # round-robin:
         # predictor = self.predictors[next(self.iterator)]
+
+        # At this point, the variable 'predictor' should indicate which predictor has been
+        # selected by one of the heuristics above
 
         # Step 2: read up runtime based on the predictor type selected
         runtime = runtimes[predictor.acc_type][(event.desc, event.qos_level)]
