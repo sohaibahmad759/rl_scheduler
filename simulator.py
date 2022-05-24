@@ -63,15 +63,16 @@ class Simulator:
                 if not extension == 'txt':
                     continue
                 logging.info('Filename: ' + file)
-                self.add_executor(isi_name, self.job_sched_algo)
+
+                self.initialize_runtimes(
+                    isi_name, random_runtimes=random_runtimes)
+
+                self.add_executor(isi_name, self.job_sched_algo, runtimes={})
                 self.idx_to_executor[idx] = isi_name
                 self.isi_to_idx[isi_name] = idx
                 self.failed_requests_arr.append(0)
                 self.total_requests_arr.append(0)
                 idx += 1
-
-                self.initialize_runtimes(
-                    isi_name, random_runtimes=random_runtimes)
 
                 if self.store_file_pointers:
                     readfile = open(os.path.join(trace_path, file), mode='r')
@@ -89,6 +90,8 @@ class Simulator:
         self.runtimes = {1: self.cpu_runtimes, 2: self.gpu_runtimes,
                          3: self.vpu_runtimes, 4: self.fpga_runtimes}
 
+        self.set_executor_runtimes()
+
         self.qos_stats = np.zeros((len(self.executors), n_qos_levels * 2))
 
         if not (mode == 'training' or mode == 'debugging'):
@@ -100,6 +103,12 @@ class Simulator:
         self.sched_interval = 200
 
         self.sched_agent_uri = 'http://127.0.0.1:8000'
+
+    
+    def set_executor_runtimes(self):
+        for idx in self.idx_to_executor:
+            isi_name = self.idx_to_executor[idx]
+            self.executors[isi_name].set_runtimes(self.runtimes)
 
 
     def reset(self):
@@ -493,7 +502,7 @@ class Simulator:
                 'Starting event {}. (Time: {})'.format(event.desc, clock))
             isi = event.desc
             if isi not in self.executors:
-                self.add_executor(isi, self.job_sched_algo)
+                self.add_executor(isi, self.job_sched_algo, self.runtimes)
             # call executor.process_request() on relevant executor
             executor = self.executors[isi]
             end_time, qos_met = executor.process_request(
@@ -537,18 +546,18 @@ class Simulator:
 
         return None
 
-    def add_executor(self, isi, job_sched_algo):
-        executor = Executor(isi, job_sched_algo, self.n_qos_levels)
+    def add_executor(self, isi, job_sched_algo, runtimes=None):
+        executor = Executor(isi, job_sched_algo, self.n_qos_levels, runtimes)
         self.executors[executor.isi] = executor
         return executor.id
 
-    def insert_event(self, time, type, desc, runtime=None, id='', deadline=1000, qos_level=0):
+    def insert_event(self, time, type, desc, runtime=None, id='', deadline=1000, qos_level=0, accuracy=None):
         if type == EventType.END_REQUEST:
-            event = Event(time, type, desc, runtime, id=id,
-                          deadline=deadline, qos_level=qos_level)
+            event = Event(time, type, desc, runtime, id=id, deadline=deadline,
+                            qos_level=qos_level)
         else:
-            event = Event(time, type, desc, runtime,
-                          deadline=deadline, qos_level=qos_level)
+            event = Event(time, type, desc, runtime, deadline=deadline,
+                            qos_level=qos_level, accuracy=accuracy)
 
         # using binary search to reduce search time complexity
         idx = self.binary_find_index(self.event_queue, time)

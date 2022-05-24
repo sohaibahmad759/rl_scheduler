@@ -18,10 +18,11 @@ class TaskAssignment(Enum):
     ROUND_ROBIN = 2
     EARLIEST_FINISH_TIME = 3
     LATEST_FINISH_TIME = 4
+    INFAAS = 5
 
 
 class Executor:
-    def __init__(self, isi, task_assignment, n_qos_levels=1, behavior=Behavior.BESTEFFORT):
+    def __init__(self, isi, task_assignment, n_qos_levels=1, behavior=Behavior.BESTEFFORT, runtimes=None):
         self.id = uuid.uuid4().hex
         self.isi = isi
         self.n_qos_levels = n_qos_levels
@@ -31,6 +32,7 @@ class Executor:
         self.iterator = itertools.cycle(self.predictors)
         self.behavior = behavior
         self.task_assignment = TaskAssignment(task_assignment)
+        self.runtimes = runtimes
         
         # EITHER: do we want a separate event queue for each executor? then we would need to
         # have another clock and interrupt when request ends
@@ -42,11 +44,17 @@ class Executor:
 
     def add_predictor(self, acc_type=AccType.CPU, qos_level=0):
         # print('acc_type: {}'.format(acc_type.value))
-        predictor = Predictor(acc_type.value, qos_level=qos_level)
+        profiled_latencies = self.runtimes[acc_type.value]
+        predictor = Predictor(acc_type.value, qos_level=qos_level, profiled_accuracy=None,
+                                profiled_latencies=profiled_latencies)
         self.predictors[predictor.id] = predictor
         self.num_predictor_types[acc_type.value-1 + qos_level*4] += 1
         self.iterator = itertools.cycle(self.predictors)
         return id
+
+
+    def set_runtimes(self, runtimes=None):
+        self.runtimes = runtimes
 
     
     def remove_predictor_by_id(self, id):
@@ -85,7 +93,7 @@ class Executor:
         # Step 1: load balance
 
         # filter out predictors that match the request's QoS level
-        filtered_predictors = list(filter(lambda key: self.predictors[key].qos_level == event.qos_level, self.predictors))
+        filtered_predictors = list(filter(lambda key: self.predictors[key].qos_level >= event.qos_level, self.predictors))
         
         # TODO: is this the implementation of behavior we want? If there is any matching QoS level,
         #       it will be used regardless of finish time or any other metric
@@ -129,6 +137,16 @@ class Executor:
             logging.debug('filtered_predictors[idx]: {}'.format(filtered_predictors[idx]))
             logging.debug('predictor: {}'.format(predictor))
             # time.sleep(2)
+        elif self.task_assignment == TaskAssignment.INFAAS:
+            accuracy_filtered_predictors = list(filter(lambda key: self.predictors[key].accuracy >= event.accuracy, self.predictors))
+
+            # There is atleast one predictor that matches the accuracy requirement of the request
+            if len(accuracy_filtered_predictors) > 0:
+                # If there is any predictor that can meet request
+                logging.debug('found')
+            # There is no predictor that even matches the accuracy requirement of the request
+            else:
+                logging.debug('not found')
 
 
         # round-robin:
