@@ -115,7 +115,7 @@ class Simulator:
                 request_description = line.rstrip('\n').split(',')
                 start_time = int(request_description[0])
                 # if qos_level is defined, use that. otherwise use qos_level 0 by default
-                if len(request_description) == 2:
+                if len(request_description) >= 2:
                     qos_level = int(request_description[1])
                 else:
                     qos_level = 0
@@ -127,8 +127,14 @@ class Simulator:
                     deadline = request_description[2]
                 else:
                     deadline = 1000
+
+                if len(request_description) >= 4:
+                    accuracy = float(request_description[3])
+                else:
+                    accuracy = 100.0
+                
                 self.insert_event(start_time, EventType.START_REQUEST, isi_name, runtime=None,
-                                  deadline=deadline, qos_level=qos_level)
+                                  deadline=deadline, qos_level=qos_level, accuracy=accuracy)
         return
 
     def add_requests_from_trace_pointer(self, isi_name, readfile, read_until=500):
@@ -146,7 +152,7 @@ class Simulator:
             request_description = line.rstrip('\n').split(',')
             start_time = int(request_description[0])
             # if qos_level is defined, use that. otherwise use qos_level 0 by default
-            if len(request_description) == 2:
+            if len(request_description) >= 2:
                 qos_level = int(request_description[1])
             else:
                 qos_level = 0
@@ -159,8 +165,14 @@ class Simulator:
                 # print(deadline)
             else:
                 deadline = 1000
+
+            if len(request_description) >= 4:
+                accuracy = float(request_description[3])
+            else:
+                accuracy = 100.0
+
             self.insert_event(start_time, EventType.START_REQUEST, isi_name, runtime=None,
-                              deadline=deadline, qos_level=qos_level)
+                              deadline=deadline, qos_level=qos_level, accuracy=accuracy)
             self.requests_added += 1
             if start_time >= read_until:
                 break
@@ -608,7 +620,7 @@ class EventType(Enum):
 
 
 class Event:
-    def __init__(self, start_time, type, desc, runtime=None, deadline=1000, id='', qos_level=0):
+    def __init__(self, start_time, type, desc, runtime=None, deadline=1000, id='', qos_level=0, accuracy=100.0):
         self.id = id
         if self.id == '':
             self.id = uuid.uuid4().hex
@@ -618,6 +630,7 @@ class Event:
         self.runtime = runtime
         self.deadline = deadline
         self.qos_level = qos_level
+        self.accuracy = accuracy
 
 
 if __name__ == '__main__':

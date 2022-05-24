@@ -121,6 +121,7 @@ class Ilp(SchedulingAlgorithm):
 
         m.setParam('NonConvex', 2)
         m.setParam('TimeLimit', 200)
+        m.setParam('MIPGap', 0.5)
 
         # Add optimization variables
         w = m.addVars(rtypes, name='x')
@@ -130,8 +131,11 @@ class Ilp(SchedulingAlgorithm):
         aux = m.addVar(name='aux')
 
         # Smaller value weighs throughput more, higher value weighs accuracy more
-        alpha = 0.1
+        alpha = 0.5
 
+        # TODO: Accuracy is from [0, 100] but throughput can be [0, +inf]
+        # TODO: We can bound throughput by dividing it by total number of requests to make throughput %
+        # TODO: That way, they will also both be on the same scale (i.e., [0, 100])
         # Set the objective
         m.setObjective(alpha * gp.quicksum(w) * aux + (1-alpha) * gp.quicksum(y), GRB.MAXIMIZE)
 
@@ -143,6 +147,8 @@ class Ilp(SchedulingAlgorithm):
             #                         for i in accelerators), 'c1_1_' + str(k))
             # m.addConstr(w[k] == sum(sum(y[j]*b[j, k]*A[j]*x[i, j] for j in models)
             #                         for i in accelerators), 'c1_2_' + str(k))
+            
+            # TODO: weird thing happens where if w[k] becomes important, all accelerators go to same model
             m.addConstr(w[k] == sum(s[k]*z[j,k]*b[j,k]*A[j] for j in models), 'c1_3' + str(k))
             # m.addConstr(w[k] <= sum(sum(y[j]*A[j]*x[i, j] for j in models)
             #                         for i in accelerators), 'c1_4_' + str(k))
@@ -151,8 +157,9 @@ class Ilp(SchedulingAlgorithm):
             m.addConstr(sum(b[j, k] * z[j, k] for j in models) == sum(b[j, k] for j in models), 'c3_' + str(k))
             m.addConstr(sum(z[j, k] for j in models) == 1, 'c3_2_' + str(k))
 
-        m.addConstr(aux * gp.quicksum(y) == 1, 'c_aux')
-        m.addConstr(gp.quicksum(y) >= 1, 'c_bound_1')
+        # m.addConstr(aux * gp.quicksum(y) == 1, 'c_aux')
+        # m.addConstr(gp.quicksum(y) >= 1, 'c_bound_1')
+        m.addConstr(aux * gp.quicksum(s) == 1, 'c_aux')
 
         # m.addConstrs((sum(x[i, j] for j in models) <=
         #              1 for i in accelerators), 'c2')
@@ -198,7 +205,8 @@ class Ilp(SchedulingAlgorithm):
             accuracy = gp.quicksum(w).getValue()
             self.log.debug('Accuracy (objective):' + str(accuracy))
             if throughput > 0:
-                self.log.debug('Effective accuracy:' + str(accuracy/throughput))
+                self.log.debug('Effective accuracy (over served requests):' + str(accuracy/throughput))
+            self.log.debug('Effective accuracy (over all requests):' + str(accuracy/sum(s[k] for k in rtypes)))
             # self.log.debug('\nx:')
             # for i in accelerators:
             #     for j in models:
