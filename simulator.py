@@ -42,6 +42,11 @@ class Simulator:
         self.vpu_runtimes = {}
         self.fpga_runtimes = {}
 
+        self.cpu_loadtimes = {}
+        self.gpu_loadtimes = {}
+        self.vpu_loadtimes = {}
+        self.fpga_loadtimes = {}
+
         self.trace_files = {}
 
         self.predictors_max = predictors_max
@@ -90,7 +95,11 @@ class Simulator:
         self.runtimes = {1: self.cpu_runtimes, 2: self.gpu_runtimes,
                          3: self.vpu_runtimes, 4: self.fpga_runtimes}
 
+        self.loadtimes = {1: self.cpu_loadtimes, 2: self.gpu_loadtimes,
+                          3: self.vpu_loadtimes, 4: self.fpga_loadtimes}
+
         self.set_executor_runtimes()
+        self.set_executor_loadtimes()
 
         self.qos_stats = np.zeros((len(self.executors), n_qos_levels * 2))
 
@@ -109,6 +118,12 @@ class Simulator:
         for idx in self.idx_to_executor:
             isi_name = self.idx_to_executor[idx]
             self.executors[isi_name].set_runtimes(self.runtimes)
+
+
+    def set_executor_loadtimes(self):
+        for idx in self.idx_to_executor:
+            isi_name = self.idx_to_executor[idx]
+            self.executors[isi_name].set_loadtimes(self.loadtimes)
 
 
     def reset(self):
@@ -212,6 +227,14 @@ class Simulator:
             # print(self.gpu_runtimes)
             # print(self.vpu_runtimes)
             # print(self.fpga_runtimes)
+        return
+
+    def initialize_loadtimes(self, isi_name):
+        for qos_level in range(self.n_qos_levels):
+            self.cpu_loadtimes[isi_name, qos_level] = 0
+            self.gpu_loadtimes[isi_name, qos_level] = 0
+            self.vpu_loadtimes[isi_name, qos_level] = 0
+            self.fpga_loadtimes[isi_name, qos_level] = 0
         return
 
     def get_runtimes(self, isi_index):

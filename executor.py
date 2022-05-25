@@ -34,6 +34,7 @@ class Executor:
         self.behavior = behavior
         self.task_assignment = TaskAssignment(task_assignment)
         self.runtimes = runtimes
+        self.loadtimes = None
         
         # EITHER: do we want a separate event queue for each executor? then we would need to
         # have another clock and interrupt when request ends
@@ -56,6 +57,10 @@ class Executor:
 
     def set_runtimes(self, runtimes=None):
         self.runtimes = runtimes
+
+    
+    def set_loadtimes(self, loadtimes=None):
+        self.loadtimes = loadtimes
 
     
     def remove_predictor_by_id(self, id):
@@ -187,6 +192,8 @@ class Executor:
             if predictor is None:
                 print()
                 # Now we try to find an inactive model variant that can meet accuracy+deadline
+
+                # If we still cannot find one, we try to serve with the closest possible accuracy and/or deadline
 
         # round-robin:
         # predictor = self.predictors[next(self.iterator)]
