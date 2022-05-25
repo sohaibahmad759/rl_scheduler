@@ -51,6 +51,7 @@ class Simulator:
         self.model_variants = {}
         self.model_variant_runtimes = {}
         self.model_variant_loadtimes = {}
+        self.model_variant_accuracies = {}
 
         self.cpu_variant_runtimes = {}
         self.gpu_variant_runtimes = {}
@@ -86,6 +87,8 @@ class Simulator:
 
                 model_variant_list = self.read_variants_from_file(variant_list_filename)
                 self.set_model_variants(isi_name, model_variant_list)
+
+                self.set_model_variant_accuracies(isi_name, filename='')
 
                 self.initialize_runtimes(
                     isi_name, random_runtimes=random_runtimes)
@@ -128,6 +131,7 @@ class Simulator:
 
         self.set_executor_model_variants()
 
+        self.set_executor_variant_accuracies()
         self.set_executor_variant_runtimes()
         self.set_executor_variant_loadtimes()
 
@@ -154,6 +158,12 @@ class Simulator:
         for idx in self.idx_to_executor:
             isi_name = self.idx_to_executor[idx]
             self.executors[isi_name].set_model_variants(self.model_variants)
+
+
+    def set_executor_variant_accuracies(self):
+        for idx in self.idx_to_executor:
+            isi_name = self.idx_to_executor[idx]
+            self.executors[isi_name].set_variant_accuracies(self.model_variant_accuracies)
 
 
     def set_executor_variant_loadtimes(self):
@@ -309,6 +319,18 @@ class Simulator:
                 self.gpu_variant_runtimes[(isi_name, model_variant)] = 25
                 self.vpu_variant_runtimes[(isi_name, model_variant)] = 35
                 self.fpga_variant_runtimes[(isi_name, model_variant)] = 30
+
+    
+    def set_model_variant_accuracies(self, isi_name, filename=''):
+        if filename == '':
+            # We set accuracies randomly
+            for model_variant in self.model_variants[isi_name]:
+                self.model_variant_accuracies[(isi_name, model_variant)] = random.uniform(50.0, 99.99)
+        else:
+            # Need to add support for reading accuracies from a file
+            logging.error('Reading accuracies from file not implemented!')
+            time.sleep(10)
+
 
 
     def initialize_loadtimes(self, isi_name):

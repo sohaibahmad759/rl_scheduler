@@ -38,6 +38,7 @@ class Executor:
 
         self.variant_runtimes = variant_runtimes
         self.variant_loadtimes = variant_loadtimes
+        self.variant_accuracies = {}
 
         self.model_variants = {}
         
@@ -70,6 +71,10 @@ class Executor:
     
     def set_model_variants(self, model_variants={}):
         self.model_variants = model_variants
+
+
+    def set_variant_accuracies(self, accuracies=None):
+        self.variant_accuracies = accuracies
 
     
     def set_variant_runtimes(self, runtimes=None):
@@ -215,6 +220,7 @@ class Executor:
                 logging.debug('checked qos level:' + str(checked_qos_levels))
 
                 print('model variants:' + str(self.model_variants))
+                print('model variant accuracies:' + str(self.variant_accuracies))
                 print('model variant runtimes:' + str(self.variant_runtimes))
                 print('model variant loadtimes:' + str(self.variant_loadtimes))
                 for qos_level in range(self.n_qos_levels):
