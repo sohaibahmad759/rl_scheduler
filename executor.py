@@ -50,11 +50,26 @@ class Executor:
         # 4 ways to do this: round robin, earliest start time, earliest finish time (EFT), latest finish time
 
 
-    def add_predictor(self, acc_type=AccType.CPU, qos_level=0):
+    def add_predictor(self, acc_type=AccType.CPU, qos_level=0, variant_name=None):
         # print('acc_type: {}'.format(acc_type.value))
         profiled_latencies = self.runtimes[acc_type.value]
-        predictor = Predictor(acc_type.value, qos_level=qos_level, profiled_accuracy=100.0,
-                                profiled_latencies=profiled_latencies)
+        
+        if variant_name is None:
+            min_accuracy = 100.0
+            for candidate in self.model_variants[self.isi]:
+                candidate_accuracy = self.variant_accuracies[(self.isi, candidate)]
+                if candidate_accuracy < min_accuracy:
+                    min_accuracy = candidate_accuracy
+                    variant_name = candidate
+        
+        profiled_accuracy = self.variant_accuracies[(self.isi, variant_name)]
+
+        # print('Model variant selected: {}, Profiled accuracy: {}'.format(variant_name, profiled_accuracy))
+        # print(self.variant_accuracies)
+        # time.sleep(5)
+
+        predictor = Predictor(acc_type.value, qos_level=qos_level, profiled_accuracy=profiled_accuracy,
+                                profiled_latencies=profiled_latencies, variant_name=variant_name)
         self.predictors[predictor.id] = predictor
         self.num_predictor_types[acc_type.value-1 + qos_level*4] += 1
         self.iterator = itertools.cycle(self.predictors)
@@ -216,24 +231,20 @@ class Executor:
                 # Now we try to find an inactive model variant that can meet accuracy+deadline
                 isi_name = event.desc
                 inactive_candidates = []
-                checked_qos_levels = list(map(lambda key: self.predictors[key].qos_level, self.predictors))
-                logging.debug('checked qos level:' + str(checked_qos_levels))
+                checked_variants = list(map(lambda key: self.predictors[key].variant_name, self.predictors))
+                print('checked variants:' + str(checked_variants))
 
                 print('model variants:' + str(self.model_variants))
                 print('model variant accuracies:' + str(self.variant_accuracies))
                 print('model variant runtimes:' + str(self.variant_runtimes))
                 print('model variant loadtimes:' + str(self.variant_loadtimes))
-                for qos_level in range(self.n_qos_levels):
-                    # If there is no such variant (runtime is math.inf), skip
-                    print(self.runtimes)
-                    if math.isinf(self.runtimes[(isi_name, qos_level)]):
-                        continue
+                for model_variant in self.model_variants[isi_name]:
                     # If we already checked for this variant
-                    elif qos_level in checked_qos_levels:
+                    if model_variant in checked_variants:
                         continue
                     else:
-                        runtime = self.runtimes[(isi_name, qos_level)]
-                        loadtime = self.loadtimes[(isi_name, qos_level)]
+                        runtime = self.variant_runtimes[(isi_name, model_variant)]
+                        loadtime = self.variant_loadtimes[(isi_name, model_variant)]
                         total_time = runtime + loadtime
                         inactive_candidates[isi_name] = total_time
                         print('got here')

@@ -12,10 +12,12 @@ class AccType(Enum):
 
 
 class Predictor:
-    def __init__(self, acc_type=AccType.CPU, qos_level=0, profiled_accuracy=100.0, profiled_latencies={}):
+    def __init__(self, acc_type=AccType.CPU, qos_level=0, profiled_accuracy=100.0,
+                    profiled_latencies={}, variant_name=None):
         # attributes related to predictor hardware
         self.id = uuid.uuid4().hex
         self.acc_type = acc_type
+        self.variant_name = variant_name
         self.qos_level = qos_level
         self.profiled_accuracy = profiled_accuracy
         self.profiled_latencies = profiled_latencies
