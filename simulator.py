@@ -2,6 +2,7 @@ import copy
 import glob
 from hashlib import new
 import logging
+from pyexpat import model
 import random
 import requests
 import os
@@ -47,6 +48,15 @@ class Simulator:
         self.vpu_loadtimes = {}
         self.fpga_loadtimes = {}
 
+        self.model_variants = {}
+        self.model_variant_runtimes = {}
+        self.model_variant_loadtimes = {}
+
+        self.cpu_variant_runtimes = {}
+        self.gpu_variant_runtimes = {}
+        self.vpu_variant_runtimes = {}
+        self.fpga_variant_runtimes = {}
+
         self.trace_files = {}
 
         self.predictors_max = predictors_max
@@ -58,7 +68,9 @@ class Simulator:
         idx = 0
         if not trace_path is None:
             logging.info('Reading trace files from: ' + trace_path)
+            variant_list_path = os.path.join(trace_path, '..', 'model_variants')
             trace_files = sorted(os.listdir(trace_path))
+
             for file in trace_files:
                 filename = file.split('/')[-1]
                 if len(filename.split('.')) == 1:
@@ -69,10 +81,19 @@ class Simulator:
                     continue
                 logging.info('Filename: ' + file)
 
+                variant_list_filename = os.path.join(variant_list_path, isi_name)
+                logging.info('Variant list filename:' + variant_list_filename)
+
+                model_variant_list = self.read_variants_from_file(variant_list_filename)
+                self.set_model_variants(isi_name, model_variant_list)
+
                 self.initialize_runtimes(
                     isi_name, random_runtimes=random_runtimes)
+                self.initialize_model_variant_loadtimes(isi_name)
+                self.initialize_model_variant_runtimes(isi_name, random_runtimes=random_runtimes)
 
-                self.add_executor(isi_name, self.job_sched_algo, runtimes={})
+                self.add_executor(isi_name, self.job_sched_algo, runtimes={},
+                                    model_variant_runtimes={}, model_variant_loadtimes={})
                 self.idx_to_executor[idx] = isi_name
                 self.isi_to_idx[isi_name] = idx
                 self.failed_requests_arr.append(0)
@@ -98,8 +119,17 @@ class Simulator:
         self.loadtimes = {1: self.cpu_loadtimes, 2: self.gpu_loadtimes,
                           3: self.vpu_loadtimes, 4: self.fpga_loadtimes}
 
+        self.model_variant_runtimes = {1: self.cpu_variant_runtimes, 2: self.gpu_variant_runtimes,
+                                        3: self.vpu_variant_runtimes, 4: self.fpga_variant_runtimes}
+
         self.set_executor_runtimes()
         self.set_executor_loadtimes()
+        time.sleep(1)
+
+        self.set_executor_model_variants()
+
+        self.set_executor_variant_runtimes()
+        self.set_executor_variant_loadtimes()
 
         self.qos_stats = np.zeros((len(self.executors), n_qos_levels * 2))
 
@@ -119,11 +149,40 @@ class Simulator:
             isi_name = self.idx_to_executor[idx]
             self.executors[isi_name].set_runtimes(self.runtimes)
 
+    
+    def set_executor_model_variants(self):
+        for idx in self.idx_to_executor:
+            isi_name = self.idx_to_executor[idx]
+            self.executors[isi_name].set_model_variants(self.model_variants)
+
+
+    def set_executor_variant_loadtimes(self):
+        for idx in self.idx_to_executor:
+            isi_name = self.idx_to_executor[idx]
+            self.executors[isi_name].set_variant_loadtimes(self.model_variant_loadtimes)
+
+    
+    def set_executor_variant_runtimes(self):
+        for idx in self.idx_to_executor:
+            isi_name = self.idx_to_executor[idx]
+            self.executors[isi_name].set_variant_runtimes(self.model_variant_runtimes)
+
 
     def set_executor_loadtimes(self):
         for idx in self.idx_to_executor:
             isi_name = self.idx_to_executor[idx]
             self.executors[isi_name].set_loadtimes(self.loadtimes)
+
+    
+    def read_variants_from_file(self, filename):
+        model_variants = []
+        if os.path.exists(filename):
+            with open(filename, mode='r') as rf:
+                model_variants = rf.readlines()
+            model_variants = list(map(str.rstrip, model_variants))
+        else:
+            logging.error('read_variants_from_file: no path {} found!'.format(filename))
+        return model_variants
 
 
     def reset(self):
@@ -203,6 +262,9 @@ class Simulator:
             # print(self.requests_added)
         return False
 
+    def set_model_variants(self, isi_name, model_variant_list):
+        self.model_variants[isi_name] = model_variant_list
+
     def initialize_runtimes(self, isi_name, random_runtimes=False):
         for qos_level in range(self.n_qos_levels):
             if random_runtimes:
@@ -229,7 +291,28 @@ class Simulator:
             # print(self.fpga_runtimes)
         return
 
+    def initialize_model_variant_loadtimes(self, isi_name):
+        model_variant_list = self.model_variants[isi_name]
+        for model_variant in model_variant_list:
+            self.model_variant_loadtimes[(isi_name, model_variant)] = 0
+    
+    def initialize_model_variant_runtimes(self, isi_name, random_runtimes=False):
+        model_variant_list = self.model_variants[isi_name]
+        for model_variant in model_variant_list:
+            if random_runtimes:
+                self.cpu_variant_runtimes[(isi_name, model_variant)] = random.randint(20, 100)
+                self.gpu_variant_runtimes[(isi_name, model_variant)] = random.randint(20, 100)
+                self.vpu_variant_runtimes[(isi_name, model_variant)] = random.randint(20, 100)
+                self.fpga_variant_runtimes[(isi_name, model_variant)] = random.randint(20, 100)
+            else:
+                self.cpu_variant_runtimes[(isi_name, model_variant)] = 50
+                self.gpu_variant_runtimes[(isi_name, model_variant)] = 25
+                self.vpu_variant_runtimes[(isi_name, model_variant)] = 35
+                self.fpga_variant_runtimes[(isi_name, model_variant)] = 30
+
+
     def initialize_loadtimes(self, isi_name):
+        self.initialize_model_variant_loadtimes(isi_name)
         for qos_level in range(self.n_qos_levels):
             self.cpu_loadtimes[isi_name, qos_level] = 0
             self.gpu_loadtimes[isi_name, qos_level] = 0
@@ -525,7 +608,8 @@ class Simulator:
                 'Starting event {}. (Time: {})'.format(event.desc, clock))
             isi = event.desc
             if isi not in self.executors:
-                self.add_executor(isi, self.job_sched_algo, self.runtimes)
+                self.add_executor(isi, self.job_sched_algo, self.runtimes, self.model_variant_runtimes,
+                                    self.model_variant_loadtimes)
             # call executor.process_request() on relevant executor
             executor = self.executors[isi]
             end_time, qos_met = executor.process_request(
@@ -569,8 +653,10 @@ class Simulator:
 
         return None
 
-    def add_executor(self, isi, job_sched_algo, runtimes=None):
-        executor = Executor(isi, job_sched_algo, self.n_qos_levels, runtimes)
+    def add_executor(self, isi, job_sched_algo, runtimes=None, model_variant_runtimes=None, 
+                        model_variant_loadtimes=None):
+        executor = Executor(isi, job_sched_algo, self.n_qos_levels, runtimes,
+                                model_variant_runtimes, model_variant_loadtimes)
         self.executors[executor.isi] = executor
         return executor.id
 

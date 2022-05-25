@@ -131,7 +131,7 @@ class Ilp(SchedulingAlgorithm):
         aux = m.addVar(name='aux')
 
         # Smaller value weighs throughput more, higher value weighs accuracy more
-        alpha = 0.5
+        alpha = 0.0
 
         # TODO: Accuracy is from [0, 100] but throughput can be [0, +inf]
         # TODO: We can bound throughput by dividing it by total number of requests to make throughput %

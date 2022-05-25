@@ -23,7 +23,8 @@ class TaskAssignment(Enum):
 
 
 class Executor:
-    def __init__(self, isi, task_assignment, n_qos_levels=1, behavior=Behavior.BESTEFFORT, runtimes=None):
+    def __init__(self, isi, task_assignment, n_qos_levels=1, behavior=Behavior.BESTEFFORT, runtimes=None,
+                    variant_runtimes=None, variant_loadtimes=None):
         self.id = uuid.uuid4().hex
         self.isi = isi
         self.n_qos_levels = n_qos_levels
@@ -34,7 +35,11 @@ class Executor:
         self.behavior = behavior
         self.task_assignment = TaskAssignment(task_assignment)
         self.runtimes = runtimes
-        self.loadtimes = None
+
+        self.variant_runtimes = variant_runtimes
+        self.variant_loadtimes = variant_loadtimes
+
+        self.model_variants = {}
         
         # EITHER: do we want a separate event queue for each executor? then we would need to
         # have another clock and interrupt when request ends
@@ -61,6 +66,18 @@ class Executor:
     
     def set_loadtimes(self, loadtimes=None):
         self.loadtimes = loadtimes
+
+    
+    def set_model_variants(self, model_variants={}):
+        self.model_variants = model_variants
+
+    
+    def set_variant_runtimes(self, runtimes=None):
+        self.variant_runtimes = runtimes
+
+    
+    def set_variant_loadtimes(self, loadtimes=None):
+        self.variant_loadtimes = loadtimes
 
     
     def remove_predictor_by_id(self, id):
@@ -192,6 +209,30 @@ class Executor:
             if predictor is None:
                 print()
                 # Now we try to find an inactive model variant that can meet accuracy+deadline
+                isi_name = event.desc
+                inactive_candidates = []
+                checked_qos_levels = list(map(lambda key: self.predictors[key].qos_level, self.predictors))
+                logging.debug('checked qos level:' + str(checked_qos_levels))
+
+                print('model variants:' + str(self.model_variants))
+                print('model variant runtimes:' + str(self.variant_runtimes))
+                print('model variant loadtimes:' + str(self.variant_loadtimes))
+                for qos_level in range(self.n_qos_levels):
+                    # If there is no such variant (runtime is math.inf), skip
+                    print(self.runtimes)
+                    if math.isinf(self.runtimes[(isi_name, qos_level)]):
+                        continue
+                    # If we already checked for this variant
+                    elif qos_level in checked_qos_levels:
+                        continue
+                    else:
+                        runtime = self.runtimes[(isi_name, qos_level)]
+                        loadtime = self.loadtimes[(isi_name, qos_level)]
+                        total_time = runtime + loadtime
+                        inactive_candidates[isi_name] = total_time
+                        print('got here')
+                        time.sleep(10)
+                
 
                 # If we still cannot find one, we try to serve with the closest possible accuracy and/or deadline
 
