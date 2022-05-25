@@ -42,6 +42,7 @@ class SchedulingEnv(gym.Env):
         # simulator environment that our RL agent will interact with
         self.simulator = Simulator(trace_path=trace_dir, mode='debugging',
                                    job_sched_algo=job_sched_algo,
+                                   max_acc_per_type=self.max_no_of_accelerators,
                                    predictors_max=self.total_predictors,
                                    n_qos_levels=self.n_qos_levels,
                                    random_runtimes=random_runtimes,

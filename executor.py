@@ -24,12 +24,13 @@ class TaskAssignment(Enum):
 
 class Executor:
     def __init__(self, isi, task_assignment, n_qos_levels=1, behavior=Behavior.BESTEFFORT, runtimes=None,
-                    variant_runtimes=None, variant_loadtimes=None):
+                    variant_runtimes=None, variant_loadtimes=None, max_acc_per_type=0):
         self.id = uuid.uuid4().hex
         self.isi = isi
         self.n_qos_levels = n_qos_levels
         self.predictors = {}
         self.num_predictor_types = np.zeros(4 * n_qos_levels)
+        self.max_acc_per_type = max_acc_per_type
         self.assigned_requests = {}
         self.iterator = itertools.cycle(self.predictors)
         self.behavior = behavior
@@ -73,7 +74,7 @@ class Executor:
         self.predictors[predictor.id] = predictor
         self.num_predictor_types[acc_type.value-1 + qos_level*4] += 1
         self.iterator = itertools.cycle(self.predictors)
-        return id
+        return predictor.id
 
 
     def set_runtimes(self, runtimes=None):
@@ -185,7 +186,6 @@ class Executor:
             predictor = None
             infaas_candidates = []
             not_found_reason = 'None'
-            print()
             # There is atleast one predictor that matches the accuracy requirement of the request
             if len(accuracy_filtered_predictors) > 0:
                 # If there is any predictor that can meet request
@@ -195,8 +195,8 @@ class Executor:
                                                     event.qos_level)])
                     queued_requests = len(_predictor.request_queue)
 
-                    print('Throughput:', peak_throughput)
-                    print('Queued requests:', queued_requests)
+                    logging.debug('Throughput:', peak_throughput)
+                    logging.debug('Queued requests:', queued_requests)
                     if peak_throughput > queued_requests:
                         _predictor.set_load(float(queued_requests)/peak_throughput)
                         infaas_candidates.append(_predictor)
@@ -227,52 +227,106 @@ class Executor:
             
             # No predictor has been found yet, either because accuracy not met or deadline not met
             if predictor is None:
-                print()
                 # Now we try to find an inactive model variant that can meet accuracy+deadline
                 isi_name = event.desc
-                inactive_candidates = []
+                inactive_candidates = {}
                 checked_variants = list(map(lambda key: self.predictors[key].variant_name, self.predictors))
-                print('checked variants:' + str(checked_variants))
+                # print('checked variants:' + str(checked_variants))
 
-                print('model variants:' + str(self.model_variants))
-                print('model variant accuracies:' + str(self.variant_accuracies))
-                print('model variant runtimes:' + str(self.variant_runtimes))
-                print('model variant loadtimes:' + str(self.variant_loadtimes))
+                # print('model variants:' + str(self.model_variants))
+                # print()
+                # print('model variant accuracies:' + str(self.variant_accuracies))
+                # print()
+                # print('model variant runtimes:' + str(self.variant_runtimes))
+                # print()
+                # print('model variant loadtimes:' + str(self.variant_loadtimes))
+                # print()
                 for model_variant in self.model_variants[isi_name]:
                     # If we already checked for this variant
                     if model_variant in checked_variants:
                         continue
                     else:
-                        runtime = self.variant_runtimes[(isi_name, model_variant)]
-                        loadtime = self.variant_loadtimes[(isi_name, model_variant)]
-                        total_time = runtime + loadtime
-                        inactive_candidates[isi_name] = total_time
-                        print('got here')
-                        time.sleep(10)
-                
+                        for acc_type in AccType:
+                            predictor_type = acc_type.value
+                            runtime = self.variant_runtimes[predictor_type][(isi_name, model_variant)]
 
-                # If we still cannot find one, we try to serve with the closest possible accuracy and/or deadline
+                            if math.isinf(runtime):
+                                continue
+                            
+                            loadtime = self.variant_loadtimes[(isi_name, model_variant)]
+                            total_time = runtime + loadtime
 
-        # round-robin:
-        # predictor = self.predictors[next(self.iterator)]
+                            if total_time < event.deadline:
+                                inactive_candidates[(model_variant, acc_type)] = total_time
+                logging.debug('inactive candidates:' + str(inactive_candidates))
 
-        # At this point, the variable 'predictor' should indicate which predictor has been
-        # selected by one of the heuristics above
+                for candidate in inactive_candidates:
+                    model_variant, acc_type = candidate
 
-        # Step 2: read up runtime based on the predictor type selected
-        runtime = runtimes[predictor.acc_type][(event.desc, event.qos_level)]
-        event.runtime = runtime
-        # print('executor.py -- Request runtime read from dict: {}'.format(runtime))
+                    if self.num_predictor_types[acc_type.value-1 + event.qos_level*4] < self.max_acc_per_type:
+                        predictor_id = self.add_predictor(acc_type=acc_type, variant_name=model_variant)
+                        predictor = self.predictors[predictor_id]
+                        logging.debug('Predictor {} added from inactive variants'.format(predictor))
+                        break
 
-        # Step 3: assign to predictor selected
-        assigned = predictor.assign_request(event, clock)
-        if assigned is not None:
-            self.assigned_requests[event.id] = predictor
-            # print('self.assigned_requests: {}'.format(self.assigned_requests))
+            # (Line 8) If we still cannot find one, we try to serve with the closest
+            # possible accuracy and/or deadline
+            if predictor is None:
+                logging.debug('No predictor found from inactive variants either')
+                closest_acc_candidates = sorted(self.predictors, key=lambda x: abs(self.predictors[x].profiled_accuracy - event.accuracy))
+                # print('event accuracy:' + str(event.accuracy))
+                # print('closest accuracy candidates:' + str(closest_acc_candidates))
+                for candidate in closest_acc_candidates:
+                    _predictor = self.predictors[candidate]
+                    variant_name = _predictor.variant_name
+                    acc_type = _predictor.acc_type
+
+                    runtime = self.variant_runtimes[acc_type][(isi_name, variant_name)]
+
+                    peak_throughput = math.floor(1000 /  _predictor.profiled_latencies[(event.desc, 
+                                                    event.qos_level)])
+                    queued_requests = len(_predictor.request_queue)
+
+                    logging.debug('Throughput:', peak_throughput)
+                    logging.debug('Queued requests:', queued_requests)
+                    if peak_throughput > queued_requests and runtime <= event.deadline:
+                        _predictor.set_load(float(queued_requests)/peak_throughput)
+                        predictor = _predictor
+                        logging.debug('closest predictor {} found'.format(predictor))
+                        break
+                    else:
+                        continue
+            
+        if predictor is None:
+            # No predictor, there is literally nothing that can be done at this point except to drop request
+            logging.info('No predictor available whatsoever')
+            assigned = None
+            qos_met = False
+            return assigned, qos_met
+
         else:
-            logging.debug('WARN: Request id {} for {} could not be assigned to any predictor. (Time: {})'.format(event.id, event.desc, clock))
+            # Predictor has been found, assign request to it
 
-        return assigned, qos_met
+            # round-robin:
+            # predictor = self.predictors[next(self.iterator)]
+
+            # At this point, the variable 'predictor' should indicate which predictor has been
+            # selected by one of the heuristics above
+
+            # Step 2: read up runtime based on the predictor type selected
+            runtime = runtimes[predictor.acc_type][(event.desc, event.qos_level)]
+            event.runtime = runtime
+            # print('executor.py -- Request runtime read from dict: {}'.format(runtime))
+
+            # Step 3: assign to predictor selected
+            assigned = predictor.assign_request(event, clock)
+            if assigned is not None:
+                self.assigned_requests[event.id] = predictor
+                # print('self.assigned_requests: {}'.format(self.assigned_requests))
+            else:
+                logging.debug('WARN: Request id {} for {} could not be assigned to any predictor. (Time: {})'.format(event.id, event.desc, clock))
+
+            return assigned, qos_met
 
     
     def finish_request(self, event, clock):

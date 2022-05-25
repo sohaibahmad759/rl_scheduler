@@ -15,7 +15,7 @@ from executor import Executor, AccType
 
 class Simulator:
     def __init__(self, job_sched_algo, trace_path=None, mode='training', 
-                 predictors_max=[10, 10, 10, 10], n_qos_levels=1, random_runtimes=False,
+                 max_acc_per_type=0, predictors_max=[10, 10, 10, 10], n_qos_levels=1, random_runtimes=False,
                  fixed_seed=0):
         self.clock = 0
         self.event_queue = []
@@ -27,6 +27,8 @@ class Simulator:
         self.total_requests_arr = []
         self.mode = mode
         self.completed_requests = 0
+
+        self.max_acc_per_type = max_acc_per_type
 
         if fixed_seed != 0:
             random.seed(fixed_seed)
@@ -96,7 +98,8 @@ class Simulator:
                 self.initialize_model_variant_runtimes(isi_name, random_runtimes=random_runtimes)
 
                 self.add_executor(isi_name, self.job_sched_algo, runtimes={},
-                                    model_variant_runtimes={}, model_variant_loadtimes={})
+                                    model_variant_runtimes={}, model_variant_loadtimes={},
+                                    max_acc_per_type=self.max_acc_per_type)
                 self.idx_to_executor[idx] = isi_name
                 self.isi_to_idx[isi_name] = idx
                 self.failed_requests_arr.append(0)
@@ -631,7 +634,7 @@ class Simulator:
             isi = event.desc
             if isi not in self.executors:
                 self.add_executor(isi, self.job_sched_algo, self.runtimes, self.model_variant_runtimes,
-                                    self.model_variant_loadtimes)
+                                    self.model_variant_loadtimes, max_acc_per_type=self.max_acc_per_type)
             # call executor.process_request() on relevant executor
             executor = self.executors[isi]
             end_time, qos_met = executor.process_request(
@@ -676,9 +679,10 @@ class Simulator:
         return None
 
     def add_executor(self, isi, job_sched_algo, runtimes=None, model_variant_runtimes=None, 
-                        model_variant_loadtimes=None):
+                        model_variant_loadtimes=None, max_acc_per_type=0):
         executor = Executor(isi, job_sched_algo, self.n_qos_levels, runtimes,
-                                model_variant_runtimes, model_variant_loadtimes)
+                                model_variant_runtimes, model_variant_loadtimes,
+                                max_acc_per_type=max_acc_per_type)
         self.executors[executor.isi] = executor
         return executor.id
 
