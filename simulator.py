@@ -90,7 +90,8 @@ class Simulator:
                 model_variant_list = self.read_variants_from_file(variant_list_filename)
                 self.set_model_variants(isi_name, model_variant_list)
 
-                self.set_model_variant_accuracies(isi_name, filename='')
+                # This random initialization has been replaced by reading from file in read_variants_from_file()
+                # self.set_model_variant_accuracies(isi_name, filename='')
 
                 self.initialize_runtimes(
                     isi_name, random_runtimes=random_runtimes)
@@ -130,6 +131,7 @@ class Simulator:
 
         self.set_executor_runtimes()
         self.set_executor_loadtimes()
+        logging.info('Model variant accuracies: {}'.format(self.model_variant_accuracies))
         time.sleep(1)
 
         self.set_executor_model_variants()
@@ -189,10 +191,15 @@ class Simulator:
     
     def read_variants_from_file(self, filename):
         model_variants = []
+        isi_name = filename.split('/')[-1]
         if os.path.exists(filename):
             with open(filename, mode='r') as rf:
-                model_variants = rf.readlines()
-            model_variants = list(map(str.rstrip, model_variants))
+                for line in rf.readlines():
+                    model_variant = line.split(',')[0]
+                    accuracy = float(line.rstrip('\n').split(',')[1])
+
+                    model_variants.append(model_variant)
+                    self.model_variant_accuracies[(isi_name, model_variant)] = accuracy
         else:
             logging.error('read_variants_from_file: no path {} found!'.format(filename))
         return model_variants
