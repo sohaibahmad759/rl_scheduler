@@ -219,7 +219,11 @@ class Simulator:
                 start_time = int(request_description[0])
                 # if qos_level is defined, use that. otherwise use qos_level 0 by default
                 if len(request_description) >= 2:
-                    qos_level = int(request_description[1])
+                    try:
+                        qos_level = int(request_description[1])
+                    except ValueError:
+                        accuracy = float(request_description[1])
+                        qos_level = 0
                 else:
                     qos_level = 0
                 # also, if n_qos_levels is 1, ignore qos info from trace
@@ -256,7 +260,11 @@ class Simulator:
             start_time = int(request_description[0])
             # if qos_level is defined, use that. otherwise use qos_level 0 by default
             if len(request_description) >= 2:
-                qos_level = int(request_description[1])
+                try:
+                    qos_level = int(request_description[1])
+                except ValueError:
+                    accuracy = float(request_description[1])
+                    qos_level = 0
             else:
                 qos_level = 0
             # also, if n_qos_levels is 1, ignore qos info from trace

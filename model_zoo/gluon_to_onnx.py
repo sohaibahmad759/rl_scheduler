@@ -1,9 +1,11 @@
+# Tutorial from https://chai-bapat.medium.com/5min-gluon-model-to-onnx-e8ed0eea754e
+
 import os
 from gluoncv import model_zoo
 import numpy as np
 import mxnet as mx
 
-model_names = ['mobilenet1.0', 'mobilenet0.75', 'mobilenet0.5', 'mobilenet0.25']
+model_names = ['efficientnet-b0']
 
 for model_name in model_names:
     directory = os.path.join('onnx', model_name)

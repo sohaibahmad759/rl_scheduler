@@ -1,0 +1,5 @@
+efficientnetb0,77.1
+efficientnetb1,79.1
+efficientnetb3,81.6
+efficientnetb5,83.6
+efficientnetb7,84.3
