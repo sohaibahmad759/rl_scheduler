@@ -30,10 +30,11 @@ def getargs():
     parser.add_argument('--reward_window_length', '-l', required=False, default=10,
                         dest='reward_window_length', help='The number of steps to look out into the future to ' +
                         'calculate the reward of an action. Default value is 10')
-    parser.add_argument('--model_assignment', '-ma', required=True, choices=['1', '2', '3', '4', '5', '6', '7', '8'],
+    parser.add_argument('--model_assignment', '-ma', required=True, choices=['1', '2', '3', '4', '5', '6', '7', '8', '9'],
                         dest='model_asn_algo', help='The model assignment algorithm. Select a number:\n' +
                         '1 - Random. 2 - Static. 3 - Least Frequently Used (LFU). 4 - Load proportional. ' +
-                        '5 - RL. 6 - RL with warm start (load proportional). 7 - ILP. 8 - ILP (Max throughput)')
+                        '5 - RL. 6 - RL with warm start (load proportional). 7 - ILP. 8 - ILP (Max throughput). ' +
+                        '9 - INFaaS')
     parser.add_argument('--job_scheduling', '-js', required=True, choices=['1', '2', '3', '4', '5'],
                         dest='job_sched_algo', help='The job scheduling algorithm. Select a number:\n' +
                         '1 - Random. 2 - Round robin. 3 - Earliest Finish Time with FIFO. ' +
@@ -53,7 +54,8 @@ def main(args):
     reward_window_length = args.reward_window_length
     allocation_window = int(args.allocation_window)
 
-    model_asn_algos = ['random', 'static', 'lfu', 'load_proportional', 'rl', 'rl_warm', 'ilp', 'ilp_throughput']
+    model_asn_algos = ['random', 'static', 'lfu', 'load_proportional', 'rl', 'rl_warm',
+                        'ilp', 'ilp_throughput', 'infaas']
     model_assignment = model_asn_algos[int(args.model_asn_algo)-1]
 
     env = SchedulingEnv(trace_dir=args.trace_path, job_sched_algo=int(args.job_sched_algo),
@@ -92,6 +94,8 @@ def main(args):
         ilp = IlpThroughput(allocation_window=allocation_window)
         ilp_applied = True
         print('Testing with solution given by ILP (Max throughput version)')
+    elif model_assignment == 'infaas':
+        print('Testing with INFaaS model assignment policy')
     else:
         print('Undefined mode, exiting')
         sys.exit(0)
@@ -249,10 +253,29 @@ def main(args):
 
                 if isi == env.n_executors - 1:
                     ilp_applied = True
-
+            
             # action = env.action_space.sample()
             # for j in range(5, len(action)):
             #     action[j] = 0
+        elif model_assignment == 'infaas':
+            print()
+            env.trigger_infaas_upscaling()
+            env.trigger_infaas_downscaling()
+            
+            num_isi = observation.shape[0] - 1
+            # Initially, we give all executors one CPU predictor to start with
+            if i < num_isi:
+                action = env.action_space.sample()
+                action[0] = i
+                action[1:5] = [1,0,0,0]
+            else:
+                # apply null action, as autoscaling is done by now
+                action = env.action_space.sample()
+                action[0] = 0
+                action[1:5] = observation[0, 0:4]
+            # print('observation:' + str(observation))
+            # print('null action:' + str(action))
+            # time.sleep(2)
 
         if i % 100 == 0:
             print('Testing step: {} of {}'.format(i, testing_steps))

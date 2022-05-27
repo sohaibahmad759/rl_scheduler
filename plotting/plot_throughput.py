@@ -18,6 +18,6 @@ capacity = df['capacity']
 
 plt.plot(time, demand, label='demand')
 plt.plot(time, throughput, label='throughput')
-plt.plot(time, capacity, label='capacity')
+# plt.plot(time, capacity, label='capacity')
 plt.legend()
 plt.savefig(os.path.join('..', 'figures', 'throughput.png'))

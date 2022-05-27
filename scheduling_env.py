@@ -32,7 +32,7 @@ class SchedulingEnv(gym.Env):
         self.allocation_window = allocation_window
         
         # if we make this a vector, can have heterogeneous no. of accelerators for each type
-        self.max_no_of_accelerators = 5
+        self.max_no_of_accelerators = 10
         self.max_runtime = 1000
 
         # max total predictors for each accelerator type (CPU, GPU, VPU, FPGA) respectively
@@ -199,6 +199,14 @@ class SchedulingEnv(gym.Env):
             logging.debug(self.simulator.get_runtimes(i))
             logging.debug(self.state)
         return
+
+    
+    def trigger_infaas_upscaling(self):
+        self.simulator.trigger_infaas_upscaling()
+
+
+    def trigger_infaas_downscaling(self):
+        self.simulator.trigger_infaas_downscaling()
 
     
     def reset(self):

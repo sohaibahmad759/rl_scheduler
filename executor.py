@@ -24,7 +24,7 @@ class TaskAssignment(Enum):
 
 class Executor:
     def __init__(self, isi, task_assignment, n_qos_levels=1, behavior=Behavior.BESTEFFORT, runtimes=None,
-                    variant_runtimes=None, variant_loadtimes=None, max_acc_per_type=0):
+                    variant_runtimes=None, variant_loadtimes=None, max_acc_per_type=0, simulator=None):
         self.id = uuid.uuid4().hex
         self.isi = isi
         self.n_qos_levels = n_qos_levels
@@ -42,6 +42,8 @@ class Executor:
         self.variant_accuracies = {}
 
         self.model_variants = {}
+
+        self.simulator = simulator
         
         # EITHER: do we want a separate event queue for each executor? then we would need to
         # have another clock and interrupt when request ends
@@ -327,6 +329,104 @@ class Executor:
                 logging.debug('WARN: Request id {} for {} could not be assigned to any predictor. (Time: {})'.format(event.id, event.desc, clock))
 
             return assigned, qos_met
+    
+
+    def trigger_infaas_upscaling(self):
+        logging.debug('infaas upscaling triggered')
+        for key in self.predictors:
+            predictor = self.predictors[key]
+            # peak_throughput = 1000 / predictor.profiled_latencies[(self.isi, predictor.qos_level)]
+            peak_throughput = 1000 / self.variant_runtimes[predictor.acc_type][(self.isi, predictor.variant_name)]
+            queued_requests = len(predictor.request_queue)
+
+            infaas_slack = 0.95
+
+            if math.floor(peak_throughput * infaas_slack) > queued_requests:
+                # no need for scaling
+                logging.debug('no need for scaling')
+            else:
+                logging.info('INFaaS autoscaling triggered at predictor {}, executor {}.'.format(predictor.id,
+                                self.isi))
+                logging.info('floor(peak_throughput * infaas_slack):' +
+                             str(math.floor(peak_throughput * infaas_slack)))
+                logging.info('queued requests:' + str(queued_requests))
+
+                # Now we have two options: (1) replication, (2) upgrading to meet SLO
+                # Calculate the cost for both and choose the cheaper option
+
+                # Option 1: Replication
+                incoming_load = self.simulator.total_requests_arr[self.simulator.isi_to_idx[self.isi]]
+                logging.info('incoming load:' + str(incoming_load))
+                replicas_needed = math.ceil(incoming_load / (peak_throughput * infaas_slack))
+
+                # Option 2: Upgrade
+                # We might not upgrade to a model variant with higher accuracy, but we
+                # could upgrade to a different accelerator type with higher throughput
+                cpu_peak_throughput = self.variant_runtimes[AccType.CPU.value][(self.isi, predictor.variant_name)]
+                gpu_peak_throughput = self.variant_runtimes[AccType.GPU.value][(self.isi, predictor.variant_name)]
+                vpu_peak_throughput = self.variant_runtimes[AccType.VPU.value][(self.isi, predictor.variant_name)]
+                fpga_peak_throughput = self.variant_runtimes[AccType.FPGA.value][(self.isi, predictor.variant_name)]
+                
+                cpu_needed = math.ceil(incoming_load / (cpu_peak_throughput * infaas_slack))
+                gpu_needed = math.ceil(incoming_load / (gpu_peak_throughput * infaas_slack))
+                vpu_needed = math.ceil(incoming_load / (vpu_peak_throughput * infaas_slack))
+                fpga_needed = math.ceil(incoming_load / (fpga_peak_throughput * infaas_slack))
+
+                cpu_available = self.simulator.available_predictors[0]
+                gpu_available = self.simulator.available_predictors[1]
+                vpu_available = self.simulator.available_predictors[2]
+                fpga_available = self.simulator.available_predictors[3]
+
+                if cpu_available == 0:
+                    cpu_needed = math.inf
+                if gpu_available == 0:
+                    gpu_needed = math.inf
+                if vpu_available == 0:
+                    vpu_needed = math.inf
+                if fpga_available == 0:
+                    fpga_needed = math.inf
+
+                upgrade_needed = min([cpu_needed, gpu_needed, vpu_needed, fpga_needed])
+
+                if upgrade_needed <= replicas_needed:
+                    type_needed = [cpu_needed, gpu_needed, vpu_needed, fpga_needed].index(upgrade_needed)
+
+                    logging.info('upgrade needed:' + str(upgrade_needed))
+                    logging.info('type needed:' + str(type_needed))
+                    logging.info('available predictors left:' +
+                                 str(self.simulator.available_predictors[type_needed]))
+                    # add 'upgrade_needed' predictors of type 'type_needed' or as many as possible
+                    while self.simulator.available_predictors[type_needed] > 0 and upgrade_needed > 0:
+                        self.add_predictor(acc_type=AccType(type_needed+1))
+                        upgrade_needed -= 1
+                        self.simulator.available_predictors[type_needed] -= 1
+                    logging.info('upgrade needed:' + str(upgrade_needed))
+                    logging.info('available predictors left:' +
+                                 str(self.simulator.available_predictors[type_needed]))
+                    # time.sleep(2)
+                    return
+                else:
+                    # add 'replicas_needed' predictors of type 'predictor.acc_type' or as many as possible
+                    type_needed = predictor.acc_type
+                    logging.info('replicas needed:' + str(replicas_needed))
+                    logging.info('type needed:' + str(type_needed))
+                    logging.info('available predictors left:' +
+                                 str(self.simulator.available_predictors[type_needed]))
+                    # add 'upgrade_needed' predictors of type 'type_needed' or as many as possible
+                    while self.simulator.available_predictors[type_needed] > 0 and replicas_needed > 0:
+                        self.add_predictor(acc_type=type_needed)
+                        replicas_needed -= 1
+                        self.simulator.available_predictors[type_needed] -= 1
+                    logging.info('replicas needed:' + str(upgrade_needed))
+                    logging.info('available predictors left:' +
+                                 str(self.simulator.available_predictors[type_needed]))
+                    # time.sleep(2)
+                    return
+
+    
+    def trigger_infaas_downscaling(self):
+        logging.info('infaas downscaling not implemented')
+        time.sleep(2)
 
     
     def finish_request(self, event, clock):
