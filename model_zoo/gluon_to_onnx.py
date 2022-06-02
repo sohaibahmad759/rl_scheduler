@@ -5,7 +5,7 @@ from gluoncv import model_zoo
 import numpy as np
 import mxnet as mx
 
-model_names = ['efficientnet-b0']
+model_names = ['vgg11', 'vgg13', 'vgg16', 'vgg19']
 
 for model_name in model_names:
     directory = os.path.join('onnx', model_name)
