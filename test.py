@@ -237,7 +237,7 @@ def main(args):
             if ilp_applied == True:
                 actions = ilp.run(observation, env.n_accelerators, env.max_no_of_accelerators)
             
-            if np.sum(actions) == 0:
+            if np.sum(actions) == 0 or actions is None:
                 # Apply null action
                 action = env.action_space.sample()
                 for j in range(len(action)):

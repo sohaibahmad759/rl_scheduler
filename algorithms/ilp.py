@@ -132,12 +132,20 @@ class Ilp(SchedulingAlgorithm):
 
         # Smaller value weighs throughput more, higher value weighs accuracy more
         alpha = 0.0
+        # alpha = 0.9
+
+        # If there are no incoming requests, terminate ILP
+        if sum(s.values()) == 0:
+            self.log.error('No requests received, terminating ILP.')
+            return None
+        else:
+            print('\nIncoming requests:' + str(sum(s.values())))
 
         # TODO: Accuracy is from [0, 100] but throughput can be [0, +inf]
         # TODO: We can bound throughput by dividing it by total number of requests to make throughput %
         # TODO: That way, they will also both be on the same scale (i.e., [0, 100])
         # Set the objective
-        m.setObjective(alpha * gp.quicksum(w) * aux + (1-alpha) * gp.quicksum(y), GRB.MAXIMIZE)
+        m.setObjective(alpha * gp.quicksum(w) * aux + (1-alpha) * gp.quicksum(y) / sum(s.values()), GRB.MAXIMIZE)
 
         # Add constraints
         # m.addConstrs((w[k] == sum(sum(s[k]*b[j, k]*A[j]*z[j, k]*x[i, j] for j in models)
