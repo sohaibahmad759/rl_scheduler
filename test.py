@@ -234,6 +234,9 @@ def main(args):
                 action[receiving_acc+1] += 1
                 # print(observation)
         elif model_assignment == 'ilp' or model_assignment == 'ilp_throughput':
+            if ilp.is_simulator_set() is False:
+                ilp.set_simulator(env.simulator)
+
             if ilp_applied == True:
                 actions = ilp.run(observation, env.n_accelerators, env.max_no_of_accelerators)
             

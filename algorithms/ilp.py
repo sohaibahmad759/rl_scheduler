@@ -17,10 +17,21 @@ class Ilp(SchedulingAlgorithm):
 
         self.allocation_window = allocation_window
 
+        self.simulator = None
+
         # logging.basicConfig(filename='output.log',
         #                     mode='w',
         #                     format='%(asctime)s - %(message)s', datefmt='%d-%b-%y %H:%M:%S',
         #                     level=logging.DEBUG)
+
+    def is_simulator_set(self):
+        if self.simulator is None:
+            return True
+        else:
+            return False
+
+    def set_simulator(self, simulator):
+        self.simulator = simulator
 
     def run(self, observation, num_acc_types, num_max_acc):
         # print('observation shape:', observation.shape)
@@ -131,8 +142,8 @@ class Ilp(SchedulingAlgorithm):
         aux = m.addVar(name='aux')
 
         # Smaller value weighs throughput more, higher value weighs accuracy more
-        alpha = 0.0
-        # alpha = 0.9
+        # alpha = 0.0
+        alpha = 0.9
 
         # If there are no incoming requests, terminate ILP
         if sum(s.values()) == 0:
@@ -145,7 +156,8 @@ class Ilp(SchedulingAlgorithm):
         # TODO: We can bound throughput by dividing it by total number of requests to make throughput %
         # TODO: That way, they will also both be on the same scale (i.e., [0, 100])
         # Set the objective
-        m.setObjective(alpha * gp.quicksum(w) * aux + (1-alpha) * gp.quicksum(y) / sum(s.values()), GRB.MAXIMIZE)
+        # m.setObjective(alpha * gp.quicksum(w) * aux + (1-alpha) * gp.quicksum(y) / sum(s.values()), GRB.MAXIMIZE)
+        m.setObjective(alpha * gp.quicksum(w) / sum(s.values()) / 100 + (1-alpha) * gp.quicksum(y) / sum(s.values()), GRB.MAXIMIZE)
 
         # Add constraints
         # m.addConstrs((w[k] == sum(sum(s[k]*b[j, k]*A[j]*z[j, k]*x[i, j] for j in models)
@@ -157,9 +169,10 @@ class Ilp(SchedulingAlgorithm):
             #                         for i in accelerators), 'c1_2_' + str(k))
             
             # TODO: weird thing happens where if w[k] becomes important, all accelerators go to same model
-            m.addConstr(w[k] == sum(s[k]*z[j,k]*b[j,k]*A[j] for j in models), 'c1_3' + str(k))
+            # m.addConstr(w[k] == sum(s[k]*z[j,k]*b[j,k]*A[j] for j in models), 'c1_3' + str(k))
             # m.addConstr(w[k] <= sum(sum(y[j]*A[j]*x[i, j] for j in models)
-            #                         for i in accelerators), 'c1_4_' + str(k))
+                                    # for i in accelerators), 'c1_4_' + str(k))
+            m.addConstr(w[k] == sum(y[j]*z[j,k]*A[k] for j in models), 'c1_5_' + str(k))
             # m.addConstr(sum(b[j, k] * z[j, k] for j in models) <= 1, 'c3_' + str(k))
             # m.addConstr(sum(z[j, k] for j in models) <= 1, 'c3_2_' + str(k))
             m.addConstr(sum(b[j, k] * z[j, k] for j in models) == sum(b[j, k] for j in models), 'c3_' + str(k))
@@ -167,6 +180,7 @@ class Ilp(SchedulingAlgorithm):
 
         # m.addConstr(aux * gp.quicksum(y) == 1, 'c_aux')
         # m.addConstr(gp.quicksum(y) >= 1, 'c_bound_1')
+
         m.addConstr(aux * gp.quicksum(s) == 1, 'c_aux')
 
         # m.addConstrs((sum(x[i, j] for j in models) <=
