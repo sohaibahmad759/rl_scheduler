@@ -150,7 +150,7 @@ class Ilp(SchedulingAlgorithm):
 
         # Smaller value weighs throughput more, higher value weighs accuracy more
         # alpha = 0.0
-        alpha = 0.0
+        alpha = 0.9
 
         # If there are no incoming requests, terminate ILP
         if sum(s.values()) == 0:
@@ -172,8 +172,6 @@ class Ilp(SchedulingAlgorithm):
             #                         for i in accelerators), 'c1_1_' + str(k))
             # m.addConstr(w[k] == sum(sum(y[j]*b[j, k]*A[j]*x[i, j] for j in models)
             #                         for i in accelerators), 'c1_2_' + str(k))
-            
-            # TODO: weird thing happens where if w[k] becomes important, all accelerators go to same model
             # m.addConstr(w[k] == sum(s[k]*z[j,k]*b[j,k]*A[j] for j in models), 'c1_3' + str(k))
             # m.addConstr(w[k] <= sum(sum(y[j]*A[j]*x[i, j] for j in models)
                                     # for i in accelerators), 'c1_4_' + str(k))
@@ -183,8 +181,9 @@ class Ilp(SchedulingAlgorithm):
 
             # TODO: Jun 1: model is infeasible due to this particular constraint, without it the model
             #               works but gives weird result
+            # TODO: edit: it seems like this issue has been resolved with constraint c3_3_
             # m.addConstr(sum(b[j, k] * z[j, k] for j in models) == sum(b[j, k] for j in models), 'c3_' + str(k))
-            
+            m.addConstr(sum(b[j,k] * z[j,k] for j in models) == 1, 'c3_3_' + str(k))
             m.addConstr(sum(z[j, k] for j in models) == 1, 'c3_2_' + str(k))
 
         # m.addConstr(aux * gp.quicksum(y) == 1, 'c_aux')
@@ -259,8 +258,8 @@ class Ilp(SchedulingAlgorithm):
         # Generate a 2D np.ndarray from ilp_solution similar to current_alloc
         new_alloc = np.zeros(current_alloc.shape)
 
-        # print('accelerators:', accelerators)
-        # print('models:', models)
+        print('accelerators:', accelerators)
+        print('models:', models)
         # time.sleep(5)
 
         for i in accelerators:
@@ -268,6 +267,10 @@ class Ilp(SchedulingAlgorithm):
                 if ilp_solution[i, j].X == 1:
                     accelerator_type = i.split('-')[0]
                     new_alloc[j, self.accelerator_dict[accelerator_type]] += 1
+                    
+                    # TODO: We are going to add predictors manually
+                    
+                    
 
         # print('new allocation:', new_alloc)
         self.log.debug('current_allocation:' + str(current_alloc))
