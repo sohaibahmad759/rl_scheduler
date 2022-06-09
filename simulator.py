@@ -132,7 +132,6 @@ class Simulator:
         self.set_executor_runtimes()
         self.set_executor_loadtimes()
         logging.info('Model variant accuracies: {}'.format(self.model_variant_accuracies))
-        time.sleep(1)
 
         self.set_executor_model_variants()
 

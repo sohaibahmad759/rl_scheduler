@@ -26,9 +26,9 @@ class Ilp(SchedulingAlgorithm):
 
     def is_simulator_set(self):
         if self.simulator is None:
-            return True
-        else:
             return False
+        else:
+            return True
 
     def set_simulator(self, simulator):
         self.simulator = simulator
@@ -92,36 +92,40 @@ class Ilp(SchedulingAlgorithm):
         b = {}
 
         for isi in range(num_isi):
-            # print(isi)
             rtypes.append(isi)
 
             # Initialize demand for each request type (ISI)
             s[isi] = demand[isi]
 
-        # We want to randomly initialize accuracy values for now, but we set the
-        # seed so that accuracy values are always the same
-        np.random.seed(0)
+            isi_name = self.simulator.idx_to_executor[isi]
+            model_variants = self.simulator.model_variants[isi_name]
 
-        for model in range(num_models):
-            models.append(model)
+            for model_variant in model_variants:
+                models.append(model_variant)
 
-            A[model] = np.random.randint(50, 100)
+                # A[model_variant] = np.random.randint(50, 100)
+                A[model_variant] = self.simulator.model_variant_accuracies[(
+                    isi_name, model_variant)]
 
-            for accelerator in accelerators:
-                accelerator_type = accelerator.split('-')[0]
-                latency = latencies[isi, self.accelerator_dict[accelerator_type]]
+                for accelerator in accelerators:
+                    accelerator_type = accelerator.split('-')[0]
+                    latency = latencies[isi, self.accelerator_dict[accelerator_type]]
 
-                if latency is None:
-                    throughput = 0
-                else:
-                    throughput = 1000 / latency
-                p[accelerator, model] = throughput
+                    if latency is None:
+                        throughput = 0
+                    else:
+                        throughput = 1000 / latency
+                    p[accelerator, model_variant] = throughput
 
-            for isi in range(num_isi):
-                if model == isi:
-                    b[model, isi] = 1
-                else:
-                    b[model, isi] = 0
+                for isi in range(num_isi):
+                    # if model == isi:
+                    #     b[model, isi] = 1
+                    # else:
+                    #     b[model, isi] = 0
+                    if model_variant in self.simulator.model_variants[self.simulator.idx_to_executor[isi]]:
+                        b[model_variant, isi] = 1
+                    else:
+                        b[model_variant, isi] = 0
 
         # Helper variables for setting up the ILP
         ij_pairs, _ = gp.multidict(p)
@@ -137,13 +141,16 @@ class Ilp(SchedulingAlgorithm):
         # Add optimization variables
         w = m.addVars(rtypes, name='x')
         x = m.addVars(ij_pairs, vtype=GRB.BINARY, name='x')
+        # TODO: Both these variables need to be positive
+        # y = m.addVars(models, name='y', vtype=GRB.POSITIVE)
+        # z = m.addVars(jk_pairs, name='z', vtype=GRB.POSITIVE)
         y = m.addVars(models, name='y')
         z = m.addVars(jk_pairs, name='z')
         aux = m.addVar(name='aux')
 
         # Smaller value weighs throughput more, higher value weighs accuracy more
         # alpha = 0.0
-        alpha = 0.9
+        alpha = 0.0
 
         # If there are no incoming requests, terminate ILP
         if sum(s.values()) == 0:
@@ -151,10 +158,8 @@ class Ilp(SchedulingAlgorithm):
             return None
         else:
             print('\nIncoming requests:' + str(sum(s.values())))
-
-        # TODO: Accuracy is from [0, 100] but throughput can be [0, +inf]
-        # TODO: We can bound throughput by dividing it by total number of requests to make throughput %
-        # TODO: That way, they will also both be on the same scale (i.e., [0, 100])
+        
+        # TODO: how to set accelerators for each model variant (and specify model variant while doing so)?
         # Set the objective
         # m.setObjective(alpha * gp.quicksum(w) * aux + (1-alpha) * gp.quicksum(y) / sum(s.values()), GRB.MAXIMIZE)
         m.setObjective(alpha * gp.quicksum(w) / sum(s.values()) / 100 + (1-alpha) * gp.quicksum(y) / sum(s.values()), GRB.MAXIMIZE)
@@ -172,10 +177,14 @@ class Ilp(SchedulingAlgorithm):
             # m.addConstr(w[k] == sum(s[k]*z[j,k]*b[j,k]*A[j] for j in models), 'c1_3' + str(k))
             # m.addConstr(w[k] <= sum(sum(y[j]*A[j]*x[i, j] for j in models)
                                     # for i in accelerators), 'c1_4_' + str(k))
-            m.addConstr(w[k] == sum(y[j]*z[j,k]*A[k] for j in models), 'c1_5_' + str(k))
+            m.addConstr(w[k] == sum(y[j]*z[j,k]*A[j] for j in models), 'c1_5_' + str(k))
             # m.addConstr(sum(b[j, k] * z[j, k] for j in models) <= 1, 'c3_' + str(k))
             # m.addConstr(sum(z[j, k] for j in models) <= 1, 'c3_2_' + str(k))
-            m.addConstr(sum(b[j, k] * z[j, k] for j in models) == sum(b[j, k] for j in models), 'c3_' + str(k))
+
+            # TODO: Jun 1: model is infeasible due to this particular constraint, without it the model
+            #               works but gives weird result
+            # m.addConstr(sum(b[j, k] * z[j, k] for j in models) == sum(b[j, k] for j in models), 'c3_' + str(k))
+            
             m.addConstr(sum(z[j, k] for j in models) == 1, 'c3_2_' + str(k))
 
         # m.addConstr(aux * gp.quicksum(y) == 1, 'c_aux')
@@ -249,6 +258,10 @@ class Ilp(SchedulingAlgorithm):
 
         # Generate a 2D np.ndarray from ilp_solution similar to current_alloc
         new_alloc = np.zeros(current_alloc.shape)
+
+        # print('accelerators:', accelerators)
+        # print('models:', models)
+        # time.sleep(5)
 
         for i in accelerators:
             for j in models:
