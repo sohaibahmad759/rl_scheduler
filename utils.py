@@ -20,3 +20,15 @@ def log_throughput(logger, observation, simulation_time, allocation_window):
     
     logger.info(str(time.time()) + ',' + str(simulation_time) + ',' + str(demand) \
                     + ',' + str(throughput) + ',' + str(capacity))
+
+def log_thput_accuracy_per_model(logger, simulation_time, requests, failed, accuracy):
+    line = str(time.time()) + ',' + str(simulation_time)
+    for model in range(len(requests)):
+        throughput = requests[model] - failed[model]
+        line = line + ',' + str(requests[model]) + ',' + str(throughput) + ','
+        if requests[model] > 0:
+            line = line + str(throughput/requests[model])
+        else:
+            line = line + '0'
+        line = line + ',' + str(accuracy[model])
+    logger.info(line)

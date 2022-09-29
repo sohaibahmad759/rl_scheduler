@@ -14,7 +14,7 @@ class SchedulingEnv(gym.Env):
 
     def __init__(self, trace_dir, job_sched_algo, action_group_size,
                  reward_window_length=10, random_runtimes=False, fixed_seed=0,
-                 allocation_window=1000):
+                 allocation_window=1000, model_assignment=''):
         super(SchedulingEnv, self).__init__()
 
         logging.basicConfig(level=logging.INFO)
@@ -34,6 +34,8 @@ class SchedulingEnv(gym.Env):
         # if we make this a vector, can have heterogeneous no. of accelerators for each type
         self.max_no_of_accelerators = 10
         self.max_runtime = 1000
+
+        self.model_assignment = model_assignment
 
         # max total predictors for each accelerator type (CPU, GPU, VPU, FPGA) respectively
         self.predictors_max = self.max_no_of_accelerators * np.ones(self.n_accelerators * self.n_qos_levels)
@@ -127,16 +129,18 @@ class SchedulingEnv(gym.Env):
         logging.debug('--------------------------')
         logging.debug('')
 
-        applied_assignment = self.simulator.apply_assignment_vector(action)
+        if not(self.model_assignment == 'ilp'):
+            applied_assignment = self.simulator.apply_assignment_vector(action)
         # self.state[action[0], 0:4] = action[1:]
         # self.state[action[0], 0:4] = applied_assignment
-        self.state[action[0], 0:self.n_accelerators*self.n_qos_levels] = applied_assignment
-        logging.debug(self.state)
+            self.state[action[0], 0:self.n_accelerators*self.n_qos_levels] = applied_assignment
+            logging.debug(self.state)
 
         available_predictors = self.simulator.get_available_predictors()
         # self.failed_requests += self.simulator.get_failed_requests()
         total_requests_arr = self.simulator.get_total_requests_arr()
         failed_requests_arr = self.simulator.get_failed_requests_arr()
+        completed_requests = self.simulator.completed_requests
         qos_stats = self.simulator.get_qos_stats()
 
         self.state[-1, 0:4] = available_predictors

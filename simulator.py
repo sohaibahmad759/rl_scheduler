@@ -10,6 +10,8 @@ import time
 import uuid
 import numpy as np
 from enum import Enum
+
+from scipy.fft import idct
 from executor import Executor, AccType
 
 
@@ -60,7 +62,14 @@ class Simulator:
         self.vpu_variant_runtimes = {}
         self.fpga_variant_runtimes = {}
 
+        self.requests_per_model = {}
+        self.failed_per_model = {}
+
+        self.accuracy_per_model = {}
+
         self.trace_files = {}
+
+        self.accuracy_logfile = open('logs/log_ilp_accuracy.txt', mode='w')
 
         self.predictors_max = predictors_max
         # self.available_predictors = np.tile(copy.deepcopy(predictors_max), self.n_qos_levels)
@@ -292,6 +301,11 @@ class Simulator:
     def set_model_variants(self, isi_name, model_variant_list):
         self.model_variants[isi_name] = model_variant_list
 
+        self.requests_per_model[isi_name] = 0
+        self.failed_per_model[isi_name] = 0
+
+        self.accuracy_per_model[isi_name] = []
+
     def initialize_runtimes(self, isi_name, random_runtimes=False):
         for qos_level in range(self.n_qos_levels):
             if random_runtimes:
@@ -317,6 +331,23 @@ class Simulator:
             # print(self.vpu_runtimes)
             # print(self.fpga_runtimes)
         return
+
+    def get_thput_accuracy_per_model(self):
+        requests = []
+        failed = []
+        accuracy = []
+        for model in self.requests_per_model:
+            requests.append(self.requests_per_model[model])
+            self.requests_per_model[model] = 0
+            
+            failed.append(self.failed_per_model[model])
+            self.failed_per_model[model] = 0
+
+            total_accuracy = sum(self.accuracy_per_model[model])
+            accuracy.append(total_accuracy)
+            self.accuracy_per_model[model] = []
+
+        return requests, failed, accuracy
 
     def initialize_model_variant_loadtimes(self, isi_name):
         model_variant_list = self.model_variants[isi_name]
@@ -475,6 +506,133 @@ class Simulator:
                 'Executor {} has assignment: {}'.format(isi, assignment))
         return
 
+    def apply_predictor_dict(self, required_predictors={}, canary_dict={}):
+        """ Takes in a dictionary 'required_predictors' with
+        key: (model_variant, accelerator_type)
+        value: number of predictors
+        A dictionary 'canary_dict' with
+        key: (model_variant, isi)
+        value: canary routing percentage
+        Applies the assignment to current system
+        """
+        if len(required_predictors) == 0:
+            print('No required predictors passed')
+            time.sleep(5)
+            return
+
+        ilp_to_acc_type = {}
+        ilp_to_acc_type['CPU'] = 1
+        ilp_to_acc_type['GPU_PASCAL'] = 2
+        ilp_to_acc_type['VPU'] = 3
+        ilp_to_acc_type['GPU_AMPERE'] = 4
+
+        variant_to_executor = {}
+
+        # Build a dictionary 'existing_predictors'
+        existing_predictors = {}
+        for ex_key in self.executors:
+            executor = self.executors[ex_key]
+            # print('executor {}, name: {}'.format(executor, executor.isi))
+            # print('executor.predictors:', executor.predictors)
+            for pred_list_key in executor.predictors:
+                predictor = executor.predictors[pred_list_key]
+                model_variant = predictor.variant_name
+                acc_type = predictor.acc_type
+                
+                tuple_key = (model_variant, acc_type)
+
+                if tuple_key in existing_predictors:
+                    existing_predictors[tuple_key].append(predictor)
+                else:
+                    existing_predictors[tuple_key] = [predictor]
+
+            # Build a reverse dictionary to get executor from model variant name
+            model_variants = executor.variants_for_this_executor
+            for variant in model_variants:
+                variant_to_executor[variant] = executor
+        # time.sleep(3)
+
+        # total_required = sum(required_predictors.values())
+        # total_existing = sum(len(x) for x in existing_predictors.values())
+        # print('total_required predictors:', total_required)
+        # print('total_existing predictors', total_existing)
+        # if (total_required > 40):
+        #     time.sleep(10)
+
+        existing_count = {}
+        for key in existing_predictors:
+            (model_variant, acc_type) = key
+            existing_count[(model_variant, AccType(acc_type))] = len(existing_predictors[key])
+        # print('existing predictor count:', sorted(existing_count))
+        # print('required predictors:', sorted(required_predictors))
+        # time.sleep(3)
+
+        # Go through each key:
+        for tuple_key in required_predictors:
+            # Remove predictors if needed
+            (model_variant, accelerator_type) = tuple_key
+            acc_type = ilp_to_acc_type[accelerator_type]
+
+            if not((model_variant, acc_type) in existing_predictors):
+                continue
+            existing = len(existing_predictors[(model_variant, acc_type)])
+            required = required_predictors[tuple_key]
+
+            while existing > required:
+                predictor = existing_predictors[(model_variant, acc_type)].pop()
+                id = predictor.id
+                executor = predictor.executor
+                if (executor.remove_predictor_by_id(id)):
+                    print('removed predictor {} of type {} for model variant {}'.format(id,
+                                predictor.acc_type, model_variant))
+                    self.available_predictors[acc_type-1] += 1
+                else:
+                    print('no predictor found with id:', id)
+                    time.sleep(2)
+
+                existing -= 1
+
+        # Go through each key:
+        added = 0
+        for tuple_key in required_predictors:
+            (model_variant, accelerator_type) = tuple_key
+            acc_type = ilp_to_acc_type[accelerator_type]
+
+            required = required_predictors[tuple_key]
+            if not((model_variant, acc_type) in existing_predictors):
+                existing = 0
+            else:
+                existing = len(existing_predictors[(model_variant, acc_type)])
+
+            # Add predictors if needed
+            while required > existing:
+                if (self.available_predictors[acc_type-1]) > 0:
+                    executor = variant_to_executor[model_variant]
+                    executor.add_predictor(acc_type=AccType(acc_type), variant_name=model_variant)
+                    self.available_predictors[acc_type-1] -= 1
+                    print('added predictor of type {} for model variant {}'.format(acc_type, model_variant))
+                    added += 1
+                if (self.available_predictors[acc_type-1]) < 0:
+                    print('Error! Available predictors {} for type {}'.format(self.available_predictors[acc_type-1], acc_type))
+                    time.sleep(5)
+                required -= 1
+        print('added predictors:', added)
+        # time.sleep(1)
+        
+        return
+
+    def null_action(self, action, idx):
+        action[0] = idx
+        action[1:] = np.zeros(len(action)-1)
+        executor_idx = self.idx_to_executor[idx]
+        executor = self.executors[executor_idx]
+        print('isi:', executor.isi)
+        predictor_list = executor.predictors
+        for predictor_key in predictor_list:
+            predictor = predictor_list[predictor_key]
+            action[predictor.acc_type] += 1
+        return action
+
     def apply_assignment(self, assignment):
         logging.debug('Applying assignment: {}'.format(assignment))
         assignment = np.round(np.nan_to_num(
@@ -623,6 +781,9 @@ class Simulator:
         if len(self.event_queue) == 0:
             logging.warn('WARN: Ran out of requests while evaluating reward.')
 
+        # TODO: turn back on when using RL
+        return 0
+
         # only copying partial event queue
         partial_event_queue = copy.deepcopy(self.event_queue[:K * 2])
         temp_event_queue = self.event_queue
@@ -659,7 +820,7 @@ class Simulator:
                                     simulator=self)
             # call executor.process_request() on relevant executor
             executor = self.executors[isi]
-            end_time, qos_met = executor.process_request(
+            end_time, qos_met, accuracy_seen = executor.process_request(
                 event, clock, self.runtimes)
 
             # we report QoS fail whenever (i) request fails, (ii) request succeeds but QoS is not met
@@ -669,6 +830,7 @@ class Simulator:
             if end_time is None:
                 self.failed_requests += 1
                 self.failed_requests_arr[self.isi_to_idx[isi]] += 1
+                self.failed_per_model[isi] += 1
                 self.qos_stats[self.isi_to_idx[isi],
                                event.qos_level * 2 + 1] += 1
                 logging.debug('WARN: Request id {} for {} failed. (Time: {})'.format(
@@ -677,7 +839,11 @@ class Simulator:
                 # TODO: look into dequeue
                 self.insert_event(end_time, EventType.END_REQUEST,
                                   event.desc, id=event.id, qos_level=event.qos_level)
+                self.accuracy_logfile.write(str(accuracy_seen) + '\n')
+                self.accuracy_per_model[isi].append(accuracy_seen)
+                # self.accuracy += event.
             self.total_requests_arr[self.isi_to_idx[isi]] += 1
+            self.requests_per_model[isi] += 1
             self.qos_stats[self.isi_to_idx[isi], event.qos_level * 2] += 1
 
         elif event.type == EventType.END_REQUEST:

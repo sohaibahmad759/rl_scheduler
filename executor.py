@@ -3,6 +3,7 @@ import logging
 import math
 import random
 import time
+from types import NoneType
 import uuid
 import numpy as np
 from enum import Enum
@@ -20,6 +21,7 @@ class TaskAssignment(Enum):
     EARLIEST_FINISH_TIME = 3
     LATEST_FINISH_TIME = 4
     INFAAS = 5
+    CANARY = 6
 
 
 class Executor:
@@ -42,6 +44,7 @@ class Executor:
         self.variant_accuracies = {}
 
         self.model_variants = {}
+        self.variants_for_this_executor = []
 
         self.simulator = simulator
         
@@ -72,7 +75,8 @@ class Executor:
         # time.sleep(5)
 
         predictor = Predictor(acc_type.value, qos_level=qos_level, profiled_accuracy=profiled_accuracy,
-                                profiled_latencies=profiled_latencies, variant_name=variant_name)
+                                profiled_latencies=profiled_latencies, variant_name=variant_name,
+                                executor=self)
         self.predictors[predictor.id] = predictor
         self.num_predictor_types[acc_type.value-1 + qos_level*4] += 1
         self.iterator = itertools.cycle(self.predictors)
@@ -89,6 +93,7 @@ class Executor:
     
     def set_model_variants(self, model_variants={}):
         self.model_variants = model_variants
+        self.variants_for_this_executor = model_variants[self.isi]
 
 
     def set_variant_accuracies(self, accuracies=None):
@@ -105,7 +110,7 @@ class Executor:
     
     def remove_predictor_by_id(self, id):
         if id in self.predictors:
-            predictor_type = self.predictors[id].acc_type.value
+            predictor_type = self.predictors[id].acc_type
             predictor_qos = self.predictors[id].qos_level
             self.num_predictor_types[predictor_type-1 + predictor_qos*4] -= 1
             del self.predictors[id]
@@ -132,7 +137,7 @@ class Executor:
 
     def process_request(self, event, clock, runtimes):
         if len(self.predictors) == 0:
-            return None, False
+            return None, False, 0
             
         qos_met = True
 
@@ -183,6 +188,15 @@ class Executor:
             logging.debug('filtered_predictors[idx]: {}'.format(filtered_predictors[idx]))
             logging.debug('predictor: {}'.format(predictor))
             # time.sleep(2)
+
+        elif self.task_assignment == TaskAssignment.CANARY:
+            predictor = None
+
+            # First choose model variant
+
+            # Then within that model variant, perform earliest finish time
+
+
         elif self.task_assignment == TaskAssignment.INFAAS:
             accuracy_filtered_predictors = list(filter(lambda key: self.predictors[key].profiled_accuracy >= event.accuracy, self.predictors))
             predictor = None
@@ -304,7 +318,7 @@ class Executor:
             logging.info('No predictor available whatsoever')
             assigned = None
             qos_met = False
-            return assigned, qos_met
+            return assigned, qos_met, 0
 
         else:
             # Predictor has been found, assign request to it
@@ -322,13 +336,14 @@ class Executor:
 
             # Step 3: assign to predictor selected
             assigned = predictor.assign_request(event, clock)
+            accuracy = predictor.profiled_accuracy
             if assigned is not None:
                 self.assigned_requests[event.id] = predictor
                 # print('self.assigned_requests: {}'.format(self.assigned_requests))
             else:
                 logging.debug('WARN: Request id {} for {} could not be assigned to any predictor. (Time: {})'.format(event.id, event.desc, clock))
 
-            return assigned, qos_met
+            return assigned, qos_met, accuracy
     
 
     def trigger_infaas_upscaling(self):
@@ -426,7 +441,7 @@ class Executor:
     
     def trigger_infaas_downscaling(self):
         logging.info('infaas downscaling not implemented')
-        time.sleep(2)
+        # time.sleep(2)
 
     
     def finish_request(self, event, clock):

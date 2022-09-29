@@ -18,6 +18,7 @@ class Ilp(SchedulingAlgorithm):
         self.allocation_window = allocation_window
 
         self.simulator = None
+        self.num_isi = 0
 
         # logging.basicConfig(filename='output.log',
         #                     mode='w',
@@ -40,6 +41,7 @@ class Ilp(SchedulingAlgorithm):
         num_isi = observation.shape[0] - 1
         # For simple use cases, the number of models = number of ISIs
         num_models = num_isi
+        self.num_isi = num_isi
         
         current_alloc = observation[0:num_isi, 0:num_acc_types]
 
@@ -145,12 +147,13 @@ class Ilp(SchedulingAlgorithm):
         # y = m.addVars(models, name='y', vtype=GRB.POSITIVE)
         # z = m.addVars(jk_pairs, name='z', vtype=GRB.POSITIVE)
         y = m.addVars(models, name='y')
+        ind = m.addVars(models, name='ind', vtype=GRB.BINARY)
         z = m.addVars(jk_pairs, name='z')
-        aux = m.addVar(name='aux')
+        # aux = m.addVar(name='aux')
 
         # Smaller value weighs throughput more, higher value weighs accuracy more
         # alpha = 0.0
-        alpha = 0.9
+        alpha = 0.1
 
         # If there are no incoming requests, terminate ILP
         if sum(s.values()) == 0:
@@ -162,11 +165,12 @@ class Ilp(SchedulingAlgorithm):
         # TODO: how to set accelerators for each model variant (and specify model variant while doing so)?
         # Set the objective
         # m.setObjective(alpha * gp.quicksum(w) * aux + (1-alpha) * gp.quicksum(y) / sum(s.values()), GRB.MAXIMIZE)
-        m.setObjective(alpha * gp.quicksum(w) / sum(s.values()) / 100 + (1-alpha) * gp.quicksum(y) / sum(s.values()), GRB.MAXIMIZE)
+        m.setObjective((alpha * gp.quicksum(w) / sum(s.values()) / 100) + ((1-alpha) * gp.quicksum(y) / sum(s.values())), GRB.MAXIMIZE)
 
         # Add constraints
         # m.addConstrs((w[k] == sum(sum(s[k]*b[j, k]*A[j]*z[j, k]*x[i, j] for j in models)
         #                           for i in accelerators) for k in rtypes), 'c1')
+        m.addConstr(gp.quicksum(y) / sum(s.values()) >= 0.8, 'c_min_thput')
         for k in rtypes:
             # m.addConstr(w[k] <= sum(sum(s[k]*z[j, k]*b[j, k]*A[j]*x[i, j] for j in models)
             #                         for i in accelerators), 'c1_1_' + str(k))
@@ -175,7 +179,11 @@ class Ilp(SchedulingAlgorithm):
             # m.addConstr(w[k] == sum(s[k]*z[j,k]*b[j,k]*A[j] for j in models), 'c1_3' + str(k))
             # m.addConstr(w[k] <= sum(sum(y[j]*A[j]*x[i, j] for j in models)
                                     # for i in accelerators), 'c1_4_' + str(k))
-            m.addConstr(w[k] == sum(y[j]*z[j,k]*A[j] for j in models), 'c1_5_' + str(k))
+            # TODO: how of many of the requests in y[j] belong to isi k?
+            # m.addConstr(w[k] <= sum(y[j]*z[j,k]*A[j] for j in models), 'c1_5_' + str(k))
+            # TODO: Probably this constraint is forcing z[j,k] to be either 1 or 0
+            #       When alpha = 0, z[j,k] varies from 0 to 1 quite often
+            m.addConstr(w[k] <= sum(s[k]*z[j,k]*A[j] for j in models), 'c1_5_' + str(k))
             # m.addConstr(sum(b[j, k] * z[j, k] for j in models) <= 1, 'c3_' + str(k))
             # m.addConstr(sum(z[j, k] for j in models) <= 1, 'c3_2_' + str(k))
 
@@ -183,13 +191,19 @@ class Ilp(SchedulingAlgorithm):
             #               works but gives weird result
             # TODO: edit: it seems like this issue has been resolved with constraint c3_3_
             # m.addConstr(sum(b[j, k] * z[j, k] for j in models) == sum(b[j, k] for j in models), 'c3_' + str(k))
-            m.addConstr(sum(b[j,k] * z[j,k] for j in models) == 1, 'c3_3_' + str(k))
-            m.addConstr(sum(z[j, k] for j in models) == 1, 'c3_2_' + str(k))
+            m.addConstr(sum(b[j, k] * z[j, k] for j in models) == sum(z[j,k] for j in models), 'c3_3_' + str(k))
+            m.addConstr(sum(z[j, k] for j in models) <= 1, 'c3_2_' + str(k))
+            # m.addConstr(sum(z[j, k] * ind[j] for j in models) == 1, 'c_ind_3_' + str(k))
+
+            m.addConstr(sum(sum(x[i, j] for i in accelerators)*b[j, k]
+                        for j in models) >= 1, 'c_no_zeros_' + str(k))
+
+        # if sum(x[i, j] for all i in accelerators) >= 1, then sum(z[j,k] for k in rtypes) > 0
 
         # m.addConstr(aux * gp.quicksum(y) == 1, 'c_aux')
         # m.addConstr(gp.quicksum(y) >= 1, 'c_bound_1')
 
-        m.addConstr(aux * gp.quicksum(s) == 1, 'c_aux')
+        # m.addConstr(aux * gp.quicksum(s) == 1, 'c_aux')
 
         # m.addConstrs((sum(x[i, j] for j in models) <=
         #              1 for i in accelerators), 'c2')
@@ -208,6 +222,12 @@ class Ilp(SchedulingAlgorithm):
             # This could still be correct, just need to make sure
             m.addConstr(y[j] <= sum(z[j, k]*s[k] for k in rtypes), 'c5_' + str(j))
 
+            m.addConstr(100000 * ind[j] >= sum(x[i, j] for i in accelerators), 'c_ind_1_' + str(j))
+            m.addConstr(ind[j] <= sum(x[i, j] for i in accelerators), 'c_ind_2_' + str(j))
+
+            # m.addConstr(y[j] == sum(y_prime[j,k] for k in rtypes))
+            # y_prime[j,k] = 
+
         # # ct4(j) .. y(j) =l= sum(i, x(i,j) * p(i,j));
         # m.addConstrs((y[j] <= sum(p[i, j]*x[i, j]
         #              for i in accelerators) for j in models), 'c4')
@@ -217,7 +237,25 @@ class Ilp(SchedulingAlgorithm):
         #              for j in models), 'c5')
 
         # Solve ILP
+        start_time = time.time()
         m.optimize()
+        end_time = time.time()
+        ilp_overhead = end_time - start_time
+        print('Time to solve ILP:', ilp_overhead)
+
+        # request_assignment_dummy = {'resnet1': 0.3, 'resnet2': 0.2, 'resnet3': 0.3,
+        #                             'resnet4': 0.3, 'resnet5': 0.2, 'resnet6': 0.3,
+        #                             'resnet7': 0.3, 'resnet8': 0.2, 'resnet9': 0.3,
+        #                             'resnet50': 0.3, 'resnet18': 0.2, 'resnet34': 0.3}
+        request_assignment_dummy = {}
+        for dummy in range(5000):
+            request_assignment_dummy[dummy] = dummy
+        start_time = time.time()
+        request_assignment_dummy[50]
+        end_time = time.time()
+        lookup_overhead = end_time - start_time
+        print('Routing table lookup overhead:', lookup_overhead)
+        time.sleep(0.5)
 
         if m.status == GRB.OPTIMAL:
             self.log.info('\nObjective: %g' % m.ObjVal)
@@ -228,9 +266,11 @@ class Ilp(SchedulingAlgorithm):
 
             # throughput = m.ObjVal
             throughput = gp.quicksum(y).getValue()
+            normalized_throughput = gp.quicksum(y).getValue() / sum(s.values())
             self.log.debug('Theoretical throughput (objective):' + str(throughput))
             self.log.debug('Percentage of requests met per second (theoretically):' + \
                             str(throughput/total_request_rate*100))
+            self.log.debug('Normalized throughput from objective: {}'.format(normalized_throughput))
 
             accuracy = gp.quicksum(w).getValue()
             self.log.debug('Accuracy (objective):' + str(accuracy))
@@ -243,7 +283,8 @@ class Ilp(SchedulingAlgorithm):
             #         if x[i, j].X > 0.0001:
             #             self.log.debug('{}, {}, x: {}'.format(i, j, x[i, j].X))
             actions = self.generate_actions(current_alloc=current_alloc, ilp_solution=x,
-                                            accelerators=accelerators, models=models)
+                                            canary_solution=z, accelerators=accelerators,
+                                            models=models)
         else:
             actions = np.zeros(current_alloc.shape)
             self.log.error('No solution')
@@ -252,25 +293,46 @@ class Ilp(SchedulingAlgorithm):
 
     def generate_actions(self, current_alloc: np.ndarray, 
                          ilp_solution: np.ndarray,
+                         canary_solution: np.ndarray,
                          accelerators: list,
                          models: list) -> np.ndarray:
 
         # Generate a 2D np.ndarray from ilp_solution similar to current_alloc
         new_alloc = np.zeros(current_alloc.shape)
 
-        print('accelerators:', accelerators)
-        print('models:', models)
-        # time.sleep(5)
+        required_predictors = {}
 
-        for i in accelerators:
-            for j in models:
-                if ilp_solution[i, j].X == 1:
-                    accelerator_type = i.split('-')[0]
-                    new_alloc[j, self.accelerator_dict[accelerator_type]] += 1
+        for accelerator in accelerators:
+            for model_variant in models:
+                if ilp_solution[accelerator, model_variant].X == 1:
+                    accelerator_type = accelerator.split('-')[0]
+                    # new_alloc[j, self.accelerator_dict[accelerator_type]] += 1
                     
+                    # TODO: How to remove predictors currently in the system?
                     # TODO: We are going to add predictors manually
-                    
-                    
+                    #       Maybe similar to BLIS implementation, we can build a dictionary first
+                    if (model_variant, accelerator_type) in required_predictors:
+                        required_predictors[(model_variant, accelerator_type)] += 1
+                    else:
+                        required_predictors[(model_variant, accelerator_type)] = 1
+        
+        canary_dict = {}
+        for isi in range(self.num_isi):
+            for model_variant in models:
+                canary_pct = canary_solution[model_variant, isi].X
+                if canary_pct > 0:
+                    canary_dict[(model_variant, isi)] = canary_pct
+                
+                if canary_pct > 0.0 and canary_pct < 1.0:
+                    logging.info('variant: {}, isi: {}, canary pct: {}'.format(model_variant, isi, canary_pct))
+
+
+        # logging.info('required_predictors: {}'.format(required_predictors))
+        # logging.info('canary dict: {}'.format(canary_dict))
+        # time.sleep(1)
+        self.simulator.apply_predictor_dict(required_predictors, canary_dict)
+
+        return None
 
         # print('new allocation:', new_alloc)
         self.log.debug('current_allocation:' + str(current_alloc))

@@ -35,10 +35,10 @@ def getargs():
                         '1 - Random. 2 - Static. 3 - Least Frequently Used (LFU). 4 - Load proportional. ' +
                         '5 - RL. 6 - RL with warm start (load proportional). 7 - ILP. 8 - ILP (Max throughput). ' +
                         '9 - INFaaS')
-    parser.add_argument('--job_scheduling', '-js', required=True, choices=['1', '2', '3', '4', '5'],
+    parser.add_argument('--job_scheduling', '-js', required=True, choices=['1', '2', '3', '4', '5', '6'],
                         dest='job_sched_algo', help='The job scheduling algorithm. Select a number:\n' +
                         '1 - Random. 2 - Round robin. 3 - Earliest Finish Time with FIFO. ' +
-                        '4 - Latest Finish Time with FIFO. 5 - INFAAS')
+                        '4 - Latest Finish Time with FIFO. 5 - INFAAS. 6 - Canary Routing')
     parser.add_argument('--allocation_window', '-w', required=False, default=1000,
                         dest='allocation_window', help='Milliseconds to wait before recalculating allocation. Default is 1000')
     parser.set_defaults(random_runtimes=False)
@@ -50,7 +50,7 @@ def main(args):
     model_training_steps = 8000
     testing_steps = int(args.test_steps)
     fixed_seed = int(args.fixed_seed)
-    action_group_size = args.action_size
+    action_group_size = int(args.action_size)
     reward_window_length = args.reward_window_length
     allocation_window = int(args.allocation_window)
 
@@ -61,7 +61,7 @@ def main(args):
     env = SchedulingEnv(trace_dir=args.trace_path, job_sched_algo=int(args.job_sched_algo),
                         action_group_size=action_group_size, reward_window_length=reward_window_length,
                         random_runtimes=args.random_runtimes, fixed_seed=fixed_seed,
-                        allocation_window=allocation_window)
+                        allocation_window=allocation_window, model_assignment=model_assignment)
 
     policy_kwargs = dict(net_arch=[128, 128, dict(pi=[128, 128, 128],
                                         vf=[128, 128, 128])])
@@ -110,6 +110,12 @@ def main(args):
     rate_logger.addHandler(logging.FileHandler(rate_loggerfile, mode='w'))
     rate_logger.setLevel(logging.DEBUG)
     rate_logger.info('wallclock_time,simulation_time,demand,throughput,capacity')
+
+    rate_logger_per_model =logging.getLogger('Rate logger per model')
+    rate_logger_per_model_file = os.path.join('logs', 'throughput_per_model', str(time.time()) + '_' + model_assignment + '.csv')
+    rate_logger_per_model.addHandler(
+        logging.FileHandler(rate_logger_per_model_file, mode='w'))
+    rate_logger_per_model.setLevel(logging.DEBUG)
 
     rl_reward = 0
     observation = env.reset()
@@ -239,8 +245,14 @@ def main(args):
 
             if ilp_applied == True:
                 actions = ilp.run(observation, env.n_accelerators, env.max_no_of_accelerators)
-            
-            if np.sum(actions) == 0 or actions is None:
+
+            if actions is None:
+                # action = env.action_space.sample()
+                # action[0] = 1
+                # for j in range(1, len(action)):
+                #     action[j] = 
+                action = env.simulator.null_action(env.action_space.sample(), 1)
+            elif np.sum(actions) == 0:
                 # Apply null action
                 action = env.action_space.sample()
                 for j in range(len(action)):
@@ -289,9 +301,14 @@ def main(args):
         if (i-1) % action_group_size == 0:
             failed_requests += np.sum(observation[:,-1])
             total_requests += np.sum(observation[:,-2])
-            logfile.write(str(total_requests) + ',' + str(failed_requests) + '\n')
+            logfile.write(str(total_requests) + ',' +
+                          str(failed_requests) + '\n')
+            requests_per_model, failed_per_model, accuracy_per_model = env.simulator.get_thput_accuracy_per_model()
+            utils.log_thput_accuracy_per_model(rate_logger_per_model, i, requests_per_model,
+                                            failed_per_model, accuracy_per_model)
         rl_reward += reward
         env.render()
+
 
         utils.log_throughput(rate_logger, observation, i, allocation_window)
         print('observation:', observation)

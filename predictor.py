@@ -10,10 +10,16 @@ class AccType(Enum):
     VPU = 3
     FPGA = 4
 
+    def __lt__(self, other):
+        if self.__class__ is other.__class__:
+           return self.value < other.value
+        else:
+            return NotImplemented
+
 
 class Predictor:
     def __init__(self, acc_type=AccType.CPU, qos_level=0, profiled_accuracy=100.0,
-                    profiled_latencies={}, variant_name=None):
+                    profiled_latencies={}, variant_name=None, executor=None):
         # attributes related to predictor hardware
         self.id = uuid.uuid4().hex
         self.acc_type = acc_type
@@ -28,6 +34,8 @@ class Predictor:
         self.request_queue = {}
 
         self.load = None
+
+        self.executor = executor
 
     
     def set_load(self, load):
