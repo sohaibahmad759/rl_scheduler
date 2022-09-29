@@ -35,3 +35,16 @@ This is a list of general to-dos. Apart from this, every code file has to-dos at
 
 2. Sparse ISIs when max limit on number of ISIs is large
 
+
+# Reproducing results from SoCC 2022 submission:
+
+To activate conda environment:
+`conda activate scheduler`
+
+To run ILP with Earliest Finish Time (EFT-FIFO):
+`python3 test.py -ma 7 -js 4 -r -f 10 -p traces/azure`
+
+Various scripts used for plotting results:
+`python3 plot_vs_infaas.py`
+`python3 cdf_response_times_per_model.py`
+`python3 per_model_throughput.py`
