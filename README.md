@@ -44,7 +44,7 @@ To activate conda environment:
 
 To run ILP with Earliest Finish Time (EFT-FIFO):
 
-`python3 test.py -ma 7 -js 4 -r -f 10 -p traces/azure`
+`python3 test.py -ma 7 -js 4 -r -f 10 -p traces/azure --alpha 0.1 --beta 0.8`
 
 Various scripts used for plotting results:
 
