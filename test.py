@@ -41,9 +41,31 @@ def getargs():
                         '4 - Latest Finish Time with FIFO. 5 - INFAAS. 6 - Canary Routing')
     parser.add_argument('--allocation_window', '-w', required=False, default=1000,
                         dest='allocation_window', help='Milliseconds to wait before recalculating allocation. Default is 1000')
+    parser.add_argument('--alpha', required=False, default=-1,
+                        dest='alpha', help='alpha parameter for ILP. Only needed if MA is ILP')
     parser.set_defaults(random_runtimes=False)
 
     return parser.parse_args()
+
+
+def validate_parameters(args):
+    ''' Validates the parameters provided. If invalid, prints reason.
+    '''
+    model_asn_algos = ['random', 'static', 'lfu', 'load_proportional', 'rl', 'rl_warm',
+                       'ilp', 'ilp_throughput', 'infaas']
+    model_assignment = model_asn_algos[int(args.model_asn_algo)-1]
+
+    alpha = float(args.alpha)
+
+    if model_assignment == 'ilp' and alpha == -1:
+        print('Invalid parameters: --alpha flag must be specified when using ILP model assignment algorithm')
+        return False
+
+    if model_assignment == 'ilp' and (alpha > 1 or alpha < 0):
+        print('Invalid parameters: --alpha value must be in the range [0,1]')
+        return False
+    
+    return True
 
 
 def main(args):
@@ -53,6 +75,10 @@ def main(args):
     action_group_size = int(args.action_size)
     reward_window_length = args.reward_window_length
     allocation_window = int(args.allocation_window)
+    alpha = float(args.alpha)
+
+    if validate_parameters(args) is False:
+        sys.exit(0)
 
     model_asn_algos = ['random', 'static', 'lfu', 'load_proportional', 'rl', 'rl_warm',
                         'ilp', 'ilp_throughput', 'infaas']
@@ -87,9 +113,9 @@ def main(args):
     elif model_assignment == 'load_proportional':
         print('Testing with load proportional algorithm')
     elif model_assignment == 'ilp':
-        ilp = Ilp(allocation_window=allocation_window)
+        ilp = Ilp(allocation_window=allocation_window, alpha=alpha)
         ilp_applied = True
-        print('Testing with solution given by ILP')
+        print(f'Testing with solution given by ILP (alpha={alpha})')
     elif model_assignment == 'ilp_throughput':
         ilp = IlpThroughput(allocation_window=allocation_window)
         ilp_applied = True
@@ -101,6 +127,8 @@ def main(args):
         sys.exit(0)
     print('--------------------------')
     print()
+    print('Starting in 5 seconds...')
+    time.sleep(5)
 
     logfile_name = 'log_' + model_assignment + '.txt'
     logfile = open('logs/' + logfile_name, mode='w')

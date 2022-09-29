@@ -7,7 +7,7 @@ from algorithms.base import SchedulingAlgorithm
 
 
 class Ilp(SchedulingAlgorithm):
-    def __init__(self, allocation_window):
+    def __init__(self, allocation_window, alpha):
         SchedulingAlgorithm.__init__(self, 'ILP')
 
         self.log = logging.getLogger(__name__)
@@ -16,6 +16,8 @@ class Ilp(SchedulingAlgorithm):
         self.log.setLevel(logging.DEBUG)
 
         self.allocation_window = allocation_window
+
+        self.alpha = alpha
 
         self.simulator = None
         self.num_isi = 0
@@ -153,7 +155,7 @@ class Ilp(SchedulingAlgorithm):
 
         # Smaller value weighs throughput more, higher value weighs accuracy more
         # alpha = 0.0
-        alpha = 0.1
+        alpha = self.alpha
 
         # If there are no incoming requests, terminate ILP
         if sum(s.values()) == 0:
@@ -241,21 +243,10 @@ class Ilp(SchedulingAlgorithm):
         m.optimize()
         end_time = time.time()
         ilp_overhead = end_time - start_time
-        print('Time to solve ILP:', ilp_overhead)
+        print(f'Time to solve ILP: {ilp_overhead} seconds')
 
-        # request_assignment_dummy = {'resnet1': 0.3, 'resnet2': 0.2, 'resnet3': 0.3,
-        #                             'resnet4': 0.3, 'resnet5': 0.2, 'resnet6': 0.3,
-        #                             'resnet7': 0.3, 'resnet8': 0.2, 'resnet9': 0.3,
-        #                             'resnet50': 0.3, 'resnet18': 0.2, 'resnet34': 0.3}
-        request_assignment_dummy = {}
-        for dummy in range(5000):
-            request_assignment_dummy[dummy] = dummy
-        start_time = time.time()
-        request_assignment_dummy[50]
-        end_time = time.time()
-        lookup_overhead = end_time - start_time
-        print('Routing table lookup overhead:', lookup_overhead)
-        time.sleep(0.5)
+        # Measuring routing table overhead for reporting in paper
+        # measure_routing_table_overhead()
 
         if m.status == GRB.OPTIMAL:
             self.log.info('\nObjective: %g' % m.ObjVal)
@@ -341,6 +332,24 @@ class Ilp(SchedulingAlgorithm):
 
         # Return suggested actions from the difference matrix
         return new_alloc
+    
+    def measure_routing_table_overhead(self):
+        ''' Since routing table lies on the critical path for serving inference requests,
+        this function measures the expected overhead of the routing table with a large
+        number of entries (order of thousands).
+        '''
+        # request_assignment_dummy = {'resnet1': 0.3, 'resnet2': 0.2, 'resnet3': 0.3,
+        #                             'resnet4': 0.3, 'resnet5': 0.2, 'resnet6': 0.3,
+        #                             'resnet7': 0.3, 'resnet8': 0.2, 'resnet9': 0.3,
+        #                             'resnet50': 0.3, 'resnet18': 0.2, 'resnet34': 0.3}
+        request_assignment_dummy = {}
+        for dummy in range(5000):
+            request_assignment_dummy[dummy] = dummy
+        start_time = time.time()
+        request_assignment_dummy[50]
+        end_time = time.time()
+        lookup_overhead = end_time - start_time
+        print('Routing table lookup overhead:', lookup_overhead)
 
 
 if __name__ == "__main__":
