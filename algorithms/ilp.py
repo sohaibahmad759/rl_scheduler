@@ -7,7 +7,7 @@ from algorithms.base import SchedulingAlgorithm
 
 
 class Ilp(SchedulingAlgorithm):
-    def __init__(self, allocation_window, alpha):
+    def __init__(self, allocation_window, alpha, beta):
         SchedulingAlgorithm.__init__(self, 'ILP')
 
         self.log = logging.getLogger(__name__)
@@ -18,6 +18,7 @@ class Ilp(SchedulingAlgorithm):
         self.allocation_window = allocation_window
 
         self.alpha = alpha
+        self.beta = beta
 
         self.simulator = None
         self.num_isi = 0
@@ -154,7 +155,6 @@ class Ilp(SchedulingAlgorithm):
         # aux = m.addVar(name='aux')
 
         # Smaller value weighs throughput more, higher value weighs accuracy more
-        # alpha = 0.0
         alpha = self.alpha
 
         # If there are no incoming requests, terminate ILP
@@ -172,7 +172,7 @@ class Ilp(SchedulingAlgorithm):
         # Add constraints
         # m.addConstrs((w[k] == sum(sum(s[k]*b[j, k]*A[j]*z[j, k]*x[i, j] for j in models)
         #                           for i in accelerators) for k in rtypes), 'c1')
-        m.addConstr(gp.quicksum(y) / sum(s.values()) >= 0.8, 'c_min_thput')
+        m.addConstr(gp.quicksum(y) / sum(s.values()) >= self.beta, 'c_min_thput')
         for k in rtypes:
             # m.addConstr(w[k] <= sum(sum(s[k]*z[j, k]*b[j, k]*A[j]*x[i, j] for j in models)
             #                         for i in accelerators), 'c1_1_' + str(k))

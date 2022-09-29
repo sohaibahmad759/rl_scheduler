@@ -42,7 +42,9 @@ def getargs():
     parser.add_argument('--allocation_window', '-w', required=False, default=1000,
                         dest='allocation_window', help='Milliseconds to wait before recalculating allocation. Default is 1000')
     parser.add_argument('--alpha', required=False, default=-1,
-                        dest='alpha', help='alpha parameter for ILP. Only needed if MA is ILP')
+                        dest='alpha', help='alpha parameter for ILP (weightage of throughput vs accuracy). Only needed if MA is ILP')
+    parser.add_argument('--beta', required=False, default=-1,
+                        dest='beta', help='beta parameter for ILP (minimum throughput constraint). Only needed if MA is ILP')
     parser.set_defaults(random_runtimes=False)
 
     return parser.parse_args()
@@ -56,13 +58,22 @@ def validate_parameters(args):
     model_assignment = model_asn_algos[int(args.model_asn_algo)-1]
 
     alpha = float(args.alpha)
+    beta = float(args.beta)
 
     if model_assignment == 'ilp' and alpha == -1:
         print('Invalid parameters: --alpha flag must be specified when using ILP model assignment algorithm')
         return False
 
+    if model_assignment == 'ilp' and beta == -1:
+        print('Invalid parameters: --beta flag must be specified when using ILP model assignment algorithm')
+        return False
+
     if model_assignment == 'ilp' and (alpha > 1 or alpha < 0):
         print('Invalid parameters: --alpha value must be in the range [0,1]')
+        return False
+
+    if model_assignment == 'ilp' and (beta > 1 or beta < 0):
+        print('Invalid parameters: --beta value must be in the range [0,1]')
         return False
     
     return True
@@ -76,6 +87,7 @@ def main(args):
     reward_window_length = args.reward_window_length
     allocation_window = int(args.allocation_window)
     alpha = float(args.alpha)
+    beta = float(args.beta)
 
     if validate_parameters(args) is False:
         sys.exit(0)
@@ -113,7 +125,7 @@ def main(args):
     elif model_assignment == 'load_proportional':
         print('Testing with load proportional algorithm')
     elif model_assignment == 'ilp':
-        ilp = Ilp(allocation_window=allocation_window, alpha=alpha)
+        ilp = Ilp(allocation_window=allocation_window, alpha=alpha, beta=beta)
         ilp_applied = True
         print(f'Testing with solution given by ILP (alpha={alpha})')
     elif model_assignment == 'ilp_throughput':
