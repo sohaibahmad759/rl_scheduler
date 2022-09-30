@@ -18,17 +18,21 @@ def log_throughput(logger, observation, simulation_time, allocation_window):
     # logger.debug('allocation matrix:' + str(allocation_matrix))
     # logger.debug('capacity matrix:' + str(capacity_matrix))
     
-    logger.info(str(time.time()) + ',' + str(simulation_time) + ',' + str(demand) \
-                    + ',' + str(throughput) + ',' + str(capacity))
+    logger.info(f'{time.time()},{simulation_time},{demand},{throughput},{capacity}')
 
 def log_thput_accuracy_per_model(logger, simulation_time, requests, failed, accuracy):
-    line = str(time.time()) + ',' + str(simulation_time)
+    line = f'{time.time()},{simulation_time}'
+
     for model in range(len(requests)):
         throughput = requests[model] - failed[model]
-        line = line + ',' + str(requests[model]) + ',' + str(throughput) + ','
+
+        line += f',{requests[model]},{throughput},'
+        
         if requests[model] > 0:
-            line = line + str(throughput/requests[model])
+            normalized_throughput = throughput/requests[model]
         else:
-            line = line + '0'
-        line = line + ',' + str(accuracy[model])
+            normalized_throughput = 0
+
+        line += f'{normalized_throughput},{accuracy[model]}'
+
     logger.info(line)

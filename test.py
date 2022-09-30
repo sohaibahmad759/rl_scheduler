@@ -151,11 +151,13 @@ def main(args):
     rate_logger.setLevel(logging.DEBUG)
     rate_logger.info('wallclock_time,simulation_time,demand,throughput,capacity')
 
-    rate_logger_per_model =logging.getLogger('Rate logger per model')
+    rate_logger_per_model = logging.getLogger('Rate logger per model')
     rate_logger_per_model_file = os.path.join('logs', 'throughput_per_model', str(time.time()) + '_' + model_assignment + '.csv')
     rate_logger_per_model.addHandler(
         logging.FileHandler(rate_logger_per_model_file, mode='w'))
     rate_logger_per_model.setLevel(logging.DEBUG)
+    rate_logger_per_model.info(
+        'wallclock_time,simulation_time,demand_nth_model,throughput_nth_model,normalized_throughput_nth_model,accuracy_nth_model')
 
     rl_reward = 0
     observation = env.reset()
@@ -173,7 +175,7 @@ def main(args):
                 action[j] = 0
             action[0] = i % env.n_executors
         elif model_assignment == 'load_proportional':
-            # we only need to apply the assignment once at the start
+            # We only need to apply the assignment once at the start
             if i == 0:
                 # proportions = np.array([0.30, 0.14, 0.091, 0.066, 0.051, 0.042, 0.035, 0.030, 0.027, \
                 #                0.024, 0.022, 0.020, 0.018, 0.016, 0.015, 0.014, 0.013, 0.012, \
@@ -182,7 +184,7 @@ def main(args):
                                         0.05204432, 0.04448577, 0.03854691, 0.03237666, 0.02960862])
                 # we calculate the shares for each model architecture (ISI) and round to integer
                 shares = np.rint(proportions * env.n_accelerators * env.max_no_of_accelerators)
-                # print('this: {}'.format(env.n_accelerators * env.max_no_of_accelerators))
+
                 # we use a counter to loop through the types of accelerators available, assigning
                 # them in round robin fashion
                 counter = 0
@@ -354,21 +356,35 @@ def main(args):
         print('observation:', observation)
 
     end = time.time()
-    print('Reward from RL model: ' + str(rl_reward))
-    print('Requests failed by RL model: ' + str(failed_requests))
-    print('Total requests: ' + str(total_requests))
-    print('Percentage of requests failed: {}%'.format(failed_requests/total_requests*100))
-    print('Test time: {} seconds'.format(end-start))
-    print('Requests added: {}'.format(env.simulator.requests_added))
+
+    print()
+    print('---------------------------------')
+    print('Printing overall statistics below')
+    print('---------------------------------')
+    print(f'Reward from RL model: {rl_reward}')
+    print(f'Requests failed by RL model: {failed_requests}')
+    print(f'Total requests: {total_requests}')
+    print(
+        f'Percentage of requests failed: {(failed_requests/total_requests*100)}%')
+    print(f'Test time: {(end-start)} seconds')
+    print(f'Requests added: {env.simulator.requests_added}')
     logfile.close()
 
     completed_requests = env.simulator.completed_requests
     sim_time_elapsed = env.simulator.clock / 1000
     overall_throughput = completed_requests / sim_time_elapsed
     print()
-    print('Completed requests: {}'.format(completed_requests))
-    print('Simulator time elapsed: {}'.format(sim_time_elapsed))
-    print('Overall throughput (requests/sec): {}'.format(overall_throughput))
+    print(f'Completed requests: {completed_requests}')
+    print(f'Simulator time elapsed: {sim_time_elapsed}')
+    print(f'Overall throughput (requests/sec): {overall_throughput}')
+    print()
+
+    print('---------------')
+    print('Logging details')
+    print('---------------')
+    print(f'Aggregate throughput and accuracy logs written to: {rate_loggerfile}')
+    print(f'Per-model throughput and accuracy logs written to: {rate_logger_per_model_file}')
+    print()
 
 if __name__=='__main__':
     main(getargs())
