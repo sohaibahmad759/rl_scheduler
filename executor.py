@@ -46,6 +46,7 @@ class Executor:
         self.model_variants = {}
         self.variants_for_this_executor = []
 
+        # Mapping from model variant to percentage of requests to send to that variant
         self.canary_routing_table = {}
 
         self.simulator = simulator
@@ -461,4 +462,30 @@ class Executor:
         else:
             logging.debug('WARN: Could not finish request at predictor {}, \
                     executor {}. (Time: {})'.format(predictor.id, self.id, clock))
+            return False
+
+    
+    def enqueue_request(self, event, clock):
+        ''' When batching is enabled, we send an incoming request to the queue of an
+        appropriate predictor. The predictor will dequeue the request and process it
+        with a batch of requests.
+        '''
+        if self.task_assignment == TaskAssignment.CANARY:
+            selected_variant = random.choices(list(self.canary_routing_table.keys()),
+                                    list(weights=self.canary_routing_table.values()))
+            
+            # Canary routing only tells us the model variant to use, but does not
+            # tell us which instance of that model variant. We therefore randomly
+            # choose different instances of the model variant, with the expectation
+            # that with a large enough number of requests, we will have spread out
+            # the requests evenly to all instances (law of large numbers)
+            variants = list(filter(lambda x: x.variant_name == selected_variant, self.predictors))
+            selected_predictor = random.choice(variants)
+
+            selected_predictor.enqueue_request(event, clock)
+            return
+
+        else:
+            logging.error('Only canary routing is supported with batch request processing')
+            exit(0)
                     

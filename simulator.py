@@ -827,33 +827,39 @@ class Simulator:
             self.add_executor(isi, self.job_sched_algo, self.runtimes, self.model_variant_runtimes,
                                 self.model_variant_loadtimes, max_acc_per_type=self.max_acc_per_type,
                                 simulator=self)
+
         # call executor.process_request() on relevant executor
         executor = self.executors[isi]
-        end_time, qos_met, accuracy_seen = executor.process_request(
-            event, clock, self.runtimes)
 
-        # we report QoS fail whenever (i) request fails, (ii) request succeeds but QoS is not met
-        if not qos_met:
-            self.qos_stats[self.isi_to_idx[isi],
-                            event.qos_level * 2 + 1] += 1
+        if not self.batching_enabled:
+            end_time, qos_met, accuracy_seen = executor.process_request(
+                event, clock, self.runtimes)
+        else:
+            # TODO: fix the return types for this function
+            end_time, qos_met, accuracy_seen = executor.enqueue_request(
+                event, clock)
+
+        # Note: we report QoS failure whenever
+        # (i) request fails, (ii) request succeeds but QoS is not met
+
         if end_time is None:
-            self.failed_requests += 1
-            self.failed_requests_arr[self.isi_to_idx[isi]] += 1
-            self.failed_per_model[isi] += 1
-            self.qos_stats[self.isi_to_idx[isi],
-                            event.qos_level * 2 + 1] += 1
+            # Cannot process request, no end event generated, bump failure stats
+            self.bump_failed_request_stats(event)
             logging.debug('WARN: Request id {} for {} failed. (Time: {})'.format(
                 event.id, event.desc, clock))
         else:
+            # Request can be processed, generate an end event for it
             # TODO: look into dequeue
             self.insert_event(end_time, EventType.END_REQUEST,
                                 event.desc, id=event.id, qos_level=event.qos_level)
             self.accuracy_logfile.write(str(accuracy_seen) + '\n')
             self.accuracy_per_model[isi].append(accuracy_seen)
-            # self.accuracy += event.
-        self.total_requests_arr[self.isi_to_idx[isi]] += 1
-        self.requests_per_model[isi] += 1
-        self.qos_stats[self.isi_to_idx[isi], event.qos_level * 2] += 1
+            
+            if not qos_met:
+                self.bump_qos_unmet_stats(event)
+        
+        # Bump overall request statistics
+        self.bump_overall_request_stats(event)
         return
 
     def process_end_event(self, event, clock):
@@ -878,6 +884,32 @@ class Simulator:
                 event.start_time))
         self.insert_event(clock + self.sched_interval,
                             EventType.SCHEDULING, event.desc)
+        return
+
+    def bump_failed_request_stats(self, event):
+        ''' Bump stats for a failed request
+        '''
+        isi = event.desc
+        self.failed_requests += 1
+        self.failed_requests_arr[self.isi_to_idx[isi]] += 1
+        self.failed_per_model[isi] += 1
+        self.bump_qos_unmet_stats(event)
+        return
+
+    def bump_qos_unmet_stats(self, event):
+        ''' Bump stats for unmet QoS on request
+        '''
+        isi = event.desc
+        self.qos_stats[self.isi_to_idx[isi], event.qos_level * 2 + 1] += 1
+
+    def bump_overall_request_stats(self, event):
+        ''' Bump overall request stats, i.e., total requests per ISI, requests
+        per model, and QoS stats
+        '''
+        isi = event.desc
+        self.total_requests_arr[self.isi_to_idx[isi]] += 1
+        self.requests_per_model[isi] += 1
+        self.qos_stats[self.isi_to_idx[isi], event.qos_level * 2] += 1
         return
 
     def add_executor(self, isi, job_sched_algo, runtimes=None, model_variant_runtimes=None, 

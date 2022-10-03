@@ -81,6 +81,12 @@ class Predictor:
         return True
 
     
+    def enqueue_request(self, event, clock):
+        ''' Add the request to the request queue of this predictor
+        '''
+        return
+
+    
     def assign_batch(self, clock):
         # If request can be finished within deadline, return end_time, else return None (failed request)
         temp_queue = []
