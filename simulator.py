@@ -11,7 +11,6 @@ import uuid
 import numpy as np
 from enum import Enum
 
-from scipy.fft import idct
 from executor import Executor, AccType
 
 
@@ -811,60 +810,75 @@ class Simulator:
         Process the given event according to its EventType.
         '''
         if event.type == EventType.START_REQUEST:
-            logging.debug(
-                'Starting event {}. (Time: {})'.format(event.desc, clock))
-            isi = event.desc
-            if isi not in self.executors:
-                self.add_executor(isi, self.job_sched_algo, self.runtimes, self.model_variant_runtimes,
-                                    self.model_variant_loadtimes, max_acc_per_type=self.max_acc_per_type,
-                                    simulator=self)
-            # call executor.process_request() on relevant executor
-            executor = self.executors[isi]
-            end_time, qos_met, accuracy_seen = executor.process_request(
-                event, clock, self.runtimes)
-
-            # we report QoS fail whenever (i) request fails, (ii) request succeeds but QoS is not met
-            if not qos_met:
-                self.qos_stats[self.isi_to_idx[isi],
-                               event.qos_level * 2 + 1] += 1
-            if end_time is None:
-                self.failed_requests += 1
-                self.failed_requests_arr[self.isi_to_idx[isi]] += 1
-                self.failed_per_model[isi] += 1
-                self.qos_stats[self.isi_to_idx[isi],
-                               event.qos_level * 2 + 1] += 1
-                logging.debug('WARN: Request id {} for {} failed. (Time: {})'.format(
-                    event.id, event.desc, clock))
-            else:
-                # TODO: look into dequeue
-                self.insert_event(end_time, EventType.END_REQUEST,
-                                  event.desc, id=event.id, qos_level=event.qos_level)
-                self.accuracy_logfile.write(str(accuracy_seen) + '\n')
-                self.accuracy_per_model[isi].append(accuracy_seen)
-                # self.accuracy += event.
-            self.total_requests_arr[self.isi_to_idx[isi]] += 1
-            self.requests_per_model[isi] += 1
-            self.qos_stats[self.isi_to_idx[isi], event.qos_level * 2] += 1
-
+            self.process_start_event(event, clock)
         elif event.type == EventType.END_REQUEST:
-            logging.debug('Event {} ended. (Time: {})'.format(
-                event.desc, event.start_time))
-            isi = event.desc
-            executor = self.executors[isi]
-            executor.finish_request(event, clock)
-            self.completed_requests += 1
-
+            self.process_end_event(event, clock)
         elif event.type == EventType.SCHEDULING:
-            sched_decision = self.invoke_scheduling_agent()
-            if sched_decision is not None:
-                logging.debug(sched_decision)
-            else:
-                logging.error('ERROR: The scheduling agent returned an exception. (Time: {})'.format(
-                    event.start_time))
-            self.insert_event(clock + self.sched_interval,
-                              EventType.SCHEDULING, event.desc)
+            self.process_scheduling_event(event, clock)
 
         return None
+
+    def process_start_event(self, event, clock):
+        ''' Process EventType.START_REQUEST
+        '''
+        logging.debug('Starting event {}. (Time: {})'.format(event.desc, clock))
+        isi = event.desc
+        if isi not in self.executors:
+            self.add_executor(isi, self.job_sched_algo, self.runtimes, self.model_variant_runtimes,
+                                self.model_variant_loadtimes, max_acc_per_type=self.max_acc_per_type,
+                                simulator=self)
+        # call executor.process_request() on relevant executor
+        executor = self.executors[isi]
+        end_time, qos_met, accuracy_seen = executor.process_request(
+            event, clock, self.runtimes)
+
+        # we report QoS fail whenever (i) request fails, (ii) request succeeds but QoS is not met
+        if not qos_met:
+            self.qos_stats[self.isi_to_idx[isi],
+                            event.qos_level * 2 + 1] += 1
+        if end_time is None:
+            self.failed_requests += 1
+            self.failed_requests_arr[self.isi_to_idx[isi]] += 1
+            self.failed_per_model[isi] += 1
+            self.qos_stats[self.isi_to_idx[isi],
+                            event.qos_level * 2 + 1] += 1
+            logging.debug('WARN: Request id {} for {} failed. (Time: {})'.format(
+                event.id, event.desc, clock))
+        else:
+            # TODO: look into dequeue
+            self.insert_event(end_time, EventType.END_REQUEST,
+                                event.desc, id=event.id, qos_level=event.qos_level)
+            self.accuracy_logfile.write(str(accuracy_seen) + '\n')
+            self.accuracy_per_model[isi].append(accuracy_seen)
+            # self.accuracy += event.
+        self.total_requests_arr[self.isi_to_idx[isi]] += 1
+        self.requests_per_model[isi] += 1
+        self.qos_stats[self.isi_to_idx[isi], event.qos_level * 2] += 1
+        return
+
+    def process_end_event(self, event, clock):
+        ''' Process EventType.END_REQUEST
+        '''
+        logging.debug('Event {} ended. (Time: {})'.format(
+            event.desc, event.start_time))
+        isi = event.desc
+        executor = self.executors[isi]
+        executor.finish_request(event, clock)
+        self.completed_requests += 1
+        return
+
+    def process_scheduling_event(self, event, clock):
+        ''' Process EventType.SCHEDULING
+        '''
+        sched_decision = self.invoke_scheduling_agent()
+        if sched_decision is not None:
+            logging.debug(sched_decision)
+        else:
+            logging.error('ERROR: The scheduling agent returned an exception. (Time: {})'.format(
+                event.start_time))
+        self.insert_event(clock + self.sched_interval,
+                            EventType.SCHEDULING, event.desc)
+        return
 
     def add_executor(self, isi, job_sched_algo, runtimes=None, model_variant_runtimes=None, 
                         model_variant_loadtimes=None, max_acc_per_type=0, simulator=None):

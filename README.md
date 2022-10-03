@@ -53,3 +53,7 @@ Various scripts used for plotting results:
 `python3 cdf_response_times_per_model.py`
 
 `python3 per_model_throughput.py`
+
+### Batch processing
+
+Underway: We are implementing batch processing for canary routing job scheduling. It will not support EFT for the time being.

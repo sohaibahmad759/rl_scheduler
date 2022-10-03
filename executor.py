@@ -46,6 +46,8 @@ class Executor:
         self.model_variants = {}
         self.variants_for_this_executor = []
 
+        self.canary_routing_table = {}
+
         self.simulator = simulator
         
         # EITHER: do we want a separate event queue for each executor? then we would need to
@@ -209,7 +211,7 @@ class Executor:
                     _predictor = self.predictors[key]
                     peak_throughput = math.floor(1000 /  _predictor.profiled_latencies[(event.desc, 
                                                     event.qos_level)])
-                    queued_requests = len(_predictor.request_queue)
+                    queued_requests = len(_predictor.request_dict)
 
                     logging.debug('Throughput:', peak_throughput)
                     logging.debug('Queued requests:', queued_requests)
@@ -301,7 +303,7 @@ class Executor:
 
                     peak_throughput = math.floor(1000 /  _predictor.profiled_latencies[(event.desc, 
                                                     event.qos_level)])
-                    queued_requests = len(_predictor.request_queue)
+                    queued_requests = len(_predictor.request_dict)
 
                     logging.debug('Throughput:', peak_throughput)
                     logging.debug('Queued requests:', queued_requests)
@@ -352,7 +354,7 @@ class Executor:
             predictor = self.predictors[key]
             # peak_throughput = 1000 / predictor.profiled_latencies[(self.isi, predictor.qos_level)]
             peak_throughput = 1000 / self.variant_runtimes[predictor.acc_type][(self.isi, predictor.variant_name)]
-            queued_requests = len(predictor.request_queue)
+            queued_requests = len(predictor.request_dict)
 
             infaas_slack = 0.95
 
