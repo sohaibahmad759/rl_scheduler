@@ -84,6 +84,10 @@ class Predictor:
     def enqueue_request(self, event, clock):
         ''' Add the request to the request queue of this predictor
         '''
+        self.request_queue.append(event)
+
+        # TODO: check if len(self.request_queue) >= self.max_batch_size
+        #           process_batch()
         return
 
     
@@ -92,6 +96,7 @@ class Predictor:
         temp_queue = []
         dequeued_requests = 0
 
+        # TODO: wait to fill batch size, this implementation is not correct
         while dequeued_requests < self.batch_size or len(self.request_queue) > 0:
             temp_queue.append(self.request_queue.pop(0))
 

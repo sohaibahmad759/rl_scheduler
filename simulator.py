@@ -1,5 +1,4 @@
 import copy
-import glob
 from hashlib import new
 import logging
 from pyexpat import model
@@ -7,9 +6,8 @@ import random
 import requests
 import os
 import time
-import uuid
 import numpy as np
-from enum import Enum
+from event import Event, EventType
 
 from executor import Executor, AccType
 
@@ -989,26 +987,6 @@ class Simulator:
             event = self.event_queue[i]
             print('Time: {}, event {} of type {}'.format(
                 event.start_time, event.desc, event.type))
-
-
-class EventType(Enum):
-    START_REQUEST = 1
-    SCHEDULING = 2
-    END_REQUEST = 3
-
-
-class Event:
-    def __init__(self, start_time, type, desc, runtime=None, deadline=1000, id='', qos_level=0, accuracy=100.0):
-        self.id = id
-        if self.id == '':
-            self.id = uuid.uuid4().hex
-        self.type = type
-        self.start_time = start_time
-        self.desc = desc
-        self.runtime = runtime
-        self.deadline = deadline
-        self.qos_level = qos_level
-        self.accuracy = accuracy
 
 
 if __name__ == '__main__':
