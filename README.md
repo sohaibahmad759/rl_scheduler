@@ -36,7 +36,7 @@ This is a list of general to-dos. Apart from this, every code file has to-dos at
 2. Sparse ISIs when max limit on number of ISIs is large
 
 
-# Reproducing results from SoCC 2022 submission:
+## Reproducing results from SoCC 2022 submission
 
 To activate conda environment:
 
@@ -53,6 +53,10 @@ Various scripts used for plotting results:
 `python3 cdf_response_times_per_model.py`
 
 `python3 per_model_throughput.py`
+
+### Profiled data
+
+The profiled data is under the `profiling` folder. `blis_profiled.csv` contains profiled data for the 6 models used in the paper with batch size of 1.
 
 ### Batch processing
 

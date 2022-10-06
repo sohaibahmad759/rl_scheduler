@@ -4,8 +4,10 @@ import os
 from gluoncv import model_zoo
 import numpy as np
 import mxnet as mx
+from mxnet.onnx import export_model
 
-model_names = ['vgg11', 'vgg13', 'vgg16', 'vgg19']
+# model_names = ['vgg11', 'vgg13', 'vgg16', 'vgg19']
+model_names = ['densenet121']
 
 for model_name in model_names:
     directory = os.path.join('onnx', model_name)
@@ -32,7 +34,6 @@ for model_name in model_names:
 
     #convert using onnx
     # from mxnet.contrib import onnx as onnx_mxnet
-    from mxnet.onnx import export_model
     onnx_file='./'+model_name+'.onnx'
     # onnx_file = filename + '.onnx'
     params = './'+model_name+'-0000.params'
@@ -41,7 +42,9 @@ for model_name in model_names:
     sym='./'+model_name+'-symbol.json'
     # sym = filename + '-symbol.json'
     # onnx_mxnet.export_model(sym, params, [input_shape], np.float32, onnx_file)
-    export_model(sym, params, [input_shape], np.float32, onnx_file)
+    dynamic_input_shapes = [(None, 3, 224, 224)]
+    export_model(sym, params, [input_shape], np.float32, onnx_file,
+                    dynamic=True, dynamic_input_shapes=dynamic_input_shapes)
     print('onnx export done')
 
     os.chdir('../..')
