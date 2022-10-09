@@ -7,7 +7,11 @@ import mxnet as mx
 from mxnet.onnx import export_model
 
 # model_names = ['vgg11', 'vgg13', 'vgg16', 'vgg19']
-model_names = ['densenet121']
+# model_names = ['densenet121', 'densenet161', 'densenet169', 'densenet201']
+# model_names = ['resnet18_v1', 'resnet34_v1', 'resnet50_v1', 'resnet101_v1',
+#                 'resnet152_v1']
+# model_names = ['mobilenet0.25', 'mobilenet0.5', 'mobilenet0.75', 'mobilenet1.0']
+model_names = ['resnest14', 'resnest26', 'resnest50', 'resnest269']
 
 for model_name in model_names:
     directory = os.path.join('onnx', model_name)

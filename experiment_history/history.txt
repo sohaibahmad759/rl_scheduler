@@ -1,0 +1,500 @@
+    2  python gluon_to_onnx.py 
+    3  python -m pip install onnx
+    4  python -m pip install onnx==1.9.0
+    5  python -m pip install onnxruntime==1.8.1
+    6  python gluon_to_onnx.py 
+    7  python -m pip install protobuf==3.20.0
+    8  python gluon_to_onnx.py 
+    9  ls
+   10  md5 onnx/resnet18_v1
+   11  md5 onnx/resnet18_v1/resnet18_v1.onnx 
+   12  md5 onnx/resnet/resnet18_v1/resnet18_v1.onnx 
+   13  ls
+   14  python torch_to_onnx.py 
+   15  python --verison
+   16  python --version
+   17  ls
+   18  python test_onnx.py 
+   19  python test_onnx.py 
+   20  python test_onnx.py 
+   21  python test_onnx.py 
+   22  ls
+   23  python --version
+   24  python gluon_to_onnx.py 
+   25  python gluon_to_onnx.py 
+   26  python test_onnx.py 
+   27  python test_onnx.py 
+   28  python test_onnx.py 
+   29  python test_onnx.py 
+   30  python test_onnx.py 
+   31  python test_onnx.py 
+   32  python gluon_to_onnx.py 
+   33  python gluon_to_onnx.py 
+   34  python test_onnx.py 
+   35  python test_onnx.py 
+   36  python test_onnx.py 
+   37  python test_onnx.py 
+   38  python test_onnx.py 
+   39  python gluon_to_onnx.py 
+   40  python test_onnx.py 
+   41  python test_onnx.py 
+   42  python test_onnx.py 
+   43  python test_onnx.py 
+   44  python test_onnx.py 
+   45  python test_onnx.py 
+   46  python gluon_to_onnx.py 
+   47  python test_onnx.py 
+   48  python test_onnx.py 
+   49  python test_onnx.py 
+   50  python test_onnx.py 
+   51  python test_onnx.py 
+   52  python gluon_to_onnx.py 
+   53  python test_onnx.py 
+   54  python test_onnx.py 
+   55  python test_onnx.py 
+   56  python test_onnx.py 
+   57  git status
+   58  cd ..
+   59  ls
+   60  git status
+   61  git add model_zoo/*.py
+   62  git status
+   63  git commit -m "Added ONNX conversion scripts"
+   64  git push
+   65  ls
+   66  history
+   67  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+   68  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+   69  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+   70  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+   71  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+   72  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+   73  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+   74  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+   75  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+   76  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+   77  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+   78  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+   79  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+   80  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+   81  git status
+   82  git add -u
+   83  git commit -m "Throughput percentage in objective instead of absolute value."
+   84  git push
+   85  git push
+   86  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+   87  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+   88  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+   89  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+   90  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+   91  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+   92  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+   93  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+   94  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+   95  git status
+   96  git add -u
+   97  git commit -m "ILP works fine for all alpha values"
+   98  git push
+   99  git push
+  100  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  101  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  102  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  103  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  104  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  105  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  106  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  107  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  108  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  109  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  110  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  111  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  112  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  113  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  114  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  115  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  116  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  117  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  118  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  119  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  120  ls
+  121  python3 line_counter.py .py
+  122  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  123  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  124  git status
+  125  ls
+  126  cd figures
+  127  ls
+  128  cd ..
+  129  ls
+  130  cd plotting/
+  131  ls
+  132  python3 plot_throughput.py 
+  133  python3 plot_throughput.py 
+  134  python3 plot_throughput.py 
+  135  python3 plot_throughput.py 
+  136  python3 plot_throughput.py 
+  137  python3 plot_throughput.py 
+  138  python3 plot_throughput.py 
+  139  ls
+  140  python3 plot_cumulative_throughput.py 
+  141  python3 plot_cumulative_throughput.py 
+  142  python3 plot_cumulative_throughput.py 
+  143  python3 plot_cumulative_throughput.py 
+  144  python3 plot_cumulative_throughput.py 
+  145  python3 plot_cumulative_throughput.py 
+  146  python3 plot_cumulative_throughput.py 
+  147  python3 plot_cumulative_throughput.py 
+  148  python3 plot_cumulative_throughput.py 
+  149  python3 plot_cumulative_throughput.py 
+  150  python3 plot_cumulative_throughput.py 
+  151  conda activate scheduler
+  152  git status
+  153  git add -u
+  154  git commit -m "Fixed: Issue with objective becoming larger than 1"
+  155  git push
+  156  python3
+  157  ls
+  158  history
+  159  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  160  conda activate scheduler
+  161  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  162  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  163  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  164  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  165  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  166  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  167  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  168  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  169  ls
+  170  ls
+  171  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  172  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  173  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  174  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  175  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  176  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  177  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  178  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  179  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  180  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  181  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  182  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  183  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  184  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  185  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  186  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  187  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  188  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  189  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  190  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  191  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  192  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  193  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  194  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  195  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  196  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  197  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  198  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  199  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  200  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  201  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  202  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  203  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  204  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  205  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  206  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  207  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  208  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  209  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  210  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  211  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  212  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  213  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  214  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  215  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  216  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  217  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  218  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  219  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  220  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  221  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  222  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  223  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  224  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  225  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  226  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  227  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  228  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  229  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  230  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  231  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  232  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  233  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  234  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  235  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  236  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  237  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  238  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  239  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  240  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  241  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  242  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  243  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  244  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  245  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  246  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  247  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  248  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  249  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  250  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  251  make test
+  252  make test
+  253  make test
+  254  make test
+  255  conda activate scheduler
+  256  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  257  python3
+  258  ls
+  259  python3 line_counter.py *.py
+  260  ls
+  261  cd plotting
+  262  ls
+  263  conda activate scheduler
+  264  ls
+  265  python3 cdf_response_times.py 
+  266  python3 cdf_response_times.py 
+  267  python3 cdf_response_times.py 
+  268  python3 cdf_response_times.py 
+  269  python3 cdf_response_times.py 
+  270  python3 cdf_response_times.py 
+  271  python3 cdf_response_times.py 
+  272  python3 cdf_response_times.py 
+  273  python3 cdf_response_times.py 
+  274  python3 cdf_response_times.py 
+  275  python3 cdf_response_times.py 
+  276  python3 cdf_response_times.py 
+  277  python3 cdf_response_times.py 
+  278  python3 cdf_response_times.py 
+  279  python3 cdf_response_times.py 
+  280  python3 cdf_response_times.py 
+  281  python3 cdf_response_times.py 
+  282  python3 cdf_response_times.py 
+  283  python3 cdf_response_times.py 
+  284  python3 cdf_response_times.py 
+  285  python3 cdf_response_times.py 
+  286  python3 cdf_response_times.py 
+  287  python3 cdf_response_times.py 
+  288  python3 cdf_response_times.py 
+  289  python3 cdf_response_times.py 
+  290  python3 cdf_response_times.py 
+  291  python3 cdf_response_times.py 
+  292  python3 cdf_response_times.py 
+  293  python3 cdf_response_times_per_model.py 
+  294  python3 cdf_response_times_per_model.py 
+  295  python3 cdf_response_times_per_model.py 
+  296  python3 cdf_response_times_per_model.py 
+  297  python3 cdf_response_times_per_model.py 
+  298  python3 cdf_response_times_per_model.py 
+  299  python3 cdf_response_times_per_model.py 
+  300  python3 cdf_response_times_per_model.py 
+  301  python3 cdf_response_times_per_model.py 
+  302  python3 cdf_response_times_per_model.py 
+  303  python3 cdf_response_times_per_model.py 
+  304  python3 cdf_response_times_per_model.py 
+  305  python3 cdf_response_times_per_model.py 
+  306  python3 plot_vs_infaas.py 
+  307  python3 plot_vs_infaas.py 
+  308  python3 plot_vs_infaas.py 
+  309  python3 plot_vs_infaas.py 
+  310  python3 cdf_response_times_per_model.py 
+  311  python3 cdf_response_times_per_model.py 
+  312  python3 per_model_throughput.py 
+  313  python3 per_model_throughput.py 
+  314  ls
+  315  cd ..
+  316  ls
+  317  cd ..
+  318  ls
+  319  conda activate scheduler
+  320  python3 test.py -ma 7 -js 3 -r -f 10
+  321  python3 test.py --help
+  322  python3 test.py --help
+  323  python3 test.py --help
+  324  python3 test.py -ma 7 -js 3 -r -f 10
+  325  python3 test.py -ma 7 -js 3 -r -f 10
+  326  history
+  327  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  328  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  329  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  330  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  331  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  332  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  333  git status
+  334  git add -u
+  335  git add plotting/plot_cumulative_throughput.py 
+  336  git commit -m "Modifying ILP for effective accuracy, some errors"
+  337  git push
+  338  git reflog
+  339  git checkout 9c2c04a
+  340  git checkout 9c2c04a
+  341  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  342  git checkout main
+  343  git stash
+  344  git checkout main
+  345  git status
+  346  git status
+  347  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  348  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  349  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  350  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  351  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  352  python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure
+  353  ssh sohaib@lids.cs.umass.edu
+  354  sudo ports install mame
+  355  brew install ports
+  356  sudo port install mame
+  357  sudo ports install mame
+  358  mame
+  359  mame
+  360  openssl
+  361  openssl dgst --help
+  362  openssl dgst -sha1
+  363  openssl dgst -rs
+  364  openssl dgst -rsa
+  365  clear
+  366  gzip --help
+  367  cd Documents/Research/
+  368  ls
+  369  cd Dropbox\ backup/
+  370  ls
+  371  gzip -v9 map
+  372  gzip -v9 -r map
+  373  gunzip -v9 -r map
+  374  gzip -v9 -r map
+  375  python3
+  376  python3
+  377  conda activate scheduler
+  378  ls
+  379  cd plotting/
+  380  ls
+  381  python3 per_model_throughput.py 
+  382  cd ..
+  383  python3 plotting/per_model_throughput.py 
+  384  conda deactivate
+  385  pip list
+  386  git status
+  387  git add -u
+  388  git add profiling
+  389  git status
+  390  git commit -m "Profiled data added"
+  391  git push
+  392  git status
+  393  git add -u
+  394  git status
+  395  git commit -m "Latest code from June 2022 submission"
+  396  git push
+  397  conda  activate scheduler
+  398  ls
+  399  ls
+  400  history
+  401  python3 -v
+  402  which python
+  403  which python3
+  404  python3  --version
+  405  python3 test.py --help
+  406  history
+  407  git status
+  408  git add -u
+  409  git commit -m "Instructions for reproducing results from paper"
+  410  git push
+  411  git add -u
+  412  git commit -m "Reformatting README.md"
+  413  git  push
+  414  clear
+  415  python3 test.py -ma 7 -js 4 -r -f 10 -p traces/azure
+  416  grbgetkey 028b98ae-4029-11ed-a8ef-0242ac190004
+  417  python3 test.py -ma 7 -js 4 -r -f 10 -p traces/azure
+  418  python3 test.py -ma 7 -js 4 -r -f 10 -p traces/azure
+  419  python3 test.py -ma 7 -js 4 -r -f 10 -p traces/azure
+  420  python3 test.py -ma 7 -js 4 -r -f 10 -p traces/azure | grep 'Time to solve ILP'
+  421  git status
+  422  git commit -m "Code cleanup"
+  423  git push
+  424  clear
+  425  python3 test.py -ma 7 -js 4 -r -f 10 -p traces/azure
+  426  python3 test.py -ma 7 -js 4 -r -f 10 -p traces/azure
+  427  python3 test.py -ma 7 -js 4 -r -f 10 -p traces/azure
+  428  python3 test.py -ma 7 -js 4 -r -f 10 -p traces/azure --alpha -0.1
+  429  python3 test.py -ma 7 -js 4 -r -f 10 -p traces/azure --alpha -0.1
+  430  python3 test.py -ma 7 -js 4 -r -f 10 -p traces/azure --alpha 1.0
+  431  python3 test.py -ma 7 -js 4 -r -f 10 -p traces/azure --alpha 1.1
+  432  python3 test.py -ma 7 -js 4 -r -f 10 -p traces/azure --alpha 1.1
+  433  python3 test.py -ma 7 -js 4 -r -f 10 -p traces/azure --alpha 0.1
+  434  python3 test.py -ma 7 -js 4 -r -f 10 -p traces/azure --alpha 0.1
+  435  python3 test.py -ma 7 -js 4 -r -f 10 -p traces/azure --alpha 0.1
+  436  git diff
+  437  git status
+  438  git add -u
+  439  git commit -m "Use alpha parameter as an argument"
+  440  git push
+  441  git push
+  442  python3 test.py -ma 7 -js 4 -r -f 10 -p traces/azure --alpha 0.1
+  443  python3 test.py -ma 7 -js 4 -r -f 10 -p traces/azure --alpha 0.1 --beta 0.8
+  444  python3 test.py -ma 7 -js 4 -r -f 10 -p traces/azure --alpha 0.1 --beta 1.1
+  445  python3 test.py -ma 7 -js 4 -r -f 10 -p traces/azure --alpha 0.1 --beta 0.8
+  446  git status
+  447  git add -u
+  448  git commit -m "Use beta parameter as an argument"
+  449  git push
+  450  python3 test.py -ma 7 -js 4 -r -f 10 -p traces/azure --alpha 0.1 --beta 0.8
+  451  git add -u
+  452  git commit -m "Update readme"
+  453  git push
+  454  clear
+  455  python3 test.py -ma 7 -js 4 -r -f 10 -p traces/azure --alpha 0.1 --beta 0.8
+  456  python3 test.py --help
+  457  python3 test.py -ma 7 -js 4 -r -f 10 -p traces/azure --alpha 0.1 --beta 0.8
+  458  python3 test.py -ma 7 -js 4 -r -f 10 -p traces/azure --alpha 0.1 --beta 0.8
+  459  clear
+  460  python3 test.py -ma 7 -js 4 -r -f 10 -p traces/azure --alpha 0.1 --beta 0.8
+  461  clear
+  462  python3 test.py -ma 7 -js 4 -r -f 10 -p traces/azure --alpha 0.1 --beta 0.8
+  463  git status
+  464  git add -u
+  465  git commit -m "Improved logging and code cleanup"
+  466  git push
+  467  ls
+  468  history | grep line_counter.py
+  469  python3 line_counter.py *.py
+  470  python3 line_counter.py algorithms/*.py
+  471  git status
+  472  git add -u
+  473  git commit -m "Refactor event processing to deal with batch request handling"
+  474  git push
+  475  git  status
+  476  git status
+  477  git add -u
+  478  git commit -m "Implementation of batched request processing"
+  479  git push
+  480  clear
+  481  git status
+  482  git add -u
+  483  git add event.py
+  484  git status
+  485  git commit -m "Separate file for Event and EventType classes"
+  486  git push
+  487  ls
+  488  cd model_zoo/
+  489  ls
+  490  python3 gluon_to_onnx.py 
+  491  python3 gluon_to_onnx.py 
+  492  python3 gluon_to_onnx.py 
+  493  pip list
+  494  pip3 list
+  495  python3 gluon_to_onnx.py 
+  496  python3 gluon_to_onnx.py 
+  497  python3 --version
+  498  history
+  499  pip list
+  500  pip3 list
+  501  history > history.txt
