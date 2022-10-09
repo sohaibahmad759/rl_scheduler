@@ -72,6 +72,8 @@ class Simulator:
         # self.available_predictors = np.tile(copy.deepcopy(predictors_max), self.n_qos_levels)
         self.available_predictors = copy.deepcopy(predictors_max)
 
+        self.batching_enabled = False
+
         logging.basicConfig(level=logging.INFO)
 
         idx = 0

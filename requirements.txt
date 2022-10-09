@@ -5,3 +5,5 @@ torch
 gym
 requests
 stable-baselines3
+onnx==1.9.0
+onnxruntime==1.8.1

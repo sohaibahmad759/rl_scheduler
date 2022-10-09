@@ -101,7 +101,7 @@ class Predictor:
             temp_queue.append(self.request_queue.pop(0))
 
         # TODO: Check profiled latency for a given batch size
-        end_time = self.profiled_latencies[]
+        end_time = self.profiled_latencies[-1]
         while len(temp_queue) > 0:
             current_request = temp_queue.pop(0)
 
