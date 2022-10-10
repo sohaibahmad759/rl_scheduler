@@ -29,3 +29,4 @@ package-lock.json
 saved_models/*
 line_counter.py
 *.png
+model_zoo/onnx
