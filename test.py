@@ -3,11 +3,10 @@ import time
 import sys
 import logging
 import argparse
-import random
 import numpy as np
 from stable_baselines3 import PPO
-import utils
-from scheduling_env import SchedulingEnv
+import core.utils as utils
+from core.scheduling_env import SchedulingEnv
 from algorithms.ilp import Ilp
 from algorithms.ilp_throughput import IlpThroughput
 

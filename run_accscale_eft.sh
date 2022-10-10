@@ -1,0 +1,1 @@
+python3 test.py -ma 7 -js 3 -r -f 10 -p traces/azure --alpha 0.8 --beta 0.8
