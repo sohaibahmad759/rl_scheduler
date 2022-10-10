@@ -42,9 +42,13 @@ To activate conda environment:
 
 `conda activate scheduler`
 
-To run ILP with Earliest Finish Time (EFT-FIFO):
+To run ILP with Earliest Finish Time (EFT-FIFO), run the following command. Make sure the `alpha` and `beta` parameters in the file are set correctly.
 
-`python3 test.py -ma 7 -js 4 -r -f 10 -p traces/azure --alpha 0.1 --beta 0.8`
+`./run_accscale_eft.sh`
+
+To run INFaaS:
+
+`./run_infaas.sh`
 
 Various scripts used for plotting results:
 
