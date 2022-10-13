@@ -13,8 +13,8 @@ from core.executor import Executor, AccType
 
 class Simulator:
     def __init__(self, job_sched_algo, trace_path=None, mode='training', 
-                 max_acc_per_type=0, predictors_max=[10, 10, 10, 10], n_qos_levels=1, random_runtimes=False,
-                 fixed_seed=0):
+                 max_acc_per_type=0, predictors_max=[10, 10, 10, 10], n_qos_levels=1,
+                 random_runtimes=False, fixed_seed=0, batching=False):
         self.clock = 0
         self.event_queue = []
         self.executors = {}
@@ -74,7 +74,7 @@ class Simulator:
         # self.available_predictors = np.tile(copy.deepcopy(predictors_max), self.n_qos_levels)
         self.available_predictors = copy.deepcopy(predictors_max)
 
-        self.batching_enabled = True
+        self.batching_enabled = batching
 
         logging.basicConfig(level=logging.INFO)
 
@@ -980,7 +980,7 @@ class Simulator:
         ''' Bump stats for a failed request
         '''
         print(f'Failed request: {event.desc}')
-        time.sleep(1)
+        # time.sleep(1)
         isi = event.desc
         self.failed_requests += 1
         self.failed_requests_arr[self.isi_to_idx[isi]] += 1

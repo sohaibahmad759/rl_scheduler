@@ -44,7 +44,10 @@ def getargs():
                         dest='alpha', help='alpha parameter for ILP (weightage of throughput vs accuracy). Only needed if MA is ILP')
     parser.add_argument('--beta', required=False, default=-1,
                         dest='beta', help='beta parameter for ILP (minimum throughput constraint). Only needed if MA is ILP')
-    parser.set_defaults(random_runtimes=False)
+    parser.add_argument('--batching', required=False, action='store_true',
+                        dest='enable_batching', help='Indicate that batching should be enabled. It is disabled by default')
+
+    parser.set_defaults(random_runtimes=False, batching=False)
 
     return parser.parse_args()
 
@@ -98,7 +101,8 @@ def main(args):
     env = SchedulingEnv(trace_dir=args.trace_path, job_sched_algo=int(args.job_sched_algo),
                         action_group_size=action_group_size, reward_window_length=reward_window_length,
                         random_runtimes=args.random_runtimes, fixed_seed=fixed_seed,
-                        allocation_window=allocation_window, model_assignment=model_assignment)
+                        allocation_window=allocation_window, model_assignment=model_assignment,
+                        batching=args.enable_batching)
 
     policy_kwargs = dict(net_arch=[128, 128, dict(pi=[128, 128, 128],
                                         vf=[128, 128, 128])])
@@ -162,6 +166,7 @@ def main(args):
     observation = env.reset()
     failed_requests = 0
     total_requests = 0
+    successful_requests = 0
     start = time.time()
     for i in range(testing_steps):
         if model_assignment == 'random':
@@ -342,9 +347,10 @@ def main(args):
         if (i-1) % action_group_size == 0:
             failed_requests += np.sum(observation[:,-1])
             total_requests += np.sum(observation[:,-2])
+            successful_requests += env.simulator.get_successful_requests()
             logfile.write(str(total_requests) + ',' +
                           str(failed_requests) + '\n')
-            requests_per_model, failed_per_model, accuracy_per_model = env.simulator.get_thput_accuracy_per_model()
+            requests_per_model, failed_per_model, accuracy_per_model, successful_per_model = env.simulator.get_thput_accuracy_per_model()
             utils.log_thput_accuracy_per_model(rate_logger_per_model, i, requests_per_model,
                                             failed_per_model, accuracy_per_model)
         rl_reward += reward
@@ -365,6 +371,8 @@ def main(args):
     print(f'Total requests: {total_requests}')
     print(
         f'Percentage of requests failed: {(failed_requests/total_requests*100)}%')
+    print(
+        f'Percentage of requests succeeded: {(successful_requests/total_requests*100)}%')
     print(f'Test time: {(end-start)} seconds')
     print(f'Requests added: {env.simulator.requests_added}')
     logfile.close()
