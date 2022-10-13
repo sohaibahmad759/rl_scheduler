@@ -316,6 +316,7 @@ class Ilp(SchedulingAlgorithm):
                 
                 if canary_pct > 0.0 and canary_pct < 1.0:
                     logging.info('variant: {}, isi: {}, canary pct: {}'.format(model_variant, isi, canary_pct))
+                    logging.info('TODO: Update the canary routing table based on this value')
 
 
         # logging.info('required_predictors: {}'.format(required_predictors))

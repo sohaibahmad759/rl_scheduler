@@ -1,9 +1,10 @@
 import itertools
 import logging
 import math
-import numpy as np
 import random
+import time
 import uuid
+import numpy as np
 from types import NoneType
 from enum import Enum
 from core.predictor import AccType, Predictor
@@ -78,10 +79,18 @@ class Executor:
 
         predictor = Predictor(acc_type.value, qos_level=qos_level, profiled_accuracy=profiled_accuracy,
                                 profiled_latencies=profiled_latencies, variant_name=variant_name,
-                                executor=self)
+                                executor=self, simulator=self.simulator)
         self.predictors[predictor.id] = predictor
         self.num_predictor_types[acc_type.value-1 + qos_level*4] += 1
         self.iterator = itertools.cycle(self.predictors)
+
+        # Set an initial weight for canary routing, which will later get updated as the ILP runs
+        if len(self.canary_routing_table) == 0:
+            self.canary_routing_table[predictor.id] = 1.0
+        else:
+            self.canary_routing_table[predictor.id] = sum(list(self.canary_routing_table.values()))/len(self.canary_routing_table)
+        print(f'Weight set for predictor {predictor.id}: {self.canary_routing_table[predictor.id]}')
+
         return predictor.id
 
 
@@ -116,6 +125,7 @@ class Executor:
             predictor_qos = self.predictors[id].qos_level
             self.num_predictor_types[predictor_type-1 + predictor_qos*4] -= 1
             del self.predictors[id]
+            del self.canary_routing_table[id]
             self.iterator = itertools.cycle(self.predictors)
             return True
         else:
@@ -132,6 +142,7 @@ class Executor:
             if acc_type == predictor_type and qos_level == predictor_qos:
                 self.num_predictor_types[predictor_type-1 + predictor_qos*4] -= 1
                 del self.predictors[id]
+                del self.canary_routing_table[id]
                 self.iterator = itertools.cycle(self.predictors)
                 return True
         return False
@@ -450,6 +461,7 @@ class Executor:
         # print('self.assigned_requests: {}'.format(self.assigned_requests))
         if event.id not in self.assigned_requests:
             logging.error('ERROR: Could not find assigned request.')
+            time.sleep(10)
             return False
         
         predictor = self.assigned_requests[event.id]
@@ -461,6 +473,7 @@ class Executor:
         else:
             logging.debug('WARN: Could not finish request at predictor {}, \
                     executor {}. (Time: {})'.format(predictor.id, self.id, clock))
+            time.sleep(5)
             return False
 
     
@@ -469,19 +482,40 @@ class Executor:
         appropriate predictor. The predictor will dequeue the request and process it
         with a batch of requests.
         '''
+        if len(self.predictors) == 0:
+            self.add_predictor()
+
         if self.task_assignment == TaskAssignment.CANARY:
+            logging.debug(f'Predictors: {self.predictors}')
+            logging.debug(f'Canary routing table, keys: {list(self.canary_routing_table.keys())}, '
+                  f'weights: {list(self.canary_routing_table.values())}')
+
             selected_variant = random.choices(list(self.canary_routing_table.keys()),
-                                    list(weights=self.canary_routing_table.values()))
+                                    weights=list(self.canary_routing_table.values()),
+                                    k=1)[0]
+            logging.debug(f'Selected variant: {selected_variant}')
             
             # Canary routing only tells us the model variant to use, but does not
             # tell us which instance of that model variant. We therefore randomly
             # choose different instances of the model variant, with the expectation
             # that with a large enough number of requests, we will have spread out
             # the requests evenly to all instances (law of large numbers)
-            variants = list(filter(lambda x: x.variant_name == selected_variant, self.predictors))
-            selected_predictor = random.choice(variants)
+
+            # TODO: The peak profiled throughput on different instances of the same
+            # model variant hosted on different accelerators will be different.
+            # So instead of evenly spreading out the requests, it would make more
+            # sense to spread requests proportionally
+
+            # variants = list(filter(lambda x: x.variant_name == selected_variant, self.predictors))
+            variants = list(filter(lambda x: self.predictors[x].variant_name == self.predictors[selected_variant].variant_name,
+                                    self.predictors))
+            logging.debug(f'Variants: {variants}')
+            selected_predictor_id = random.choice(variants)
+            logging.debug(f'Selected predictor id: {selected_predictor_id}')
+            selected_predictor = self.predictors[selected_predictor_id]
 
             selected_predictor.enqueue_request(event, clock)
+            self.assigned_requests[event.id] = selected_predictor
             return
 
         else:

@@ -22,6 +22,8 @@ class Simulator:
         self.isi_to_idx = {}
         self.failed_requests = 0
         self.failed_requests_arr = []
+        self.successful_requests = 0
+        self.successful_requests_arr = []
         self.total_requests_arr = []
         self.mode = mode
         self.completed_requests = 0
@@ -60,6 +62,7 @@ class Simulator:
 
         self.requests_per_model = {}
         self.failed_per_model = {}
+        self.successful_per_model = {}
 
         self.accuracy_per_model = {}
 
@@ -71,7 +74,7 @@ class Simulator:
         # self.available_predictors = np.tile(copy.deepcopy(predictors_max), self.n_qos_levels)
         self.available_predictors = copy.deepcopy(predictors_max)
 
-        self.batching_enabled = False
+        self.batching_enabled = True
 
         logging.basicConfig(level=logging.INFO)
 
@@ -111,6 +114,7 @@ class Simulator:
                 self.idx_to_executor[idx] = isi_name
                 self.isi_to_idx[isi_name] = idx
                 self.failed_requests_arr.append(0)
+                self.successful_requests_arr.append(0)
                 self.total_requests_arr.append(0)
                 idx += 1
 
@@ -301,6 +305,7 @@ class Simulator:
 
         self.requests_per_model[isi_name] = 0
         self.failed_per_model[isi_name] = 0
+        self.successful_per_model[isi_name] = 0
 
         self.accuracy_per_model[isi_name] = []
 
@@ -334,6 +339,7 @@ class Simulator:
         requests = []
         failed = []
         accuracy = []
+        successful = []
         for model in self.requests_per_model:
             requests.append(self.requests_per_model[model])
             self.requests_per_model[model] = 0
@@ -345,7 +351,10 @@ class Simulator:
             accuracy.append(total_accuracy)
             self.accuracy_per_model[model] = []
 
-        return requests, failed, accuracy
+            successful.append(self.successful_per_model[model])
+            self.successful_per_model[model] = 0
+
+        return requests, failed, accuracy, successful
 
     def initialize_model_variant_loadtimes(self, isi_name):
         model_variant_list = self.model_variants[isi_name]
@@ -478,6 +487,8 @@ class Simulator:
             self.total_requests_arr[i] = 0
             self.failed_requests_arr[i] = 0
             self.failed_requests = 0
+            self.successful_requests = 0
+            self.successful_requests_arr[i] = 0
         self.qos_stats = np.zeros((len(self.executors), self.n_qos_levels * 2))
 
     def get_total_requests_arr(self):
@@ -491,6 +502,12 @@ class Simulator:
 
     def get_failed_requests(self):
         return self.failed_requests
+
+    def get_successful_requests_arr(self):
+        return self.successful_requests_arr
+
+    def get_successful_requests(self):
+        return self.successful_requests
 
     # def reset_failed_requests(self):
     #     self.failed_requests = 0
@@ -814,6 +831,10 @@ class Simulator:
             self.process_end_event(event, clock)
         elif event.type == EventType.SCHEDULING:
             self.process_scheduling_event(event, clock)
+        elif event.type == EventType.FINISH_BATCH:
+            self.process_finish_batch_event(event, clock)
+        elif event.type == EventType.SLO_EXPIRING:
+            self.process_slo_expiring_event(event, clock)
 
         return None
 
@@ -831,14 +852,23 @@ class Simulator:
         executor = self.executors[isi]
 
         if not self.batching_enabled:
-            end_time, qos_met, accuracy_seen = executor.process_request(
-                event, clock, self.runtimes)
+            self.process_start_event_without_batch(event, clock, executor)
         else:
-            # TODO: fix the return types for this function
-            end_time, qos_met, accuracy_seen = executor.enqueue_request(
-                event, clock)
+            self.process_start_event_with_batch(event, clock, executor)
+        
+        # Bump overall request statistics
+        self.bump_overall_request_stats(event)
+        return
 
-        # Note: we report QoS failure whenever
+    def process_start_event_without_batch(self, event, clock, executor):
+        ''' If we do not have batching enabled, we will immediately know
+        whether an incoming request can be processed or not. This function
+        handles the simulator's behavior for the no-batching scenario.
+        '''
+        end_time, qos_met, accuracy_seen = executor.process_request(
+            event, clock, self.runtimes)
+
+        # We report QoS failure whenever:
         # (i) request fails, (ii) request succeeds but QoS is not met
 
         if end_time is None:
@@ -849,16 +879,77 @@ class Simulator:
         else:
             # Request can be processed, generate an end event for it
             # TODO: look into dequeue
-            self.insert_event(end_time, EventType.END_REQUEST,
-                                event.desc, id=event.id, qos_level=event.qos_level)
-            self.accuracy_logfile.write(str(accuracy_seen) + '\n')
-            self.accuracy_per_model[isi].append(accuracy_seen)
+            self.generate_end_request_event(event, end_time, accuracy_seen, qos_met)
             
-            if not qos_met:
-                self.bump_qos_unmet_stats(event)
+        return
+
+    def process_start_event_with_batch(self, event, clock, executor):
+        ''' If batching is enabled, the request goes through a different pipeline
+        and we will not immediately know if request gets processed. So we simply
+        add the request to an appropriate predictor.
+        '''
+        # TODO: bump failed request or qos unmet stats at appropriate points
+        #       wthin the execution pipeline of batched requests 
+        executor.enqueue_request(event, clock)
+        return
+
+    def generate_end_request_event(self, event, end_time, accuracy_seen, qos_met):
+        ''' Generate an END_REQUEST event and insert it into the simulator's
+        event queue.
+        '''
+        isi = event.desc
+        self.insert_event(end_time, EventType.END_REQUEST,
+                                event.desc, id=event.id, qos_level=event.qos_level)
+        self.accuracy_logfile.write(str(accuracy_seen) + '\n')
+        self.accuracy_per_model[isi].append(accuracy_seen)
         
-        # Bump overall request statistics
-        self.bump_overall_request_stats(event)
+        if not qos_met:
+            self.bump_qos_unmet_stats(event)
+
+        return
+
+    def generate_finish_batch_event(self, finish_time, predictor, executor):
+        ''' Generate a FINISH_BATCH event and insert it into the simulator's
+        event queue
+        '''
+        self.insert_event(finish_time, EventType.FINISH_BATCH,
+                        predictor=predictor, executor=executor)
+        return
+    
+    def process_finish_batch_event(self, event, clock):
+        ''' When a FINISH_BATCH event is encountered, trigger the appropriate
+        callbacks
+        '''
+        executor = event.executor
+        predictor = event.predictor
+
+        # TODO: It is possible that predictor might have been removed by this point
+        #       how to handle this case?
+
+        predictor.finish_batch_callback(clock)
+        return
+
+    def generate_slo_expiring_event(self, time, request, predictor, executor, event_counter):
+        ''' Generate an SLO_EXPIRING event and insert it into the simulator's
+        event queue
+        '''
+        self.insert_event(time, EventType.SLO_EXPIRING, desc=request.desc,
+                        id=request.id, deadline=request.deadline,
+                        predictor=predictor, executor=executor,
+                        event_counter=event_counter)
+        return
+
+    def process_slo_expiring_event(self, event, clock):
+        ''' When an SLO_EXPIRING event is encountered, trigger the appropriate
+        callbacks
+        '''
+        executor = event.executor
+        predictor = event.predictor
+
+        # TODO: It is possible that predictor might have been removed by this point
+        #       how to handle this case?
+
+        predictor.slo_expiring_callback(event, clock)
         return
 
     def process_end_event(self, event, clock):
@@ -888,6 +979,8 @@ class Simulator:
     def bump_failed_request_stats(self, event):
         ''' Bump stats for a failed request
         '''
+        print(f'Failed request: {event.desc}')
+        time.sleep(1)
         isi = event.desc
         self.failed_requests += 1
         self.failed_requests_arr[self.isi_to_idx[isi]] += 1
@@ -900,6 +993,14 @@ class Simulator:
         '''
         isi = event.desc
         self.qos_stats[self.isi_to_idx[isi], event.qos_level * 2 + 1] += 1
+    
+    def bump_successful_request_stats(self, event):
+        ''' Bump stats for a successful request
+        '''
+        isi = event.desc
+        self.successful_requests += 1
+        self.successful_requests_arr[self.isi_to_idx[isi]] += 1
+        self.successful_per_model[isi] += 1
 
     def bump_overall_request_stats(self, event):
         ''' Bump overall request stats, i.e., total requests per ISI, requests
@@ -919,10 +1020,20 @@ class Simulator:
         self.executors[executor.isi] = executor
         return executor.id
 
-    def insert_event(self, time, type, desc, runtime=None, id='', deadline=1000, qos_level=0, accuracy=None):
+    def insert_event(self, time, type, desc, runtime=None, id='', deadline=1000,
+                    qos_level=0, accuracy=None, predictor=None, executor=None,
+                    event_counter=0):
         if type == EventType.END_REQUEST:
             event = Event(time, type, desc, runtime, id=id, deadline=deadline,
                             qos_level=qos_level)
+        elif type == EventType.FINISH_BATCH:
+            event = Event(time, type, desc, runtime, id=id, deadline=deadline,
+                            qos_level=qos_level, accuracy=accuracy, predictor=predictor,
+                            executor=executor)
+        elif type == EventType.SLO_EXPIRING:
+            event = Event(time, type, desc, runtime, id=id, deadline=deadline,
+                            qos_level=qos_level, accuracy=accuracy, predictor=predictor,
+                            executor=executor, event_counter=event_counter)
         else:
             event = Event(time, type, desc, runtime, deadline=deadline,
                             qos_level=qos_level, accuracy=accuracy)

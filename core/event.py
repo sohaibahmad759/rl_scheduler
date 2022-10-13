@@ -6,10 +6,14 @@ class EventType(Enum):
     START_REQUEST = 1
     SCHEDULING = 2
     END_REQUEST = 3
+    FINISH_BATCH = 4
+    SLO_EXPIRING = 5
 
 
 class Event:
-    def __init__(self, start_time, type, desc, runtime=None, deadline=1000, id='', qos_level=0, accuracy=100.0):
+    def __init__(self, start_time, type, desc, runtime=None, deadline=1000, id='',
+                qos_level=0, accuracy=100.0, predictor=None, executor=None,
+                event_counter=0):
         self.id = id
         if self.id == '':
             self.id = uuid.uuid4().hex
@@ -20,3 +24,9 @@ class Event:
         self.deadline = deadline
         self.qos_level = qos_level
         self.accuracy = accuracy
+
+        # parameters needed for batch processing
+        self.predictor = predictor
+        self.executor = executor
+        # event counter is only set if event is SLO_EXPIRING
+        self.event_counter = event_counter
