@@ -96,6 +96,12 @@ class Predictor:
         self.request_queue.append(event)
         self.event_counter += 1
 
+        # If predictor is busy, we have to wait until we get a FINISH_BATCH event
+        # before we further process this request
+        if self.busy:
+            self.generate_head_slo_expiring()
+            return
+
         # If we are past t_w(q), execute queue with q-1 requests
         # If q-1 is 0 at this point, the request deadlines are not set properly
         # and request cannot possibly be executed within deadline
@@ -117,11 +123,11 @@ class Predictor:
                 print('Problem: expired request has not been removed from the queue')
                 time.sleep(10)
 
-            if self.batch_processing_latency(1) > first_request.deadline:
+            if self.batch_processing_latency(1, first_request) > first_request.deadline:
                 print(f'Request cannot be processed even with batch size of 1')
                 time.sleep(10)
 
-            max_waiting_time = first_request_expiration - self.batch_processing_latency(batch_size)
+            max_waiting_time = first_request_expiration - self.batch_processing_latency(batch_size, first_request)
 
             # TODO: whenever a request is popped from the queue and the queue has a new head,
             #       we have to generate an SLO expiring event for it
@@ -153,6 +159,8 @@ class Predictor:
         # TODO: Even after all the checks, make sure to track how many reqeusts
         #       finish after their deadline
 
+        print(f'Requests in queue before popping: {len(self.request_queue)}')
+
         temp_queue = []
         dequeued_requests = 0
 
@@ -165,8 +173,10 @@ class Predictor:
         if len(self.request_queue) > 0:
             self.generate_head_slo_expiring()
 
+        print(f'Batch size given: {batch_size}, requests in queue after popping: '
+              f'{len(self.request_queue)}, dequeued_requests: {dequeued_requests}')
         # TODO: use actual batch processing time
-        batch_processing_time = self.batch_processing_latency(batch_size)
+        batch_processing_time = self.batch_processing_latency(batch_size, temp_queue[0])
         finish_time = clock + batch_processing_time
         accuracy_seen = self.profiled_accuracy
 
@@ -181,6 +191,9 @@ class Predictor:
                 time.sleep(10)
             self.simulator.generate_end_request_event(request, finish_time,
                                                     accuracy_seen, qos_met)
+        self.simulator.generate_finish_batch_event(finish_time=finish_time,
+                                                predictor=self,
+                                                executor=self.executor)
 
         self.busy = True
         self.busy_till = finish_time
@@ -227,13 +240,18 @@ class Predictor:
             batch_size = self.find_batch_size(queued_requests)
             if batch_size == -1:
                 batch_size = self.max_batch_size
-            batch_processing_time = self.batch_processing_latency(batch_size)
+            batch_processing_time = self.batch_processing_latency(batch_size, first_request)
+
+            print(f'FINISH_BATCH callback: current time: {clock}, first request '
+                  f'starts at {first_request.start_time} and expires at {first_request_expiration}, '
+                  f'time to process it will be {batch_processing_time} with batch '
+                  f'size of {batch_size}, requests in queue: {queued_requests}')
 
             if clock + batch_processing_time > first_request_expiration:
                 failed_request = self.request_queue.pop(0)
-                self.simulator.bump_failed_requests_stats(failed_request)
+                self.simulator.bump_failed_request_stats(failed_request)
                 queued_requests = len(self.request_queue)
-                time.sleep(10)
+                # time.sleep(10)
             else:
                 first_request_expiring = False
         
@@ -266,14 +284,6 @@ class Predictor:
     def slo_expiring_callback(self, event, clock):
         ''' Callback to handle an SLO_EXPIRING event
         '''
-        # if event.event_counter < self.event_counter:
-        #     # this means we have encountered an older SLO_EXPIRING callback
-        #     # we do not need to handle it
-        #     print(f'slo_expiring_callback: Encountered an older SLO_EXPIRING '
-        #           f'event with counter {event.event_counter}, current counter: '
-        #           f'{self.event_counter}')
-        #     return
-        
         logging.debug(f'SLO expiring callback, Current clock: {clock}, event counter: '
             f'{event.event_counter}, slo_expiring_dict entry: {self.slo_expiring_dict[event.event_counter]}')
         if clock != self.slo_expiring_dict[event.event_counter]:
@@ -293,6 +303,11 @@ class Predictor:
             # time.sleep(5)
             return
 
+        if len(self.request_queue) == 0:
+            # We might have already processed the request before reaching its
+            # SLO EXPIRING
+            return
+
         batch_size = self.find_batch_size(requests=len(self.request_queue))
         print(f'slo_expiring_callback: Trying to find appropriate batch size. '
             f'Number of requests in queue: {len(self.request_queue)}, '
@@ -301,6 +316,8 @@ class Predictor:
         if batch_size == -1:
             # requests in queue exceed maximum batch size, this should not happen
             # since we have not added any new requests
+            # actually, this can happen if we added new requests while the predictor
+            # was busy processing another batch
             print('slo_expiring_callback: Something is wrong, find_batch_size returned -1')
             time.sleep(10)
             return
@@ -321,25 +338,30 @@ class Predictor:
         first_request = self.request_queue[0]
         first_request_expiration = first_request.start_time + first_request.deadline
 
-        if self.batch_processing_latency(1) > first_request.deadline:
+        if self.batch_processing_latency(1, first_request) > first_request.deadline:
             print(f'Request cannot be processed even with batch size of 1')
             time.sleep(10)
         
         # TODO: what if we are already past the t_w for this batch size?
         batch_size = self.find_batch_size(requests=len(self.request_queue))
 
-        max_waiting_time = first_request_expiration - self.batch_processing_latency(batch_size)
+        max_waiting_time = first_request_expiration - self.batch_processing_latency(batch_size, first_request)
 
         self.generate_slo_expiring(first_request, max_waiting_time)
         print(f'head: Generated SLO_EXPIRING event for request {first_request.desc} '
               f'to expire at {max_waiting_time}')
+        return
 
     
-    def batch_processing_latency(self, batch_size):
+    def batch_processing_latency(self, batch_size, request):
         ''' Return the latency to process a batch of a given size
         '''
         # TODO: Replace this with actual profiled latencies
-        processing_latency = 100*batch_size
+        logging.debug('batch_processing_latency()')
+        logging.debug(f'Profiled latencies: {self.profiled_latencies}')
+        logging.debug(f'Request desc: {request.desc}, qos_level: {request.qos_level}, '
+                      f'profiled latency: {self.profiled_latencies[(request.desc, request.qos_level)]}')
+        processing_latency = self.profiled_latencies[(request.desc, request.qos_level)] * batch_size
         # processing_latency = 10000
         return processing_latency
 
@@ -374,25 +396,3 @@ class Predictor:
                 end = mid - 1
         # Return the insert position
         return end + 1
-
-    
-    # def assign_batch(self, clock):
-    #     # If request can be finished within deadline, return end_time, else return None (failed request)
-    #     temp_queue = []
-    #     dequeued_requests = 0
-
-    #     # TODO: wait to fill batch size, this implementation is not correct
-    #     while dequeued_requests < self.batch_size or len(self.request_queue) > 0:
-    #         temp_queue.append(self.request_queue.pop(0))
-    #         dequeued_requests += 1
-
-    #     # TODO: Check profiled latency for a given batch size
-    #     end_time = self.profiled_latencies[-1]
-    #     while len(temp_queue) > 0:
-    #         current_request = temp_queue.pop(0)
-
-    #         self.busy = True
-    #         self.busy_till = end_time
-    #         self.request_dict[current_request.id] = 1
-
-    #     return end_time

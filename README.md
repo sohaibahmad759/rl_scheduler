@@ -65,3 +65,7 @@ The profiled data is under the `profiling` folder. `blis_profiled.csv` contains 
 ### Batch processing
 
 Underway: We are implementing batch processing for canary routing job scheduling. It will not support EFT for the time being.
+
+To run AccScale with batching (ILP with canary routing), run the following command. Make sure to check the `alpha` and `beta` parameters are set correctly.
+
+`./run_accscale_batching.sh`

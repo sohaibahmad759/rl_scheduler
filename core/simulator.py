@@ -912,8 +912,9 @@ class Simulator:
         ''' Generate a FINISH_BATCH event and insert it into the simulator's
         event queue
         '''
-        self.insert_event(finish_time, EventType.FINISH_BATCH,
-                        predictor=predictor, executor=executor)
+        self.insert_event(time=finish_time, type=EventType.FINISH_BATCH,
+                        desc='finish_batch', predictor=predictor,
+                        executor=executor)
         return
     
     def process_finish_batch_event(self, event, clock):
