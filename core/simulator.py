@@ -521,17 +521,23 @@ class Simulator:
                 'Executor {} has assignment: {}'.format(isi, assignment))
         return
 
-    def apply_predictor_dict(self, required_predictors={}, canary_dict={}):
+    def apply_ilp_solution(self, required_predictors, canary_dict):
+        ''' Takes in two dictionaries, (i) required_predictors to indicate
+        model assignment, and (ii) canary_dict to define the canary routing
+        table for the given model assignment
+        '''
+        self.apply_predictor_dict(required_predictors)
+        self.apply_canary_dict(canary_dict)
+        return
+
+    def apply_predictor_dict(self, required_predictors={}):
         """ Takes in a dictionary 'required_predictors' with
         key: (model_variant, accelerator_type)
         value: number of predictors
-        A dictionary 'canary_dict' with
-        key: (model_variant, isi)
-        value: canary routing percentage
-        Applies the assignment to current system
+        And applies the assignment to current system
         """
         if len(required_predictors) == 0:
-            print('No required predictors passed')
+            logging.error('No required predictors passed')
             time.sleep(5)
             return
 
@@ -632,8 +638,32 @@ class Simulator:
                     time.sleep(5)
                 required -= 1
         print('added predictors:', added)
-        # time.sleep(1)
         
+        return
+
+    def apply_canary_dict(self, canary_dict):
+        ''' Takes in d dictionary 'canary_dict' with
+        key: (model_variant, isi number)
+        value: canary routing percentage
+        And applies it to the canary routing table for each ISI (executor)
+        '''
+        if len(canary_dict) == 0:
+            logging.error('apply_canary_dict: No canary dictionary passed')
+            time.sleep(5)
+            return
+        
+        print(f'Canary dict: {canary_dict}')
+        for idx in self.idx_to_executor:
+            isi = self.idx_to_executor[idx]
+            executor = self.executors[isi]
+
+            executor_routing_table = dict(filter(lambda x: x[0][1] == idx, canary_dict.items()))
+            # we want to modify this table from {(model_variant, isi number) -> canary_pct}
+            # to {model_variant -> canary_pct}
+            executor_routing_table = dict(map(lambda x: (x[0][0], x[1]), executor_routing_table.items()))
+            print(f'Executor: {isi}, routing table: {executor_routing_table}')
+
+            executor.apply_routing_table(executor_routing_table)
         return
 
     def null_action(self, action, idx):
@@ -962,6 +992,7 @@ class Simulator:
         executor = self.executors[isi]
         executor.finish_request(event, clock)
         self.completed_requests += 1
+        self.bump_successful_request_stats(event)
         return
 
     def process_scheduling_event(self, event, clock):

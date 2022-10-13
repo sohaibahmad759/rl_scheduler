@@ -1,1 +1,1 @@
-python test.py -ma 7 -js 6 -r -f 10 -p traces/azure --alpha 0.8 --beta 0.8 --batching
+python test.py -ma 7 -js 6 -r -f 10 -p traces/azure --alpha 0.1 --beta 0.8 --batching

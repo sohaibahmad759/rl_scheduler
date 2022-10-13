@@ -84,12 +84,12 @@ class Executor:
         self.num_predictor_types[acc_type.value-1 + qos_level*4] += 1
         self.iterator = itertools.cycle(self.predictors)
 
-        # Set an initial weight for canary routing, which will later get updated as the ILP runs
-        if len(self.canary_routing_table) == 0:
-            self.canary_routing_table[predictor.id] = 1.0
-        else:
-            self.canary_routing_table[predictor.id] = sum(list(self.canary_routing_table.values()))/len(self.canary_routing_table)
-        print(f'Weight set for predictor {predictor.id}: {self.canary_routing_table[predictor.id]}')
+        ## Set an initial weight for canary routing, which will later get updated as the ILP runs
+        # if len(self.canary_routing_table) == 0:
+        #     self.canary_routing_table[predictor.id] = 1.0
+        # else:
+        #     self.canary_routing_table[predictor.id] = sum(list(self.canary_routing_table.values()))/len(self.canary_routing_table)
+        # print(f'Weight set for predictor {predictor.id}: {self.canary_routing_table[predictor.id]}')
 
         return predictor.id
 
@@ -105,6 +105,27 @@ class Executor:
     def set_model_variants(self, model_variants={}):
         self.model_variants = model_variants
         self.variants_for_this_executor = model_variants[self.isi]
+        self.initialize_routing_table()
+
+    
+    def initialize_routing_table(self):
+        ''' Initializes the routing table to set equal probabilities for all
+        model variants
+        '''
+        if len(self.model_variants) == 0:
+            print(f'initialize_routing_table: no model variants set for executor {self}')
+            time.sleep(10)
+            return
+
+        routing_table = {}
+        model_variants = self.model_variants[self.isi]
+        total_variants = len(model_variants)
+
+        for model_variant in model_variants:
+            routing_table[model_variant] = 1.0 / total_variants
+
+        self.canary_routing_table = routing_table
+        return
 
 
     def set_variant_accuracies(self, accuracies=None):
@@ -125,7 +146,7 @@ class Executor:
             predictor_qos = self.predictors[id].qos_level
             self.num_predictor_types[predictor_type-1 + predictor_qos*4] -= 1
             del self.predictors[id]
-            del self.canary_routing_table[id]
+            # del self.canary_routing_table[id]
             self.iterator = itertools.cycle(self.predictors)
             return True
         else:
@@ -142,7 +163,7 @@ class Executor:
             if acc_type == predictor_type and qos_level == predictor_qos:
                 self.num_predictor_types[predictor_type-1 + predictor_qos*4] -= 1
                 del self.predictors[id]
-                del self.canary_routing_table[id]
+                # del self.canary_routing_table[id]
                 self.iterator = itertools.cycle(self.predictors)
                 return True
         return False
@@ -509,14 +530,13 @@ class Executor:
             self.add_predictor()
 
         if self.task_assignment == TaskAssignment.CANARY:
-            logging.debug(f'Predictors: {self.predictors}')
-            logging.debug(f'Canary routing table, keys: {list(self.canary_routing_table.keys())}, '
-                  f'weights: {list(self.canary_routing_table.values())}')
+            print(f'Canary routing table, keys: {list(self.canary_routing_table.keys())}, '
+                  f'weights: {list(self.canary_routing_table.values())}, isi: {self.isi}')
 
             selected_variant = random.choices(list(self.canary_routing_table.keys()),
                                     weights=list(self.canary_routing_table.values()),
                                     k=1)[0]
-            logging.debug(f'Selected variant: {selected_variant}')
+            print(f'Selected variant: {selected_variant}')
             
             # Canary routing only tells us the model variant to use, but does not
             # tell us which instance of that model variant. We therefore randomly
@@ -529,13 +549,26 @@ class Executor:
             # So instead of evenly spreading out the requests, it would make more
             # sense to spread requests proportionally
 
+            print(f'self.predictors: {self.predictors}')
             # variants = list(filter(lambda x: x.variant_name == selected_variant, self.predictors))
-            variants = list(filter(lambda x: self.predictors[x].variant_name == self.predictors[selected_variant].variant_name,
-                                    self.predictors))
-            logging.debug(f'Variants: {variants}')
+            # variants = list(filter(lambda x: self.predictors[x].variant_name == self.predictors[selected_variant].variant_name,
+            #                         self.predictors))
+            variants_dict = dict(filter(lambda x: x[1].variant_name == selected_variant,
+                                        self.predictors.items()))
+            variants = list(variants_dict.keys())
+
+            if len(variants) == 0:
+                self.add_predictor(variant_name=selected_variant)
+                variants_dict = dict(filter(lambda x: x[1].variant_name == selected_variant,
+                                            self.predictors.items()))
+                variants = list(variants_dict.keys())
+
+            print(f'Variants: {variants}')
             selected_predictor_id = random.choice(variants)
-            logging.debug(f'Selected predictor id: {selected_predictor_id}')
+            print(f'Selected predictor id: {selected_predictor_id}')
             selected_predictor = self.predictors[selected_predictor_id]
+            print(f'Selected predictor: {selected_predictor}')
+            # time.sleep(10)
 
             selected_predictor.enqueue_request(event, clock)
             self.assigned_requests[event.id] = selected_predictor
@@ -544,4 +577,20 @@ class Executor:
         else:
             logging.error('Only canary routing is supported with batch request processing')
             exit(0)
+
+    
+    def apply_routing_table(self, routing_table={}):
+        ''' Applies a given routing table to change the executor's current
+        canary routing table
+        '''
+        logging.debug(f'Executor: {self.isi}, Previous routing table: {self.canary_routing_table},'
+                      f' new routing table: {routing_table}')
+        if len(routing_table) == 0:
+            # TODO: this should not be happening if there are still predictors for this isi
+            print(f'Empty routing table passed for isi {self.isi}')
+            # time.sleep(10)
+            return
+
+        self.canary_routing_table = routing_table
+        return
                     

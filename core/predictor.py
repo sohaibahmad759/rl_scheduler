@@ -40,6 +40,7 @@ class Predictor:
         self.request_queue = []
         self.max_batch_size = max_batch_size
         self.event_counter = 0
+        # self.batch_sizes_allowed = [1]
         self.batch_sizes_allowed = [1, 2, 4, 8, 16]
         # self.batch_sizes_allowed = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
         self.slo_expiring_dict = {}
@@ -80,7 +81,7 @@ class Predictor:
             return False
         
         # self.request_dict.remove(event.id)
-        self.simulator.bump_successful_request_stats(event)
+        # self.simulator.bump_successful_request_stats(event)
         del self.request_dict[event.id]
         if len(self.request_dict) == 0:
             self.busy = False
@@ -158,8 +159,7 @@ class Predictor:
 
         # TODO: Even after all the checks, make sure to track how many reqeusts
         #       finish after their deadline
-
-        print(f'Requests in queue before popping: {len(self.request_queue)}')
+        logging.debug(f'Requests in queue before popping: {len(self.request_queue)}')
 
         temp_queue = []
         dequeued_requests = 0
@@ -173,8 +173,8 @@ class Predictor:
         if len(self.request_queue) > 0:
             self.generate_head_slo_expiring()
 
-        print(f'Batch size given: {batch_size}, requests in queue after popping: '
-              f'{len(self.request_queue)}, dequeued_requests: {dequeued_requests}')
+        logging.debug(f'Batch size given: {batch_size}, requests in queue after popping: '
+                      f'{len(self.request_queue)}, dequeued_requests: {dequeued_requests}')
         # TODO: use actual batch processing time
         batch_processing_time = self.batch_processing_latency(batch_size, temp_queue[0])
         finish_time = clock + batch_processing_time
