@@ -150,7 +150,8 @@ class Executor:
 
     def process_request(self, event, clock, runtimes):
         if len(self.predictors) == 0:
-            return None, False, 0
+            self.add_predictor()
+            # return None, False, 0
             
         qos_met = True
 
@@ -204,6 +205,28 @@ class Executor:
 
         elif self.task_assignment == TaskAssignment.CANARY:
             predictor = None
+
+            selected_variant = random.choices(list(self.canary_routing_table.keys()),
+                                    weights=list(self.canary_routing_table.values()),
+                                    k=1)[0]
+            # Canary routing only tells us the model variant to use, but does not
+            # tell us which instance of that model variant. We therefore randomly
+            # choose different instances of the model variant, with the expectation
+            # that with a large enough number of requests, we will have spread out
+            # the requests evenly to all instances (law of large numbers)
+
+            # TODO: The peak profiled throughput on different instances of the same
+            # model variant hosted on different accelerators will be different.
+            # So instead of evenly spreading out the requests, it would make more
+            # sense to spread requests proportionally
+            variants = list(filter(lambda x: self.predictors[x].variant_name == self.predictors[selected_variant].variant_name,
+                                    self.predictors))
+            selected_predictor_id = random.choice(variants)
+            selected_predictor = self.predictors[selected_predictor_id]
+            predictor = selected_predictor
+
+            # selected_predictor.enqueue_request(event, clock)
+            # self.assigned_requests[event.id] = selected_predictor
 
             # First choose model variant
 
