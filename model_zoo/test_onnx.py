@@ -4,7 +4,8 @@ import os
 model_architecture = 'vgg'
 model_name = model_architecture + '19'
 # model_name = 'resnet18_v1/resnet18_v1'
-sess = ort.InferenceSession(os.path.join('onnx', model_architecture, model_name, model_name + '.onnx'))
+sess = ort.InferenceSession(os.path.join('onnx', 'batch_size_n', 
+                    model_architecture, model_name, model_name + '.onnx'))
 # sess = ort.InferenceSession(os.path.join('onnx', model_name + '.onnx'))
 
 input_name = sess.get_inputs()[0].name

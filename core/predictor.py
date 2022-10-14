@@ -242,7 +242,7 @@ class Predictor:
                 batch_size = self.max_batch_size
             batch_processing_time = self.batch_processing_latency(batch_size, first_request)
 
-            print(f'FINISH_BATCH callback: current time: {clock}, first request '
+            logging.debug(f'FINISH_BATCH callback: current time: {clock}, first request '
                   f'starts at {first_request.start_time} and expires at {first_request_expiration}, '
                   f'time to process it will be {batch_processing_time} with batch '
                   f'size of {batch_size}, requests in queue: {queued_requests}')
@@ -270,7 +270,8 @@ class Predictor:
             # We don't need to generate a new SLO_EXPIRING event since we already have
             # an event with the same expiration time (because batch size hasn't changed)
             return
-        print(f'Generating SLO_EXPIRING event for request {event.id} to expire at {time}')
+        logging.debug(f'Generating SLO_EXPIRING event for request {event.id} '
+                      f'to expire at {time}')
         self.simulator.generate_slo_expiring_event(time, event,
                                                 predictor=self,
                                                 executor=self.executor,
@@ -348,7 +349,7 @@ class Predictor:
         max_waiting_time = first_request_expiration - self.batch_processing_latency(batch_size, first_request)
 
         self.generate_slo_expiring(first_request, max_waiting_time)
-        print(f'head: Generated SLO_EXPIRING event for request {first_request.desc} '
+        logging.debug(f'head: Generated SLO_EXPIRING event for request {first_request.desc} '
               f'to expire at {max_waiting_time}')
         return
 

@@ -541,6 +541,8 @@ class Simulator:
             time.sleep(5)
             return
 
+        logging.debug(f'apply_predictor_dict: required_predictors: {required_predictors}')
+
         ilp_to_acc_type = {}
         ilp_to_acc_type['CPU'] = 1
         ilp_to_acc_type['GPU_PASCAL'] = 2
@@ -580,6 +582,8 @@ class Simulator:
         # if (total_required > 40):
         #     time.sleep(10)
 
+        logging.debug(f'Existing predictors: {existing_predictors}')
+
         existing_count = {}
         for key in existing_predictors:
             (model_variant, acc_type) = key
@@ -588,24 +592,28 @@ class Simulator:
         # print('required predictors:', sorted(required_predictors))
         # time.sleep(3)
 
+        logging.debug(f'Existing count: {existing_count}')
+
+        all_tuple_combinations = self.generate_all_model_acc_keys()
+
         # Go through each key:
-        for tuple_key in required_predictors:
+        for tuple_key in all_tuple_combinations:
             # Remove predictors if needed
             (model_variant, accelerator_type) = tuple_key
             acc_type = ilp_to_acc_type[accelerator_type]
-
-            if not((model_variant, acc_type) in existing_predictors):
-                continue
-            existing = len(existing_predictors[(model_variant, acc_type)])
-            required = required_predictors[tuple_key]
+            
+            existing_key = (model_variant, acc_type)
+            existing = len(existing_predictors.get(existing_key, {}))
+            required = required_predictors.get(tuple_key, 0)
+            logging.debug(f'tuple_key: {tuple_key}, existing: {existing}, required: {required}')
 
             while existing > required:
                 predictor = existing_predictors[(model_variant, acc_type)].pop()
                 id = predictor.id
                 executor = predictor.executor
                 if (executor.remove_predictor_by_id(id)):
-                    print('removed predictor {} of type {} for model variant {}'.format(id,
-                                predictor.acc_type, model_variant))
+                    print(f'removed predictor {id} of type {predictor.acc_type} for '
+                          f'model variant {model_variant}')
                     self.available_predictors[acc_type-1] += 1
                 else:
                     print('no predictor found with id:', id)
@@ -641,6 +649,23 @@ class Simulator:
         
         return
 
+    def generate_all_model_acc_keys(self):
+        ''' Generates a list of tuples of the format (model variant, acc type)
+        that enumerates all possible combinations
+        '''
+        all_model_variants = list(map(lambda x: x[1], self.model_variants.items()))
+        # merge list of lists into one list
+        all_model_variants = sum(all_model_variants, [])
+
+        all_acc_types = ['CPU', 'GPU_PASCAL', 'VPU', 'GPU_AMPERE']
+
+        all_tuples = []
+        for variant in all_model_variants:
+            for acc_type in all_acc_types:
+                tuple = (variant, acc_type)
+                all_tuples.append(tuple)
+        return all_tuples
+
     def apply_canary_dict(self, canary_dict):
         ''' Takes in d dictionary 'canary_dict' with
         key: (model_variant, isi number)
@@ -652,7 +677,7 @@ class Simulator:
             time.sleep(5)
             return
         
-        print(f'Canary dict: {canary_dict}')
+        logging.debug(f'Canary dict: {canary_dict}')
         for idx in self.idx_to_executor:
             isi = self.idx_to_executor[idx]
             executor = self.executors[isi]
@@ -661,7 +686,8 @@ class Simulator:
             # we want to modify this table from {(model_variant, isi number) -> canary_pct}
             # to {model_variant -> canary_pct}
             executor_routing_table = dict(map(lambda x: (x[0][0], x[1]), executor_routing_table.items()))
-            print(f'Executor: {isi}, routing table: {executor_routing_table}')
+            logging.debug(f'Executor: {isi}, routing table: {executor_routing_table}')
+            logging.debug(f'predictors by variant name: {executor.predictors_by_variant_name()}')
 
             executor.apply_routing_table(executor_routing_table)
         return
@@ -1011,7 +1037,7 @@ class Simulator:
     def bump_failed_request_stats(self, event):
         ''' Bump stats for a failed request
         '''
-        print(f'Failed request: {event.desc}')
+        logging.debug(f'Failed request: {event.desc}')
         # time.sleep(1)
         isi = event.desc
         self.failed_requests += 1
