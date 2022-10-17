@@ -183,11 +183,13 @@ class Ilp(SchedulingAlgorithm):
                         latency = None
                     else:
                         latency = acc_latencies[(isi_name, model_variant, largest_batch_size)]
+                        # latency = acc_latencies[(isi_name, model_variant, 1)]
 
                     if latency is None:
                         throughput = 0
                     else:
                         throughput = largest_batch_size * 1000 / latency
+                        # throughput = 1000 / latency
                     p[accelerator, model_variant] = throughput
 
                 for isi in range(num_isi):

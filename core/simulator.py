@@ -491,6 +491,10 @@ class Simulator:
                     self.gpu_variant_runtimes[(isi_name, model_variant, batch_size)] = 25
                     self.vpu_variant_runtimes[(isi_name, model_variant, batch_size)] = 35
                     self.fpga_variant_runtimes[(isi_name, model_variant, batch_size)] = 30
+        
+        self.model_variant_runtimes = {1: self.cpu_variant_runtimes, 2: self.gpu_variant_runtimes,
+                                        3: self.vpu_variant_runtimes, 4: self.fpga_variant_runtimes}
+        return
 
     def replace_profiled_strings(self, element):
         if type(element) is not str:

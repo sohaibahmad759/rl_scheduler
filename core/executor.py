@@ -256,6 +256,9 @@ class Executor:
 
 
         elif self.task_assignment == TaskAssignment.INFAAS:
+            # TODO: add dynamic batching to INFaaS
+            batch_size = 1
+
             accuracy_filtered_predictors = list(filter(lambda key: self.predictors[key].profiled_accuracy >= event.accuracy, self.predictors))
             predictor = None
             infaas_candidates = []
@@ -265,6 +268,8 @@ class Executor:
                 # If there is any predictor that can meet request
                 for key in accuracy_filtered_predictors:
                     _predictor = self.predictors[key]
+                    print(f'infaas predictor profiled latencies: {_predictor.profiled_latencies}')
+                    time.sleep(10)
                     peak_throughput = math.floor(1000 /  _predictor.profiled_latencies[(event.desc, 
                                                     event.qos_level)])
                     queued_requests = len(_predictor.request_dict)
@@ -322,7 +327,9 @@ class Executor:
                     else:
                         for acc_type in AccType:
                             predictor_type = acc_type.value
-                            runtime = self.variant_runtimes[predictor_type][(isi_name, model_variant)]
+                            runtime = self.variant_runtimes[predictor_type][(isi_name, model_variant, batch_size)]
+
+                            print(f'infaas, runtime: {runtime}, deadline: {event.deadline}')
 
                             if math.isinf(runtime):
                                 continue
@@ -355,10 +362,12 @@ class Executor:
                     variant_name = _predictor.variant_name
                     acc_type = _predictor.acc_type
 
-                    runtime = self.variant_runtimes[acc_type][(isi_name, variant_name)]
+                    runtime = self.variant_runtimes[acc_type][(isi_name, variant_name, batch_size)]
 
+                    # peak_throughput = math.floor(1000 /  _predictor.profiled_latencies[(event.desc, 
+                    #                                 event.qos_level)])
                     peak_throughput = math.floor(1000 /  _predictor.profiled_latencies[(event.desc, 
-                                                    event.qos_level)])
+                                                    _predictor.variant_name, batch_size)])
                     queued_requests = len(_predictor.request_dict)
 
                     logging.debug('Throughput:', peak_throughput)
@@ -388,7 +397,8 @@ class Executor:
             # selected by one of the heuristics above
 
             # Step 2: read up runtime based on the predictor type selected
-            runtime = runtimes[predictor.acc_type][(event.desc, event.qos_level)]
+            runtime = self.variant_runtimes[predictor.acc_type][(event.desc, predictor.variant_name, batch_size)]
+            # runtime = runtimes[predictor.acc_type][(event.desc, event.qos_level)]
             event.runtime = runtime
             # print('executor.py -- Request runtime read from dict: {}'.format(runtime))
 
@@ -406,10 +416,12 @@ class Executor:
 
     def trigger_infaas_upscaling(self):
         logging.debug('infaas upscaling triggered')
+        # TODO: add dynamic batching to INFaaS
+        batch_size = 1
         for key in self.predictors:
             predictor = self.predictors[key]
             # peak_throughput = 1000 / predictor.profiled_latencies[(self.isi, predictor.qos_level)]
-            peak_throughput = 1000 / self.variant_runtimes[predictor.acc_type][(self.isi, predictor.variant_name)]
+            peak_throughput = 1000 / self.variant_runtimes[predictor.acc_type][(self.isi, predictor.variant_name, batch_size)]
             queued_requests = len(predictor.request_dict)
 
             infaas_slack = 0.95
@@ -435,10 +447,10 @@ class Executor:
                 # Option 2: Upgrade
                 # We might not upgrade to a model variant with higher accuracy, but we
                 # could upgrade to a different accelerator type with higher throughput
-                cpu_peak_throughput = self.variant_runtimes[AccType.CPU.value][(self.isi, predictor.variant_name)]
-                gpu_peak_throughput = self.variant_runtimes[AccType.GPU.value][(self.isi, predictor.variant_name)]
-                vpu_peak_throughput = self.variant_runtimes[AccType.VPU.value][(self.isi, predictor.variant_name)]
-                fpga_peak_throughput = self.variant_runtimes[AccType.FPGA.value][(self.isi, predictor.variant_name)]
+                cpu_peak_throughput = self.variant_runtimes[AccType.CPU.value][(self.isi, predictor.variant_name, batch_size)]
+                gpu_peak_throughput = self.variant_runtimes[AccType.GPU.value][(self.isi, predictor.variant_name, batch_size)]
+                vpu_peak_throughput = self.variant_runtimes[AccType.VPU.value][(self.isi, predictor.variant_name, batch_size)]
+                fpga_peak_throughput = self.variant_runtimes[AccType.FPGA.value][(self.isi, predictor.variant_name, batch_size)]
                 
                 cpu_needed = math.ceil(incoming_load / (cpu_peak_throughput * infaas_slack))
                 gpu_needed = math.ceil(incoming_load / (gpu_peak_throughput * infaas_slack))

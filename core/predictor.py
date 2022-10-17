@@ -52,11 +52,13 @@ class Predictor:
         self.batch_sizes_allowed = self.simulator.allowed_batch_sizes
         self.max_batch_size = self.get_largest_batch_size()
         
-        if self.max_batch_size == 0:
-            self.busy = True
-            print(f'Predictor cannot be used as it will exceed latency SLO')
-            time.sleep(10)
-            
+        # if self.max_batch_size == 0:
+        #     self.busy = True
+        #     print(f'Predictor cannot be used as it will exceed latency SLO, '
+        #           f'model variant: {self.variant_name}, accelerator type: '
+        #           f'{self.acc_type}')
+        #     time.sleep(10)
+
         return
 
     
@@ -171,8 +173,6 @@ class Predictor:
                 self.process_batch(clock, batch_size)
                 return
 
-        # TODO: check if len(self.request_queue) >= self.max_batch_size
-        #           process_batch()
         return
 
     
@@ -186,6 +186,16 @@ class Predictor:
         # TODO: Even after all the checks, make sure to track how many reqeusts
         #       finish after their deadline
         logging.debug(f'Requests in queue before popping: {len(self.request_queue)}')
+
+        if batch_size == -1:
+            print(f'process_batch received batch size of -1')
+            time.sleep(10)
+
+        if batch_size > self.max_batch_size:
+            print(f'process_batch received batch size of {batch_size}, max '
+                  f'batch size: {self.max_batch_size}')
+            time.sleep(10)
+            batch_size = self.max_batch_size
 
         temp_queue = []
         dequeued_requests = 0
@@ -343,10 +353,13 @@ class Predictor:
         if batch_size == -1:
             # requests in queue exceed maximum batch size, this should not happen
             # since we have not added any new requests
-            # actually, this can happen if we added new requests while the predictor
-            # was busy processing another batch
+            # actually, this can happen in two cases:
+            # 1. if we added new requests while the predictor was busy processing another batch
+            # 2. if the requests in batch were already more than max batch size when head
+            #   SLO was generated
             print('slo_expiring_callback: Something is wrong, find_batch_size returned -1')
-            time.sleep(10)
+            # time.sleep(10)
+            batch_size = self.max_batch_size
             return
         
         print(f'Calling process_batch from slo_expiring_callback')
@@ -365,15 +378,15 @@ class Predictor:
         first_request = self.request_queue[0]
         first_request_expiration = first_request.start_time + first_request.deadline
 
-        if self.batch_processing_latency(1, first_request) > first_request.deadline:
+        if self.batch_processing_latency(batch_size=1, request=first_request) > first_request.deadline:
             print(f'Request cannot be processed even with batch size of 1')
             time.sleep(10)
         
         # TODO: what if we are already past the t_w for this batch size?
         batch_size = self.find_batch_size(requests=len(self.request_queue))
 
-        # if batch_size == -1:
-        #     batch_size = self.max_batch_size
+        if batch_size == -1:
+            batch_size = self.max_batch_size
 
         max_waiting_time = first_request_expiration - self.batch_processing_latency(batch_size, first_request)
 
@@ -386,13 +399,11 @@ class Predictor:
     def batch_processing_latency(self, batch_size, request):
         ''' Return the latency to process a batch of a given size
         '''
-        # TODO: Replace this with actual profiled latencies
         logging.debug('batch_processing_latency()')
         logging.debug(f'Profiled latencies: {self.profiled_latencies}')
         logging.debug(f'Request desc: {request.desc}, qos_level: {request.qos_level}, '
                       f'profiled latency: {self.profiled_latencies[(request.desc, self.variant_name, batch_size)]}')
         processing_latency = self.profiled_latencies[(request.desc, self.variant_name, batch_size)] * batch_size
-        # processing_latency = 10000
         return processing_latency
 
     
@@ -400,7 +411,9 @@ class Predictor:
         ''' Find the appropriate batch size for a given number of requests by
         rounding up to the nearest bigger batch size
         '''
-        batch_size_index = self.binary_search_index(self.batch_sizes_allowed, requests)
+        # TODO: make sure that binary_search_index never exceeds self.max_batch_size
+        # batch_size_index = self.binary_search_index(self.batch_sizes_allowed, requests)
+        batch_size_index = self.find_maximum_that_fills(self.batch_sizes_allowed, requests)
         if batch_size_index >= len(self.batch_sizes_allowed):
             return -1
         else:
@@ -408,9 +421,29 @@ class Predictor:
             return batch_size
 
     
-    def binary_search_index(self, arr, number):
-        # TODO: check if batch size is being returned correctly
+    def find_maximum_that_fills(self, batch_size, requests):
+        ''' Alternate way of finding an appropriate batch size. We select a
+        batch size that gets completely filled up by the current queue
+        '''
+        if requests == 0:
+            return -1
 
+        idx = 0
+        batch_idx = 0
+        while idx < len(self.batch_sizes_allowed):
+            # We cannot exceed the maximum batch size in our search
+            if self.batch_sizes_allowed[idx] > self.max_batch_size:
+                return batch_idx
+
+            if requests >= self.batch_sizes_allowed[idx]:
+                batch_idx = idx
+            else:
+                return batch_idx
+            idx += 1
+        return batch_idx
+
+    
+    def binary_search_index(self, arr, number):
         # Lower and upper bounds
         start = 0
         end = len(arr) - 1
