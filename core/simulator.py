@@ -1,10 +1,12 @@
 import copy
 import logging
-import numpy as np
 import random
 import requests
+import string
 import os
 import time
+import pandas as pd
+import numpy as np
 from hashlib import new
 from pyexpat import model
 from core.event import Event, EventType
@@ -39,6 +41,9 @@ class Simulator:
 
         self.store_file_pointers = True
         self.requests_added = 0
+
+        self.allowed_batch_sizes = [1, 2, 4, 8]
+        self.profiled_filename = 'profiling/batch_size_n.csv'
 
         self.cpu_runtimes = {}
         self.gpu_runtimes = {}
@@ -103,10 +108,9 @@ class Simulator:
                 # This random initialization has been replaced by reading from file in read_variants_from_file()
                 # self.set_model_variant_accuracies(isi_name, filename='')
 
-                self.initialize_runtimes(
-                    isi_name, random_runtimes=random_runtimes)
+                # self.initialize_dummy_runtimes(
+                #     isi_name, random_runtimes=random_runtimes)
                 self.initialize_model_variant_loadtimes(isi_name)
-                self.initialize_model_variant_runtimes(isi_name, random_runtimes=random_runtimes)
 
                 self.add_executor(isi_name, self.job_sched_algo, runtimes={},
                                     model_variant_runtimes={}, model_variant_loadtimes={},
@@ -130,15 +134,14 @@ class Simulator:
                     end = time.time()
                     logging.debug(
                         'Time to add trace file: {} seconds'.format(end - start))
+        
+        self.initialize_model_variant_runtimes()
 
         self.runtimes = {1: self.cpu_runtimes, 2: self.gpu_runtimes,
                          3: self.vpu_runtimes, 4: self.fpga_runtimes}
 
         self.loadtimes = {1: self.cpu_loadtimes, 2: self.gpu_loadtimes,
                           3: self.vpu_loadtimes, 4: self.fpga_loadtimes}
-
-        self.model_variant_runtimes = {1: self.cpu_variant_runtimes, 2: self.gpu_variant_runtimes,
-                                        3: self.vpu_variant_runtimes, 4: self.fpga_variant_runtimes}
 
         self.set_executor_runtimes()
         self.set_executor_loadtimes()
@@ -309,30 +312,38 @@ class Simulator:
 
         self.accuracy_per_model[isi_name] = []
 
-    def initialize_runtimes(self, isi_name, random_runtimes=False):
+    def initialize_dummy_runtimes(self, isi_name, random_runtimes=False):
         for qos_level in range(self.n_qos_levels):
-            if random_runtimes:
-                self.cpu_runtimes[isi_name,
-                                  qos_level] = random.randint(20, 100)
-                self.gpu_runtimes[isi_name,
-                                  qos_level] = random.randint(20, 100)
-                self.vpu_runtimes[isi_name,
-                                  qos_level] = random.randint(20, 100)
-                self.fpga_runtimes[isi_name,
-                                   qos_level] = random.randint(20, 100)
-            else:
-                self.cpu_runtimes[isi_name, qos_level] = 50
-                self.gpu_runtimes[isi_name, qos_level] = 25
-                self.vpu_runtimes[isi_name, qos_level] = 35
-                self.fpga_runtimes[isi_name, qos_level] = 30
-                # self.cpu_runtimes[isi_name, qos_level] = random.randint(25, 100)
-                # self.gpu_runtimes[isi_name, qos_level] = random.randint(25, 100)
-                # self.vpu_runtimes[isi_name, qos_level] = random.randint(25, 100)
-                # self.fpga_runtimes[isi_name, qos_level] = random.randint(25, 100)
-            # print(self.cpu_runtimes)
-            # print(self.gpu_runtimes)
-            # print(self.vpu_runtimes)
-            # print(self.fpga_runtimes)
+            for batch_size in self.allowed_batch_sizes:
+                if random_runtimes:
+                    self.cpu_runtimes[isi_name,
+                                    qos_level,
+                                    batch_size] = random.randint(20, 100)
+                    self.gpu_runtimes[isi_name,
+                                    qos_level,
+                                    batch_size] = random.randint(20, 100)
+                    self.vpu_runtimes[isi_name,
+                                    qos_level,
+                                    batch_size] = random.randint(20, 100)
+                    self.fpga_runtimes[isi_name,
+                                    qos_level,
+                                    batch_size] = random.randint(20, 100)
+                else:
+                    self.cpu_runtimes[isi_name, qos_level, batch_size] = 50
+                    self.gpu_runtimes[isi_name, qos_level, batch_size] = 25
+                    self.vpu_runtimes[isi_name, qos_level, batch_size] = 35
+                    self.fpga_runtimes[isi_name, qos_level, batch_size] = 30
+                    # self.cpu_runtimes[isi_name, qos_level] = random.randint(25, 100)
+                    # self.gpu_runtimes[isi_name, qos_level] = random.randint(25, 100)
+                    # self.vpu_runtimes[isi_name, qos_level] = random.randint(25, 100)
+                    # self.fpga_runtimes[isi_name, qos_level] = random.randint(25, 100)
+                # print(self.cpu_runtimes)
+                # print(self.gpu_runtimes)
+                # print(self.vpu_runtimes)
+                # print(self.fpga_runtimes)
+        
+        # Initialize the runtimes per model variant as well
+        self.initialize_dummy_model_variant_runtimes(isi_name, random_runtimes=random_runtimes)
         return
 
     def get_thput_accuracy_per_model(self):
@@ -360,20 +371,122 @@ class Simulator:
         model_variant_list = self.model_variants[isi_name]
         for model_variant in model_variant_list:
             self.model_variant_loadtimes[(isi_name, model_variant)] = 0
+
+    def initialize_model_variant_runtimes(self):
+        profiled = self.import_profiled_data()
+        model_variants = profiled['model_variant']
+        acc_types = profiled['acc_type']
+        batch_sizes = profiled['batch_size']
+        latencies = profiled['latency']
+        isi_list = []
+        for idx in range(profiled.shape[0]):
+            model_variant = model_variants[idx]
+            isi_name = self.get_isi_from_variant_name(model_variant)
+            if isi_name not in isi_list:
+                isi_list.append(isi_name)
+            acc_type = acc_types[idx]
+            batch_size = batch_sizes[idx]
+            latency = latencies[idx]
+
+            # Since the profiled data does not have VPUs, we make the following
+            # assumption to reconcile this data with the simulator experiment
+            # setting: Assume that VPUs behave the same as CPUs. So effectively
+            # we are left with twice the number of CPUs and 0 VPUs
+            tuple = (isi_name, model_variant, batch_size)
+            if acc_type == 'CPU':
+                self.cpu_variant_runtimes[tuple] = latency
+                self.vpu_variant_runtimes[tuple] = latency
+            elif acc_type == 'GPU_AMPERE':
+                self.gpu_variant_runtimes[tuple] = latency
+            elif acc_type == 'GPU_PASCAL':
+                self.fpga_variant_runtimes[tuple] = latency
+
+            print(f'({isi_name}, {model_variant}, {batch_size}): {latency}, {acc_type}')
+        
+        # If there are unfilled entries that have not been profiled, set their
+        # latencies to be effectively infinite so we don't use them
+        for isi_name in isi_list:
+            model_variant_list = self.model_variants[isi_name]
+            for model_variant in model_variant_list:
+                for batch_size in self.allowed_batch_sizes:
+                    tuple = (isi_name, model_variant, batch_size)
+
+                    print(f'tuple: {tuple}')
+                    if tuple not in self.cpu_variant_runtimes:
+                        self.cpu_variant_runtimes[tuple] = batch_size*100
+                        print(f'{tuple} not found in cpu variant runtimes')
+                    if tuple not in self.gpu_variant_runtimes:
+                        self.gpu_variant_runtimes[tuple] = batch_size*100
+                        print(f'{tuple} not found in gpu_ampere variant runtimes')
+                    if tuple not in self.vpu_variant_runtimes:
+                        self.vpu_variant_runtimes[tuple] = batch_size*100
+                        # print(f'{tuple} not found in vpu variant runtimes')
+                    if tuple not in self.fpga_variant_runtimes:
+                        self.fpga_variant_runtimes[tuple] = batch_size*100
+                        print(f'{tuple} not found in gpu_pascal variant runtimes')
+
+        print(f'Total profiled entries: {profiled.shape[0]}')
+        print(f'Total expected entries: {(22*4*3)}')
+        # time.sleep(10)
+
+        self.model_variant_runtimes = {1: self.cpu_variant_runtimes, 2: self.gpu_variant_runtimes,
+                                        3: self.vpu_variant_runtimes, 4: self.fpga_variant_runtimes}
+        return
     
-    def initialize_model_variant_runtimes(self, isi_name, random_runtimes=False):
+    def initialize_dummy_model_variant_runtimes(self, isi_name, random_runtimes=False):
         model_variant_list = self.model_variants[isi_name]
         for model_variant in model_variant_list:
-            if random_runtimes:
-                self.cpu_variant_runtimes[(isi_name, model_variant)] = random.randint(20, 100)
-                self.gpu_variant_runtimes[(isi_name, model_variant)] = random.randint(20, 100)
-                self.vpu_variant_runtimes[(isi_name, model_variant)] = random.randint(20, 100)
-                self.fpga_variant_runtimes[(isi_name, model_variant)] = random.randint(20, 100)
-            else:
-                self.cpu_variant_runtimes[(isi_name, model_variant)] = 50
-                self.gpu_variant_runtimes[(isi_name, model_variant)] = 25
-                self.vpu_variant_runtimes[(isi_name, model_variant)] = 35
-                self.fpga_variant_runtimes[(isi_name, model_variant)] = 30
+            for batch_size in self.allowed_batch_sizes:
+                if random_runtimes:
+                    self.cpu_variant_runtimes[(isi_name, model_variant, batch_size)] = random.randint(20, 100)
+                    self.gpu_variant_runtimes[(isi_name, model_variant, batch_size)] = random.randint(20, 100)
+                    self.vpu_variant_runtimes[(isi_name, model_variant, batch_size)] = random.randint(20, 100)
+                    self.fpga_variant_runtimes[(isi_name, model_variant, batch_size)] = random.randint(20, 100)
+                else:
+                    self.cpu_variant_runtimes[(isi_name, model_variant, batch_size)] = 50
+                    self.gpu_variant_runtimes[(isi_name, model_variant, batch_size)] = 25
+                    self.vpu_variant_runtimes[(isi_name, model_variant, batch_size)] = 35
+                    self.fpga_variant_runtimes[(isi_name, model_variant, batch_size)] = 30
+
+    def replace_profiled_strings(self, element):
+        if type(element) is not str:
+            return element
+        elif element == 'onnxruntime_gpu_ampere':
+            return 'GPU_AMPERE'
+        elif element == 'onnxruntime_gpu_pascal':
+            return 'GPU_PASCAL'
+        elif element == 'onnxruntime_cpu':
+            return 'CPU'
+        # Modify the 
+        elif '.onnx' in element:
+            return element.rstrip('.onnx').split('_')[0]
+        else:
+            return element
+
+    def get_isi_from_variant_name(self, model_variant):
+        ''' Works for the following models: ResNet, ResNest, EfficientNet,
+        MobileNet, DenseNet
+        '''
+        if 'efficientnet' in model_variant:
+            return model_variant.split('-')[0]
+        elif 'mobilenet' in model_variant:
+            return model_variant.split('.')[0].rstrip(string.digits)
+        else:
+            return model_variant.rstrip(string.digits)
+
+    def import_profiled_data(self):
+        ''' Reads and parses the profiled latency data
+        '''
+        profiled = pd.read_csv(self.profiled_filename)
+        profiled = profiled.rename({'Model': 'model_variant', 'Accel': 'acc_type',
+                                    'batchsize': 'batch_size', 'avg_latency(ms)': 'latency'},
+                                    axis='columns')
+        profiled = profiled.applymap(self.replace_profiled_strings)
+        
+        pd.set_option('display.max_columns', None)
+        logging.debug(f'profiled data: {profiled}')
+        
+        return profiled
     
     def set_model_variant_accuracies(self, isi_name, filename=''):
         if filename == '':

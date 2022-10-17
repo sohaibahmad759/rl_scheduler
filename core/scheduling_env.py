@@ -200,8 +200,8 @@ class SchedulingEnv(gym.Env):
         runtimes_end_idx = self.n_accelerators * self.n_qos_levels * 2
 
         for i in range(self.n_executors):
-            self.state[i, predictors_end_idx:runtimes_end_idx] = self.simulator.get_runtimes(i)
-            logging.debug(self.simulator.get_runtimes(i))
+            # self.state[i, predictors_end_idx:runtimes_end_idx] = self.simulator.get_runtimes(i)
+            # logging.debug(self.simulator.get_runtimes(i))
             logging.debug(self.state)
         return
 

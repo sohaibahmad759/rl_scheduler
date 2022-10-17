@@ -61,7 +61,8 @@ class Executor:
 
     def add_predictor(self, acc_type=AccType.CPU, qos_level=0, variant_name=None):
         # print('acc_type: {}'.format(acc_type.value))
-        profiled_latencies = self.runtimes[acc_type.value]
+        # profiled_latencies = self.runtimes[acc_type.value]
+        profiled_latencies = self.variant_runtimes[acc_type.value]
         
         if variant_name is None:
             min_accuracy = 100.0

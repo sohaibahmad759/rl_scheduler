@@ -22,7 +22,7 @@ class AccType(Enum):
 class Predictor:
     def __init__(self, acc_type=AccType.CPU, qos_level=0, profiled_accuracy=100.0,
                     profiled_latencies={}, variant_name=None, executor=None, simulator=None,
-                    max_batch_size=16):
+                    max_batch_size=8):
         # attributes related to predictor hardware
         self.id = uuid.uuid4().hex
         self.acc_type = acc_type
@@ -41,7 +41,8 @@ class Predictor:
         self.max_batch_size = max_batch_size
         self.event_counter = 0
         # self.batch_sizes_allowed = [1]
-        self.batch_sizes_allowed = [1, 2, 4, 8, 16]
+        self.batch_sizes_allowed = [1, 2, 4, 8]
+        # self.batch_sizes_allowed = [1, 2, 4, 8, 16]
         # self.batch_sizes_allowed = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
         self.slo_expiring_dict = {}
 
@@ -361,8 +362,8 @@ class Predictor:
         logging.debug('batch_processing_latency()')
         logging.debug(f'Profiled latencies: {self.profiled_latencies}')
         logging.debug(f'Request desc: {request.desc}, qos_level: {request.qos_level}, '
-                      f'profiled latency: {self.profiled_latencies[(request.desc, request.qos_level)]}')
-        processing_latency = self.profiled_latencies[(request.desc, request.qos_level)] * batch_size
+                      f'profiled latency: {self.profiled_latencies[(request.desc, self.variant_name, batch_size)]}')
+        processing_latency = self.profiled_latencies[(request.desc, self.variant_name, batch_size)] * batch_size
         # processing_latency = 10000
         return processing_latency
 

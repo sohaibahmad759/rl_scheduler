@@ -53,7 +53,8 @@ class Ilp(SchedulingAlgorithm):
         demand = demand_since_last / (self.allocation_window / 1000)
         missed_requests = observation[0:num_isi, -1]
 
-        latencies = observation[0:num_isi, num_acc_types:2*num_acc_types]
+        # latencies = observation[0:num_isi, num_acc_types:2*num_acc_types]
+        latencies = self.simulator.model_variant_runtimes
 
         # models = range(num_isi)
 
@@ -114,7 +115,18 @@ class Ilp(SchedulingAlgorithm):
 
                 for accelerator in accelerators:
                     accelerator_type = accelerator.split('-')[0]
-                    latency = latencies[isi, self.accelerator_dict[accelerator_type]]
+                    # latency = latencies[isi, self.accelerator_dict[accelerator_type]]
+                    acc_latencies = {}
+                    if accelerator_type == 'CPU':
+                        acc_latencies = latencies[1]
+                    elif accelerator_type == 'GPU_AMPERE':
+                        acc_latencies = latencies[2]
+                    elif accelerator_type == 'VPU':
+                        acc_latencies = latencies[3]
+                    elif accelerator_type == 'GPU_PASCAL':
+                        acc_latencies = latencies[4]
+
+                    latency = acc_latencies[(isi_name, model_variant, 8)]
 
                     if latency is None:
                         throughput = 0
