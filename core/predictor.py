@@ -413,7 +413,7 @@ class Predictor:
         '''
         # TODO: make sure that binary_search_index never exceeds self.max_batch_size
         # batch_size_index = self.binary_search_index(self.batch_sizes_allowed, requests)
-        batch_size_index = self.find_maximum_that_fills(self.batch_sizes_allowed, requests)
+        batch_size_index = self.find_maximum_that_fills(requests)
         if batch_size_index >= len(self.batch_sizes_allowed):
             return -1
         else:
@@ -421,9 +421,10 @@ class Predictor:
             return batch_size
 
     
-    def find_maximum_that_fills(self, batch_size, requests):
+    def find_maximum_that_fills(self, requests):
         ''' Alternate way of finding an appropriate batch size. We select a
-        batch size that gets completely filled up by the current queue
+        batch size that gets completely filled up by the current queue,
+        instead of rounding up to the nearest bigger batch size
         '''
         if requests == 0:
             return -1
@@ -444,6 +445,13 @@ class Predictor:
 
     
     def binary_search_index(self, arr, number):
+        ''' Finds the appropriate batch size for a given number of requests
+        by rounding up to the nearest bigger batch size available.
+        For example, if we support batch sizes of 2 and 4, a queue of 3
+        requests will be given a batch size of 4 according to this.
+        Note: This might result in lower throughput as we are increasing
+        latency but finishing a smaller number of requests
+        '''
         # Lower and upper bounds
         start = 0
         end = len(arr) - 1
