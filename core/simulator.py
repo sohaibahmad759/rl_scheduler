@@ -45,6 +45,8 @@ class Simulator:
         self.allowed_batch_sizes = [1, 2, 4, 8]
         self.profiled_filename = 'profiling/batch_size_n.csv'
 
+        self.accelerator_types = ['CPU', 'GPU_AMPERE', 'VPU', 'GPU_PASCAL']
+
         self.cpu_runtimes = {}
         self.gpu_runtimes = {}
         self.vpu_runtimes = {}
@@ -80,6 +82,8 @@ class Simulator:
         self.available_predictors = copy.deepcopy(predictors_max)
 
         self.batching_enabled = batching
+        self.largest_batch_sizes = {}
+        self.slo_dict = {}
 
         logging.basicConfig(level=logging.INFO)
 
@@ -152,6 +156,8 @@ class Simulator:
         self.set_executor_variant_accuracies()
         self.set_executor_variant_runtimes()
         self.set_executor_variant_loadtimes()
+
+        self.set_largest_batch_sizes()
 
         self.qos_stats = np.zeros((len(self.executors), n_qos_levels * 2))
 
@@ -286,6 +292,7 @@ class Simulator:
 
             if len(request_description) >= 3:
                 deadline = float(request_description[2])
+                self.slo_dict[isi_name] = deadline
                 # print(deadline)
             else:
                 deadline = 1000
@@ -411,7 +418,6 @@ class Simulator:
                 for batch_size in self.allowed_batch_sizes:
                     tuple = (isi_name, model_variant, batch_size)
 
-                    print(f'tuple: {tuple}')
                     if tuple not in self.cpu_variant_runtimes:
                         self.cpu_variant_runtimes[tuple] = batch_size*100
                         print(f'{tuple} not found in cpu variant runtimes')
@@ -432,6 +438,44 @@ class Simulator:
         self.model_variant_runtimes = {1: self.cpu_variant_runtimes, 2: self.gpu_variant_runtimes,
                                         3: self.vpu_variant_runtimes, 4: self.fpga_variant_runtimes}
         return
+
+    def set_largest_batch_sizes(self):
+        ''' Accesses the profiled data to establish the maximum batch size that
+        does not violate latency SLO for each (variant, accelerator) pair
+        '''
+        max_batch_size_dict = {}
+        
+        for isi_name in self.model_variants:
+            model_variants = self.model_variants[isi_name]
+            for model_variant in model_variants:
+                # isi_name = self.simulator.get_isi_from_variant_name(model_variant)
+                for acc_type in self.accelerator_types:
+                    acc_latencies = {}
+                    if acc_type == 'CPU':
+                        acc_latencies = self.model_variant_runtimes[1]
+                    elif acc_type == 'GPU_AMPERE':
+                        acc_latencies = self.model_variant_runtimes[2]
+                    elif acc_type == 'VPU':
+                        acc_latencies = self.model_variant_runtimes[3]
+                    elif acc_type == 'GPU_PASCAL':
+                        acc_latencies = self.model_variant_runtimes[4]
+
+                    max_batch_size = 0
+                    for batch_size in self.allowed_batch_sizes:
+                        latency = acc_latencies[(isi_name, model_variant, batch_size)]
+
+                        if batch_size > max_batch_size and latency < self.slo_dict[isi_name] / 2:
+                            max_batch_size = batch_size
+
+                    max_batch_size_dict[(acc_type, model_variant)] = max_batch_size
+                    print(f'({acc_type}, {model_variant}): {max_batch_size}')
+        print(f'len(largest_batch_sizes): {len(max_batch_size_dict)}')
+        # time.sleep(10)
+        self.largest_batch_sizes = max_batch_size_dict
+        return
+    
+    def get_largest_batch_sizes(self):
+        return self.largest_batch_sizes
     
     def initialize_dummy_model_variant_runtimes(self, isi_name, random_runtimes=False):
         model_variant_list = self.model_variants[isi_name]

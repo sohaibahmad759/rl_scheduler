@@ -37,6 +37,53 @@ class Ilp(SchedulingAlgorithm):
     def set_simulator(self, simulator):
         self.simulator = simulator
 
+    def get_latency_slo(self):
+        slo_dict = {}
+
+        for isi in range(self.num_isi):
+            isi_name = self.simulator.idx_to_executor[isi]
+            
+            # Currently, we set a latency SLO of 200ms for all ISIs (model families)
+            slo_dict[isi_name] = 5000
+
+        return slo_dict
+
+    def set_largest_batch_sizes(self, slo_dict, all_model_variants, accelerators):
+        ''' Accesses the profiled data from the simulator to establish the maximum
+        batch size that does not violate latency SLO for each (variant, accelerator)
+        pair
+        '''
+        max_batch_size_dict = {}
+        profiled_latencies = self.simulator.model_variant_runtimes
+        
+        for isi_name in all_model_variants:
+            model_variants = all_model_variants[isi_name]
+            for model_variant in model_variants:
+                # isi_name = self.simulator.get_isi_from_variant_name(model_variant)
+                for acc_type in accelerators:
+                    acc_latencies = {}
+                    if acc_type == 'CPU':
+                        acc_latencies = profiled_latencies[1]
+                    elif acc_type == 'GPU_AMPERE':
+                        acc_latencies = profiled_latencies[2]
+                    elif acc_type == 'VPU':
+                        acc_latencies = profiled_latencies[3]
+                    elif acc_type == 'GPU_PASCAL':
+                        acc_latencies = profiled_latencies[4]
+
+                    max_batch_size = 0
+                    for batch_size in self.simulator.allowed_batch_sizes:
+                        latency = acc_latencies[(isi_name, model_variant, batch_size)]
+
+                        if batch_size > max_batch_size and latency < slo_dict[isi_name]:
+                            max_batch_size = batch_size
+
+                    max_batch_size_dict[(acc_type, model_variant)] = max_batch_size
+                    print(f'({acc_type}, {model_variant}): {max_batch_size}')
+        print(f'len(max_batch_size_dict): {len(max_batch_size_dict)}')
+        time.sleep(10)
+        return max_batch_size_dict
+
     def run(self, observation, num_acc_types, num_max_acc):
         # print('observation shape:', observation.shape)
         # print('observation:', observation)
@@ -96,6 +143,11 @@ class Ilp(SchedulingAlgorithm):
         # Whether request type k can be served by model variant j
         # TODO: Initialize this
         b = {}
+        
+        largest_batch_sizes = self.simulator.get_largest_batch_sizes()
+
+        # self.set_largest_batch_sizes(slo_dict=slo, all_model_variants=self.simulator.model_variants,
+        #                             accelerators=list(self.accelerator_dict.keys()))
 
         for isi in range(num_isi):
             rtypes.append(isi)
@@ -125,13 +177,17 @@ class Ilp(SchedulingAlgorithm):
                         acc_latencies = latencies[3]
                     elif accelerator_type == 'GPU_PASCAL':
                         acc_latencies = latencies[4]
-
-                    latency = acc_latencies[(isi_name, model_variant, 8)]
+                    
+                    largest_batch_size = largest_batch_sizes[(accelerator_type, model_variant)]
+                    if largest_batch_size == 0:
+                        latency = None
+                    else:
+                        latency = acc_latencies[(isi_name, model_variant, largest_batch_size)]
 
                     if latency is None:
                         throughput = 0
                     else:
-                        throughput = 1000 / latency
+                        throughput = largest_batch_size * 1000 / latency
                     p[accelerator, model_variant] = throughput
 
                 for isi in range(num_isi):

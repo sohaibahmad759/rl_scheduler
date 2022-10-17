@@ -59,7 +59,7 @@ class Executor:
         # 4 ways to do this: round robin, earliest start time, earliest finish time (EFT), latest finish time
 
 
-    def add_predictor(self, acc_type=AccType.CPU, qos_level=0, variant_name=None):
+    def add_predictor(self, acc_type=AccType.GPU, qos_level=0, variant_name=None):
         # print('acc_type: {}'.format(acc_type.value))
         # profiled_latencies = self.runtimes[acc_type.value]
         profiled_latencies = self.variant_runtimes[acc_type.value]

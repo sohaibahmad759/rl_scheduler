@@ -21,8 +21,7 @@ class AccType(Enum):
 
 class Predictor:
     def __init__(self, acc_type=AccType.CPU, qos_level=0, profiled_accuracy=100.0,
-                    profiled_latencies={}, variant_name=None, executor=None, simulator=None,
-                    max_batch_size=8):
+                    profiled_latencies={}, variant_name=None, executor=None, simulator=None):
         # attributes related to predictor hardware
         self.id = uuid.uuid4().hex
         self.acc_type = acc_type
@@ -38,12 +37,7 @@ class Predictor:
 
         # Batching-related variables (by default we have a batch size of 1)
         self.request_queue = []
-        self.max_batch_size = max_batch_size
         self.event_counter = 0
-        # self.batch_sizes_allowed = [1]
-        self.batch_sizes_allowed = [1, 2, 4, 8]
-        # self.batch_sizes_allowed = [1, 2, 4, 8, 16]
-        # self.batch_sizes_allowed = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
         self.slo_expiring_dict = {}
 
         self.load = None
@@ -51,9 +45,40 @@ class Predictor:
         self.executor = executor
         self.simulator = simulator
 
+        # self.batch_sizes_allowed = [1]
+        # self.batch_sizes_allowed = [1, 2, 4, 8]
+        # self.batch_sizes_allowed = [1, 2, 4, 8, 16]
+        # self.batch_sizes_allowed = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+        self.batch_sizes_allowed = self.simulator.allowed_batch_sizes
+        self.max_batch_size = self.get_largest_batch_size()
+        
+        if self.max_batch_size == 0:
+            self.busy = True
+            print(f'Predictor cannot be used as it will exceed latency SLO')
+            time.sleep(10)
+            
+        return
+
     
     def set_load(self, load):
         self.load = load
+
+    
+    def get_largest_batch_size(self):
+        largest_batch_sizes = self.simulator.get_largest_batch_sizes()
+
+        acc_type = self.acc_type
+        if acc_type == 1:
+            acc_type = 'CPU'
+        elif acc_type == 2:
+            acc_type = 'GPU_AMPERE'
+        elif acc_type == 3:
+            acc_type = 'VPU'
+        elif acc_type == 4:
+            acc_type = 'GPU_PASCAL'
+        
+        largest_batch_size = largest_batch_sizes[(acc_type, self.variant_name)]
+        return largest_batch_size
     
 
     def assign_request(self, event, clock):
@@ -346,6 +371,9 @@ class Predictor:
         
         # TODO: what if we are already past the t_w for this batch size?
         batch_size = self.find_batch_size(requests=len(self.request_queue))
+
+        # if batch_size == -1:
+        #     batch_size = self.max_batch_size
 
         max_waiting_time = first_request_expiration - self.batch_processing_latency(batch_size, first_request)
 
