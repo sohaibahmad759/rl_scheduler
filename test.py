@@ -8,7 +8,8 @@ from stable_baselines3 import PPO
 import core.utils as utils
 from core.scheduling_env import SchedulingEnv
 from algorithms.clipper import Clipper
-from algorithms.ilp_alpha import Ilp
+from algorithms.ilp import Ilp
+from algorithms.ilp_alpha import IlpAlpha
 from algorithms.ilp_throughput import IlpThroughput
 
 
@@ -31,11 +32,11 @@ def getargs():
                         dest='reward_window_length', help='The number of steps to look out into the future to ' +
                         'calculate the reward of an action. Default value is 10')
     parser.add_argument('--model_assignment', '-ma', required=True,
-                        choices=['1', '2', '3', '4', '5', '6', '7', '8', '9', '10'],
+                        choices=['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11'],
                         dest='model_asn_algo', help='The model assignment algorithm. Select a number:\n' +
                         '1 - Random. 2 - Static. 3 - Least Frequently Used (LFU). 4 - Load proportional. ' +
-                        '5 - RL. 6 - RL with warm start (load proportional). 7 - ILP. 8 - ILP (Max throughput). ' +
-                        '9 - INFaaS. 10 - Clipper')
+                        '5 - RL. 6 - RL with warm start (load proportional). 7 - ILP Alpha. 8 - ILP (Max throughput). ' +
+                        '9 - INFaaS. 10 - Clipper. 11 - ILP')
     parser.add_argument('--job_scheduling', '-js', required=True, choices=['1', '2', '3', '4', '5', '6'],
                         dest='job_sched_algo', help='The job scheduling algorithm. Select a number:\n' +
                         '1 - Random. 2 - Round robin. 3 - Earliest Finish Time with FIFO. ' +
@@ -58,25 +59,25 @@ def validate_parameters(args):
     ''' Validates the parameters provided. If invalid, prints reason.
     '''
     model_asn_algos = ['random', 'static', 'lfu', 'load_proportional', 'rl', 'rl_warm',
-                       'ilp', 'ilp_throughput', 'infaas', 'clipper']
+                       'ilp_alpha', 'ilp_throughput', 'infaas', 'clipper', 'ilp']
     model_assignment = model_asn_algos[int(args.model_asn_algo)-1]
 
     alpha = float(args.alpha)
     beta = float(args.beta)
 
-    if model_assignment == 'ilp' and alpha == -1:
-        print('Invalid parameters: --alpha flag must be specified when using ILP model assignment algorithm')
+    if model_assignment == 'ilp_alpha' and alpha == -1:
+        print('Invalid parameters: --alpha flag must be specified when using ILP-Alpha model assignment algorithm')
         return False
 
-    if model_assignment == 'ilp' and beta == -1:
+    if (model_assignment == 'ilp' or model_assignment == 'ilp_alpha') and beta == -1:
         print('Invalid parameters: --beta flag must be specified when using ILP model assignment algorithm')
         return False
 
-    if model_assignment == 'ilp' and (alpha > 1 or alpha < 0):
+    if model_assignment == 'ilp_alpha' and (alpha > 1 or alpha < 0):
         print('Invalid parameters: --alpha value must be in the range [0,1]')
         return False
 
-    if model_assignment == 'ilp' and (beta > 1 or beta < 0):
+    if (model_assignment == 'ilp' or model_assignment == 'ilp_alpha') and (beta > 1 or beta < 0):
         print('Invalid parameters: --beta value must be in the range [0,1]')
         return False
     
@@ -97,7 +98,7 @@ def main(args):
         sys.exit(0)
 
     model_asn_algos = ['random', 'static', 'lfu', 'load_proportional', 'rl', 'rl_warm',
-                        'ilp', 'ilp_throughput', 'infaas', 'clipper']
+                        'ilp_alpha', 'ilp_throughput', 'infaas', 'clipper', 'ilp']
     model_assignment = model_asn_algos[int(args.model_asn_algo)-1]
 
     env = SchedulingEnv(trace_dir=args.trace_path, job_sched_algo=int(args.job_sched_algo),
@@ -130,9 +131,13 @@ def main(args):
     elif model_assignment == 'load_proportional':
         print('Testing with load proportional algorithm')
     elif model_assignment == 'ilp':
-        ilp = Ilp(allocation_window=allocation_window, alpha=alpha, beta=beta)
+        ilp = Ilp(allocation_window=allocation_window, beta=beta)
         ilp_applied = True
-        print(f'Testing with solution given by ILP (alpha={alpha})')
+        print(f'Testing with solution given by ILP (no alpha, beta={beta})')
+    elif model_assignment == 'ilp_alpha':
+        ilp = IlpAlpha(allocation_window=allocation_window, alpha=alpha, beta=beta)
+        ilp_applied = True
+        print(f'Testing with solution given by ILP-Alpha (alpha={alpha}, beta={beta})')
     elif model_assignment == 'ilp_throughput':
         ilp = IlpThroughput(allocation_window=allocation_window)
         ilp_applied = True
@@ -290,7 +295,7 @@ def main(args):
                     continue
                 action[receiving_acc+1] += 1
                 # print(observation)
-        elif model_assignment == 'ilp' or model_assignment == 'ilp_throughput':
+        elif model_assignment == 'ilp' or model_assignment == 'ilp_alpha' or model_assignment == 'ilp_throughput':
             if ilp.is_simulator_set() is False:
                 ilp.set_simulator(env.simulator)
 
@@ -397,10 +402,14 @@ def main(args):
     completed_requests = env.simulator.completed_requests
     sim_time_elapsed = env.simulator.clock / 1000
     overall_throughput = completed_requests / sim_time_elapsed
+
+    total_accuracy = env.simulator.total_accuracy
+    effective_accuracy = total_accuracy / completed_requests
     print()
     print(f'Completed requests: {completed_requests}')
     print(f'Simulator time elapsed: {sim_time_elapsed}')
     print(f'Overall throughput (requests/sec): {overall_throughput}')
+    print(f'Effective accuracy (over served requests): {effective_accuracy}')
     print()
 
     print('---------------')

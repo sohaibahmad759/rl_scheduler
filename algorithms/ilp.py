@@ -6,9 +6,9 @@ from gurobipy import GRB
 from algorithms.base import SchedulingAlgorithm
 
 
-class IlpAlpha(SchedulingAlgorithm):
-    def __init__(self, allocation_window, alpha, beta):
-        SchedulingAlgorithm.__init__(self, 'ILP Alpha')
+class Ilp(SchedulingAlgorithm):
+    def __init__(self, allocation_window, beta):
+        SchedulingAlgorithm.__init__(self, 'ILP')
 
         self.log = logging.getLogger(__name__)
 
@@ -17,7 +17,6 @@ class IlpAlpha(SchedulingAlgorithm):
 
         self.allocation_window = allocation_window
 
-        self.alpha = alpha
         self.beta = beta
 
         self.simulator = None
@@ -227,9 +226,6 @@ class IlpAlpha(SchedulingAlgorithm):
         z = m.addVars(jk_pairs, name='z')
         # aux = m.addVar(name='aux')
 
-        # Smaller value weighs throughput more, higher value weighs accuracy more
-        alpha = self.alpha
-
         # If there are no incoming requests, terminate ILP
         if sum(s.values()) == 0:
             self.log.error('No requests received, terminating ILP.')
@@ -240,7 +236,7 @@ class IlpAlpha(SchedulingAlgorithm):
         # TODO: how to set accelerators for each model variant (and specify model variant while doing so)?
         # Set the objective
         # m.setObjective(alpha * gp.quicksum(w) * aux + (1-alpha) * gp.quicksum(y) / sum(s.values()), GRB.MAXIMIZE)
-        m.setObjective((alpha * gp.quicksum(w) / sum(s.values()) / 100) + ((1-alpha) * gp.quicksum(y) / sum(s.values())), GRB.MAXIMIZE)
+        m.setObjective((gp.quicksum(w) / sum(s.values()) / 100), GRB.MAXIMIZE)
 
         # Add constraints
         # m.addConstrs((w[k] == sum(sum(s[k]*b[j, k]*A[j]*z[j, k]*x[i, j] for j in models)
@@ -357,6 +353,7 @@ class IlpAlpha(SchedulingAlgorithm):
         else:
             actions = np.zeros(current_alloc.shape)
             self.log.error('No solution')
+            time.sleep(10)
         
         return actions
 
@@ -453,7 +450,7 @@ class IlpAlpha(SchedulingAlgorithm):
 
 if __name__ == "__main__":
     # Test out if the inheritance works fine
-    x = IlpAlpha()
+    x = Ilp()
     x.print_algorithm()
     y = SchedulingAlgorithm()
     y.print_algorithm()

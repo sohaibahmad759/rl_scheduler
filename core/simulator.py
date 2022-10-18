@@ -43,6 +43,8 @@ class Simulator:
         self.store_file_pointers = True
         self.requests_added = 0
 
+        self.total_accuracy = 0
+
         self.allowed_batch_sizes = [1, 2, 4, 8]
         self.profiled_filename = 'profiling/batch_size_n.csv'
 
@@ -92,7 +94,7 @@ class Simulator:
         if not trace_path is None:
             logging.info('Reading trace files from: ' + trace_path)
             
-            if model_assignment == 'ilp':
+            if 'ilp' in model_assignment:
                 variant_list_path = os.path.join(trace_path, '..', 'model_variants')
                 # The following lines are used to get a static solution for Clipper
                 # variant_list_path = os.path.join(trace_path, '..', 'model_variants_clipper')
@@ -1114,6 +1116,7 @@ class Simulator:
         ''' Generate an END_REQUEST event and insert it into the simulator's
         event queue.
         '''
+        self.total_accuracy += accuracy_seen
         isi = event.desc
         self.insert_event(end_time, EventType.END_REQUEST,
                                 event.desc, id=event.id, qos_level=event.qos_level)
