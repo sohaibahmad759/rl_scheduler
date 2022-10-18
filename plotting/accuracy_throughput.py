@@ -20,6 +20,7 @@ log_file = most_recent_file
 # Alternatively, we could provide a direct path to the file we want to analyze
 log_file = '../logs/selected/infaas.csv'
 log_file = '../logs/selected/acc_scale.csv'
+log_file = '../logs/selected/clipper.csv'
 
 df = pd.read_csv(log_file)
 
