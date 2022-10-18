@@ -160,7 +160,7 @@ def main(args):
         logging.FileHandler(rate_logger_per_model_file, mode='w'))
     rate_logger_per_model.setLevel(logging.DEBUG)
     rate_logger_per_model.info(
-        'wallclock_time,simulation_time,demand_nth_model,throughput_nth_model,normalized_throughput_nth_model,accuracy_nth_model')
+        'wallclock_time,simulation_time,demand_nth_model,throughput_nth_model,normalized_throughput_nth_model,accuracy_nth_model,,,,,,,,,,,,,,,,')
 
     rl_reward = 0
     observation = env.reset()
