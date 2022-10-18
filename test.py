@@ -7,7 +7,8 @@ import numpy as np
 from stable_baselines3 import PPO
 import core.utils as utils
 from core.scheduling_env import SchedulingEnv
-from algorithms.ilp import Ilp
+from algorithms.clipper import Clipper
+from algorithms.ilp_alpha import Ilp
 from algorithms.ilp_throughput import IlpThroughput
 
 
@@ -29,11 +30,12 @@ def getargs():
     parser.add_argument('--reward_window_length', '-l', required=False, default=10,
                         dest='reward_window_length', help='The number of steps to look out into the future to ' +
                         'calculate the reward of an action. Default value is 10')
-    parser.add_argument('--model_assignment', '-ma', required=True, choices=['1', '2', '3', '4', '5', '6', '7', '8', '9'],
+    parser.add_argument('--model_assignment', '-ma', required=True,
+                        choices=['1', '2', '3', '4', '5', '6', '7', '8', '9', '10'],
                         dest='model_asn_algo', help='The model assignment algorithm. Select a number:\n' +
                         '1 - Random. 2 - Static. 3 - Least Frequently Used (LFU). 4 - Load proportional. ' +
                         '5 - RL. 6 - RL with warm start (load proportional). 7 - ILP. 8 - ILP (Max throughput). ' +
-                        '9 - INFaaS')
+                        '9 - INFaaS. 10 - Clipper')
     parser.add_argument('--job_scheduling', '-js', required=True, choices=['1', '2', '3', '4', '5', '6'],
                         dest='job_sched_algo', help='The job scheduling algorithm. Select a number:\n' +
                         '1 - Random. 2 - Round robin. 3 - Earliest Finish Time with FIFO. ' +
@@ -56,7 +58,7 @@ def validate_parameters(args):
     ''' Validates the parameters provided. If invalid, prints reason.
     '''
     model_asn_algos = ['random', 'static', 'lfu', 'load_proportional', 'rl', 'rl_warm',
-                       'ilp', 'ilp_throughput', 'infaas']
+                       'ilp', 'ilp_throughput', 'infaas', 'clipper']
     model_assignment = model_asn_algos[int(args.model_asn_algo)-1]
 
     alpha = float(args.alpha)
@@ -95,7 +97,7 @@ def main(args):
         sys.exit(0)
 
     model_asn_algos = ['random', 'static', 'lfu', 'load_proportional', 'rl', 'rl_warm',
-                        'ilp', 'ilp_throughput', 'infaas']
+                        'ilp', 'ilp_throughput', 'infaas', 'clipper']
     model_assignment = model_asn_algos[int(args.model_asn_algo)-1]
 
     env = SchedulingEnv(trace_dir=args.trace_path, job_sched_algo=int(args.job_sched_algo),
@@ -137,6 +139,9 @@ def main(args):
         print('Testing with solution given by ILP (Max throughput version)')
     elif model_assignment == 'infaas':
         print('Testing with INFaaS model assignment policy')
+    elif model_assignment == 'clipper':
+        clipper = Clipper(simulator=env.simulator)
+        print('Testing with Clipper model assignment policy')
     else:
         print('Undefined mode, exiting')
         sys.exit(0)
@@ -315,6 +320,12 @@ def main(args):
                 if isi == env.n_executors - 1:
                     ilp_applied = True
             
+            # This is used to get a solution for Clipper at midpoint
+            # of experiment
+            # if i > 0 and i % 500 == 0:
+            #     # ilp.print_cached_solution()
+            #     time.sleep(10)
+
             # action = env.action_space.sample()
             # for j in range(5, len(action)):
             #     action[j] = 0
@@ -336,6 +347,12 @@ def main(args):
                 action[1:5] = observation[0, 0:4]
             # print('observation:' + str(observation))
             # print('null action:' + str(action))
+            # time.sleep(2)
+        elif model_assignment == 'clipper':
+            clipper.apply_solution()
+            action = env.action_space.sample()
+            action[0] = 0
+            action[1:5] = observation[0, 0:4]
             # time.sleep(2)
 
         if i % 100 == 0:

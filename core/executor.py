@@ -522,6 +522,13 @@ class Executor:
             return False
         
         predictor = self.assigned_requests[event.id]
+
+        # TODO: If predictor is removed before request is processed,
+        #       count it as a failed request
+        # if predictor.id not in self.predictors:
+        #     print(f'Predictor was deleted before request could complete')
+        #     # time.sleep(10)
+        #     return False
         finished = predictor.finish_request(event)
         if finished:
             del self.assigned_requests[event.id]

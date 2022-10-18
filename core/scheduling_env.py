@@ -49,7 +49,8 @@ class SchedulingEnv(gym.Env):
                                    n_qos_levels=self.n_qos_levels,
                                    random_runtimes=random_runtimes,
                                    fixed_seed=fixed_seed,
-                                   batching=batching)
+                                   batching=batching,
+                                   model_assignment=model_assignment)
 
         # number of steps that we play into the future to get reward
         # Note: this is a tunable parameter

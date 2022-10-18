@@ -8,7 +8,7 @@ from algorithms.base import SchedulingAlgorithm
 
 class Ilp(SchedulingAlgorithm):
     def __init__(self, allocation_window, alpha, beta):
-        SchedulingAlgorithm.__init__(self, 'ILP')
+        SchedulingAlgorithm.__init__(self, 'ILP Alpha')
 
         self.log = logging.getLogger(__name__)
 
@@ -22,6 +22,9 @@ class Ilp(SchedulingAlgorithm):
 
         self.simulator = None
         self.num_isi = 0
+        
+        # We cache the latest solution from run()
+        self.cached_solution = None
 
         # logging.basicConfig(filename='output.log',
         #                     mode='w',
@@ -338,11 +341,16 @@ class Ilp(SchedulingAlgorithm):
             if throughput > 0:
                 self.log.debug('Effective accuracy (over served requests):' + str(accuracy/throughput))
             self.log.debug('Effective accuracy (over all requests):' + str(accuracy/sum(s[k] for k in rtypes)))
-            # self.log.debug('\nx:')
+            # print('\nx:')
             # for i in accelerators:
             #     for j in models:
             #         if x[i, j].X > 0.0001:
-            #             self.log.debug('{}, {}, x: {}'.format(i, j, x[i, j].X))
+            #             print(f'{i}, {j}, x: {x[i, j].X}')
+            self.cached_solution = {}
+            self.cached_solution['x'] = x
+            self.cached_solution['accelerators'] = accelerators
+            self.cached_solution['models'] = models
+
             actions = self.generate_actions(current_alloc=current_alloc, ilp_solution=x,
                                             canary_solution=z, accelerators=accelerators,
                                             models=models)
@@ -384,14 +392,15 @@ class Ilp(SchedulingAlgorithm):
                 if canary_pct > 0:
                     canary_dict[(model_variant, isi)] = canary_pct
                 
-                if canary_pct > 0.0 and canary_pct < 1.0:
-                    logging.info('variant: {}, isi: {}, canary pct: {}'.format(model_variant, isi, canary_pct))
+                if canary_pct > 0.0 and canary_pct <= 1.0:
+                    logging.info(f'variant: {model_variant}, isi: {isi}, canary pct: {canary_pct}')
                     logging.info('TODO: Update the canary routing table based on this value')
 
         # logging.info('required_predictors: {}'.format(required_predictors))
         # logging.info('canary dict: {}'.format(canary_dict))
         # time.sleep(1)
         self.simulator.apply_ilp_solution(required_predictors, canary_dict)
+        # print(f'required_predictors:\n{required_predictors}\ncanary_dict:\n{canary_dict}')
 
         return None
 
@@ -402,6 +411,26 @@ class Ilp(SchedulingAlgorithm):
 
         # Return suggested actions from the difference matrix
         return new_alloc
+
+    def get_cached_solution(self):
+        return self.cached_solution
+
+    def print_cached_solution(self):
+        if self.cached_solution is None:
+            print('ilp: No solution has been cached yet')
+            return
+        
+        print('ilp: Printing cached solution..')
+        print('\nx:')
+        x = self.cached_solution['x']
+        accelerators = self.cached_solution['accelerators']
+        models = self.cached_solution['models']
+
+        for i in accelerators:
+            for j in models:
+                if x[i, j].X > 0.0001:
+                    print(f'{i}, {j}, x: {x[i, j].X}')
+        return
     
     def measure_routing_table_overhead(self):
         ''' Since routing table lies on the critical path for serving inference requests,

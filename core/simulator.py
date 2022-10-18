@@ -16,7 +16,8 @@ from core.executor import Executor, AccType
 class Simulator:
     def __init__(self, job_sched_algo, trace_path=None, mode='training', 
                  max_acc_per_type=0, predictors_max=[10, 10, 10, 10], n_qos_levels=1,
-                 random_runtimes=False, fixed_seed=0, batching=False):
+                 random_runtimes=False, fixed_seed=0, batching=False,
+                 model_assignment=None):
         self.clock = 0
         self.event_queue = []
         self.executors = {}
@@ -90,7 +91,19 @@ class Simulator:
         idx = 0
         if not trace_path is None:
             logging.info('Reading trace files from: ' + trace_path)
-            variant_list_path = os.path.join(trace_path, '..', 'model_variants')
+            
+            if model_assignment == 'ilp':
+                variant_list_path = os.path.join(trace_path, '..', 'model_variants')
+                # The following lines are used to get a static solution for Clipper
+                # variant_list_path = os.path.join(trace_path, '..', 'model_variants_clipper')
+                # print(f'simulator: Using clipper model variants for debugging only')
+                # time.sleep(5)
+            elif model_assignment == 'clipper':
+                variant_list_path = os.path.join(trace_path, '..', 'model_variants_clipper')
+            else:
+                print(f'simulator: No valid model assignment algorithm selected, exiting.')
+                exit(0)
+
             trace_files = sorted(os.listdir(trace_path))
 
             for file in trace_files:
@@ -108,9 +121,6 @@ class Simulator:
 
                 model_variant_list = self.read_variants_from_file(variant_list_filename)
                 self.set_model_variants(isi_name, model_variant_list)
-
-                # This random initialization has been replaced by reading from file in read_variants_from_file()
-                # self.set_model_variant_accuracies(isi_name, filename='')
 
                 # self.initialize_dummy_runtimes(
                 #     isi_name, random_runtimes=random_runtimes)
@@ -535,16 +545,6 @@ class Simulator:
         logging.debug(f'profiled data: {profiled}')
         
         return profiled
-    
-    def set_model_variant_accuracies(self, isi_name, filename=''):
-        if filename == '':
-            # We set accuracies randomly
-            for model_variant in self.model_variants[isi_name]:
-                self.model_variant_accuracies[(isi_name, model_variant)] = random.uniform(50.0, 99.99)
-        else:
-            # Need to add support for reading accuracies from a file
-            logging.error('Reading accuracies from file not implemented!')
-            time.sleep(10)
 
     def initialize_loadtimes(self, isi_name):
         self.initialize_model_variant_loadtimes(isi_name)
@@ -1177,9 +1177,11 @@ class Simulator:
             event.desc, event.start_time))
         isi = event.desc
         executor = self.executors[isi]
-        executor.finish_request(event, clock)
-        self.completed_requests += 1
-        self.bump_successful_request_stats(event)
+        request_finished = executor.finish_request(event, clock)
+        if request_finished:
+            self.bump_successful_request_stats(event)
+        else:
+            self.bump_failed_request_stats(event)
         return
 
     def process_scheduling_event(self, event, clock):
@@ -1217,6 +1219,7 @@ class Simulator:
         ''' Bump stats for a successful request
         '''
         isi = event.desc
+        self.completed_requests += 1
         self.successful_requests += 1
         self.successful_requests_arr[self.isi_to_idx[isi]] += 1
         self.successful_per_model[isi] += 1
