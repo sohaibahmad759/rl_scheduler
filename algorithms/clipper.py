@@ -7,7 +7,7 @@ class Clipper(SchedulingAlgorithm):
         SchedulingAlgorithm.__init__(self, 'Clipper')
 
         self.simulator = simulator
-        self.solution_file = 'algorithms/solution_for_clipper.txt'
+        self.solution_file = 'algorithms/clipper_solution_highacc.txt'
         self.solution_applied = False
 
         return

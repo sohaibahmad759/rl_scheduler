@@ -210,6 +210,10 @@ class SchedulingEnv(gym.Env):
     def trigger_infaas_upscaling(self):
         self.simulator.trigger_infaas_upscaling()
 
+    
+    def trigger_infaas_v2_upscaling(self):
+        self.simulator.trigger_infaas_v2_upscaling()
+
 
     def trigger_infaas_downscaling(self):
         self.simulator.trigger_infaas_downscaling()

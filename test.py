@@ -32,11 +32,11 @@ def getargs():
                         dest='reward_window_length', help='The number of steps to look out into the future to ' +
                         'calculate the reward of an action. Default value is 10')
     parser.add_argument('--model_assignment', '-ma', required=True,
-                        choices=['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11'],
+                        choices=['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'],
                         dest='model_asn_algo', help='The model assignment algorithm. Select a number:\n' +
                         '1 - Random. 2 - Static. 3 - Least Frequently Used (LFU). 4 - Load proportional. ' +
                         '5 - RL. 6 - RL with warm start (load proportional). 7 - ILP Alpha. 8 - ILP (Max throughput). ' +
-                        '9 - INFaaS. 10 - Clipper. 11 - ILP')
+                        '9 - INFaaS. 10 - Clipper. 11 - ILP. 12 - INFaaS (batching, cost=accuracy drop).')
     parser.add_argument('--job_scheduling', '-js', required=True, choices=['1', '2', '3', '4', '5', '6'],
                         dest='job_sched_algo', help='The job scheduling algorithm. Select a number:\n' +
                         '1 - Random. 2 - Round robin. 3 - Earliest Finish Time with FIFO. ' +
@@ -59,7 +59,8 @@ def validate_parameters(args):
     ''' Validates the parameters provided. If invalid, prints reason.
     '''
     model_asn_algos = ['random', 'static', 'lfu', 'load_proportional', 'rl', 'rl_warm',
-                       'ilp_alpha', 'ilp_throughput', 'infaas', 'clipper', 'ilp']
+                       'ilp_alpha', 'ilp_throughput', 'infaas', 'clipper', 'ilp',
+                       'infaas_v2']
     model_assignment = model_asn_algos[int(args.model_asn_algo)-1]
 
     alpha = float(args.alpha)
@@ -98,7 +99,8 @@ def main(args):
         sys.exit(0)
 
     model_asn_algos = ['random', 'static', 'lfu', 'load_proportional', 'rl', 'rl_warm',
-                        'ilp_alpha', 'ilp_throughput', 'infaas', 'clipper', 'ilp']
+                        'ilp_alpha', 'ilp_throughput', 'infaas', 'clipper', 'ilp',
+                        'infaas_v2']
     model_assignment = model_asn_algos[int(args.model_asn_algo)-1]
 
     env = SchedulingEnv(trace_dir=args.trace_path, job_sched_algo=int(args.job_sched_algo),
@@ -144,6 +146,8 @@ def main(args):
         print('Testing with solution given by ILP (Max throughput version)')
     elif model_assignment == 'infaas':
         print('Testing with INFaaS model assignment policy')
+    elif model_assignment == 'infaas_v2':
+        print('Testing with INFaaS model assignment policy (batching, cost=accuracy drop)')
     elif model_assignment == 'clipper':
         clipper = Clipper(simulator=env.simulator)
         print('Testing with Clipper model assignment policy')
@@ -177,6 +181,7 @@ def main(args):
     failed_requests = 0
     total_requests = 0
     successful_requests = 0
+    ilp_rounds = 0
     start = time.time()
     for i in range(testing_steps):
         if model_assignment == 'random':
@@ -300,7 +305,16 @@ def main(args):
                 ilp.set_simulator(env.simulator)
 
             if ilp_applied == True:
-                actions = ilp.run(observation, env.n_accelerators, env.max_no_of_accelerators)
+                period_tuning = 1
+                # TODO: Tune how frequently the ILP is run by tuning 'period_tuning'
+                #       The bigger it is, the less frequently the ILP is invoked
+                #       Also, what are its implications on allocation window sizes and
+                #       action group sizes?
+                if i % period_tuning == 0:
+                    actions = ilp.run(observation, env.n_accelerators, env.max_no_of_accelerators)
+                    ilp_rounds += 1
+                else:
+                    actions = None
 
             if actions is None:
                 # action = env.action_space.sample()
@@ -325,8 +339,8 @@ def main(args):
                 if isi == env.n_executors - 1:
                     ilp_applied = True
             
-            # This is used to get a solution for Clipper at midpoint
-            # of experiment
+            # # This is used to get a solution for Clipper at midpoint
+            # # of experiment
             # if i > 0 and i % 500 == 0:
             #     # ilp.print_cached_solution()
             #     time.sleep(10)
@@ -334,9 +348,14 @@ def main(args):
             # action = env.action_space.sample()
             # for j in range(5, len(action)):
             #     action[j] = 0
-        elif model_assignment == 'infaas':
+        elif 'infaas' in model_assignment:
             print()
-            env.trigger_infaas_upscaling()
+            if model_assignment == 'infaas':
+                env.trigger_infaas_upscaling()
+            elif model_assignment == 'infaas_v2':
+                env.trigger_infaas_v2_upscaling()
+            else:
+                print(f'Invalid verison of INFaaS: {model_assignment}')
             env.trigger_infaas_downscaling()
             
             num_isi = observation.shape[0] - 1
@@ -397,6 +416,7 @@ def main(args):
         f'Percentage of requests succeeded: {(successful_requests/total_requests*100)}%')
     print(f'Test time: {(end-start)} seconds')
     print(f'Requests added: {env.simulator.requests_added}')
+    # print(f'ILP made changes {ilp_rounds} times')
     logfile.close()
 
     completed_requests = env.simulator.completed_requests

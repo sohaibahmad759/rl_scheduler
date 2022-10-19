@@ -509,6 +509,11 @@ class Executor:
                     return
 
     
+    def trigger_infaas_upscaling(self):
+        logging.info('infaas v2 upscaling not implemented')
+        time.sleep(10)
+
+    
     def trigger_infaas_downscaling(self):
         logging.info('infaas downscaling not implemented')
         # time.sleep(2)

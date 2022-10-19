@@ -88,6 +88,8 @@ class Simulator:
         self.largest_batch_sizes = {}
         self.slo_dict = {}
 
+        self.model_assignment = model_assignment
+
         logging.basicConfig(level=logging.INFO)
 
         idx = 0
@@ -96,12 +98,12 @@ class Simulator:
             
             if 'ilp' in model_assignment:
                 variant_list_path = os.path.join(trace_path, '..', 'model_variants')
-                # The following lines are used to get a static solution for Clipper
-                # variant_list_path = os.path.join(trace_path, '..', 'model_variants_clipper')
+                # # The following lines are used to get a static solution for Clipper
+                # variant_list_path = os.path.join(trace_path, '..', 'model_variants_clipper_highacc')
                 # print(f'simulator: Using clipper model variants for debugging only')
                 # time.sleep(5)
             elif model_assignment == 'clipper':
-                variant_list_path = os.path.join(trace_path, '..', 'model_variants_clipper')
+                variant_list_path = os.path.join(trace_path, '..', 'model_variants_clipper_highacc')
             else:
                 print(f'simulator: No valid model assignment algorithm selected, exiting.')
                 exit(0)
@@ -561,6 +563,11 @@ class Simulator:
         for key in self.executors:
             executor = self.executors[key]
             executor.trigger_infaas_upscaling()
+
+    def trigger_infaas_v2_upscaling(self):
+        for key in self.executors:
+            executor = self.executors[key]
+            executor.trigger_infaas_v2_upscaling()
 
     def trigger_infaas_downscaling(self):
         for key in self.executors:

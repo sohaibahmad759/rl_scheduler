@@ -140,6 +140,11 @@ class Predictor:
               f'of requests in queue: {len(self.request_queue)}, batch size '
               f'returned: {batch_size}')
 
+        if self.simulator.model_assignment == 'clipper':
+            self.pop_while_first_expires(clock)
+            if len(self.request_queue) == 0:
+                return
+
         if batch_size == -1:
             # requests in queue exceed maximum batch size
             self.process_batch(clock, self.max_batch_size)
@@ -154,7 +159,7 @@ class Predictor:
 
             if self.batch_processing_latency(1, first_request) > first_request.deadline:
                 print(f'Request cannot be processed even with batch size of 1')
-                time.sleep(10)
+                # time.sleep(1)
 
             max_waiting_time = first_request_expiration - self.batch_processing_latency(batch_size, first_request)
 
@@ -194,7 +199,8 @@ class Predictor:
         if batch_size > self.max_batch_size:
             print(f'process_batch received batch size of {batch_size}, max '
                   f'batch size: {self.max_batch_size}')
-            time.sleep(10)
+            if self.simulator.model_assignment != 'clipper':    
+                time.sleep(10)
             batch_size = self.max_batch_size
 
         temp_queue = []
@@ -211,7 +217,7 @@ class Predictor:
 
         logging.debug(f'Batch size given: {batch_size}, requests in queue after popping: '
                       f'{len(self.request_queue)}, dequeued_requests: {dequeued_requests}')
-        # TODO: use actual batch processing time
+
         batch_processing_time = self.batch_processing_latency(batch_size, temp_queue[0])
         finish_time = clock + batch_processing_time
         accuracy_seen = self.profiled_accuracy
