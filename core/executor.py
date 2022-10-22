@@ -335,17 +335,8 @@ class Executor:
                             runtime = self.variant_runtimes[predictor_type][(isi_name, model_variant, batch_size)]
 
                             print(f'infaas, runtime: {runtime}, deadline: {event.deadline}')
-
-                            largest_batch_sizes = self.simulator.get_largest_batch_sizes()
-                            if acc_type.value == 1:
-                                sim_acc_type = 'CPU'
-                            elif acc_type.value == 2:
-                                sim_acc_type = 'GPU_AMPERE'
-                            elif acc_type.value == 3:
-                                sim_acc_type = 'VPU'
-                            elif acc_type.value == 4:
-                                sim_acc_type = 'GPU_PASCAL'
-                            largest_batch_size = largest_batch_sizes[(sim_acc_type, model_variant)]
+                            
+                            largest_batch_size = self.get_largest_batch_size(model_variant=model_variant, acc_type=acc_type.value)
 
                             if math.isinf(runtime) or largest_batch_size == 0:
                                 print(f'largest_batch_size: {largest_batch_size}, runtime: {runtime}')
@@ -816,7 +807,6 @@ class Executor:
             new_throughput = total_peak_throughput - predictor_peak_throughput
             if new_throughput * infaas_slack > total_queued_requests:
                 # remove this predictor
-                # self.remove_predictor_by_id(predictor.id)
                 predictors_to_remove.append(predictor.id)
                 total_peak_throughput = new_throughput
                 continue
@@ -870,15 +860,12 @@ class Executor:
                         time.sleep(1)
                         total_peak_throughput = new_throughput
                         # remove this predictor
-                        # self.remove_predictor_by_id(predictor.id)
                         predictors_to_remove.append(predictor.id)
                         # add a CPU or VPU predictor, whichever is available
                         if cpu_available > 0:
                             predictors_to_add.append((AccType.CPU, predictor.variant_name))
-                            # self.add_predictor(acc_type=AccType.CPU, variant_name=predictor.variant_name)
                         elif vpu_available > 0:
                             predictors_to_add.append((AccType.VPU, predictor.variant_name))
-                            # self.add_predictor(acc_type=AccType.VPU, variant_name=predictor.variant_name)
                         else:
                             logging.error('infaas_v2_downscaling: neither CPU nor VPU is available!')
                             time.sleep(10)
