@@ -5,8 +5,8 @@ import requests
 import string
 import os
 import time
-import pandas as pd
 import numpy as np
+import pandas as pd
 from hashlib import new
 from pyexpat import model
 from core.event import Event, EventType
@@ -44,9 +44,6 @@ class Simulator:
         self.requests_added = 0
 
         self.total_accuracy = 0
-
-        self.allowed_batch_sizes = [1, 2, 4, 8]
-        self.profiled_filename = 'profiling/batch_size_n.csv'
 
         self.accelerator_types = ['CPU', 'GPU_AMPERE', 'VPU', 'GPU_PASCAL']
 
@@ -87,8 +84,12 @@ class Simulator:
         self.batching_enabled = batching
         self.largest_batch_sizes = {}
         self.slo_dict = {}
+        self.allowed_batch_sizes = [1, 2, 4, 8]
+        self.profiled_filename = 'profiling/batch_size_n.csv'
 
         self.model_assignment = model_assignment
+
+        self.infaas_slack = 0.95
 
         logging.basicConfig(level=logging.INFO)
 
@@ -104,6 +105,8 @@ class Simulator:
                 # time.sleep(5)
             elif model_assignment == 'clipper':
                 variant_list_path = os.path.join(trace_path, '..', 'model_variants_clipper_highacc')
+            elif 'infaas' in model_assignment:
+                variant_list_path = os.path.join(trace_path, '..', 'model_variants')
             else:
                 print(f'simulator: No valid model assignment algorithm selected, exiting.')
                 exit(0)
@@ -573,6 +576,11 @@ class Simulator:
         for key in self.executors:
             executor = self.executors[key]
             executor.trigger_infaas_downscaling()
+
+    def trigger_infaas_v2_downscaling(self):
+        for key in self.executors:
+            executor = self.executors[key]
+            executor.trigger_infaas_v2_downscaling()
 
     def get_runtimes(self, isi_index):
         runtimes = []

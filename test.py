@@ -55,7 +55,7 @@ def getargs():
     return parser.parse_args()
 
 
-def validate_parameters(args):
+def validate_parameters(model_asn_algos, args):
     ''' Validates the parameters provided. If invalid, prints reason.
     '''
     model_asn_algos = ['random', 'static', 'lfu', 'load_proportional', 'rl', 'rl_warm',
@@ -95,13 +95,13 @@ def main(args):
     alpha = float(args.alpha)
     beta = float(args.beta)
 
-    if validate_parameters(args) is False:
-        sys.exit(0)
-
     model_asn_algos = ['random', 'static', 'lfu', 'load_proportional', 'rl', 'rl_warm',
                         'ilp_alpha', 'ilp_throughput', 'infaas', 'clipper', 'ilp',
                         'infaas_v2']
     model_assignment = model_asn_algos[int(args.model_asn_algo)-1]
+    
+    if validate_parameters(model_asn_algos, args) is False:
+        sys.exit(0)
 
     env = SchedulingEnv(trace_dir=args.trace_path, job_sched_algo=int(args.job_sched_algo),
                         action_group_size=action_group_size, reward_window_length=reward_window_length,
@@ -352,11 +352,12 @@ def main(args):
             print()
             if model_assignment == 'infaas':
                 env.trigger_infaas_upscaling()
+                env.trigger_infaas_downscaling()
             elif model_assignment == 'infaas_v2':
                 env.trigger_infaas_v2_upscaling()
+                env.trigger_infaas_v2_downscaling()
             else:
                 print(f'Invalid verison of INFaaS: {model_assignment}')
-            env.trigger_infaas_downscaling()
             
             num_isi = observation.shape[0] - 1
             # Initially, we give all executors one CPU predictor to start with

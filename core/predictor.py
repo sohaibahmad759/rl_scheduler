@@ -1,6 +1,7 @@
 import logging
 import time
 import uuid
+import numpy as np
 from enum import Enum
 
 
@@ -21,7 +22,8 @@ class AccType(Enum):
 
 class Predictor:
     def __init__(self, acc_type=AccType.CPU, qos_level=0, profiled_accuracy=100.0,
-                    profiled_latencies={}, variant_name=None, executor=None, simulator=None):
+                    profiled_latencies={}, variant_name=None, executor=None,
+                    simulator=None):
         # attributes related to predictor hardware
         self.id = uuid.uuid4().hex
         self.acc_type = acc_type
@@ -51,19 +53,54 @@ class Predictor:
         # self.batch_sizes_allowed = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
         self.batch_sizes_allowed = self.simulator.allowed_batch_sizes
         self.max_batch_size = self.get_largest_batch_size()
-        
-        # if self.max_batch_size == 0:
-        #     self.busy = True
-        #     print(f'Predictor cannot be used as it will exceed latency SLO, '
-        #           f'model variant: {self.variant_name}, accelerator type: '
-        #           f'{self.acc_type}')
-        #     time.sleep(10)
 
+        # Only needed if model assignment and job scheduling policies are INFaaS v2
+        self.infaas_batch_size = self.max_batch_size
+        self.infaas_cost = np.inf
+        self.set_infaas_cost()
+        
+        # If the maximum batch size is 0, that means that predictor cannot even
+        # serve a batch size of 1 without violating latency SLO
+        if self.max_batch_size == 0:
+            if self.simulator.model_assignment != 'clipper':
+                self.busy = True
+                print(f'Predictor cannot be used as it will exceed latency SLO, '
+                    f'model variant: {self.variant_name}, accelerator type: '
+                    f'{self.acc_type}')
+                time.sleep(10)
         return
 
     
     def set_load(self, load):
         self.load = load
+        return
+
+    
+    def get_infaas_cost(self):
+        return self.infaas_cost
+
+    
+    def set_infaas_cost(self):
+        ''' The cost of this model variant is the drop in accuracy when compared
+        to the most accurate model in the model family
+        '''
+        all_variant_accuracies = self.executor.variant_accuracies
+        model_name = self.executor.isi
+        model_variant_accuracies = dict(filter(lambda x: x[0][0]==model_name, all_variant_accuracies.items()))
+
+        highest_accuracy = max(model_variant_accuracies.values())
+        accuracy_drop = highest_accuracy - self.profiled_accuracy
+        self.infaas_cost = accuracy_drop
+        return
+
+    
+    def get_infaas_batch_size(self):
+        return self.infaas_batch_size
+
+    
+    def set_infaas_batch_size(self, batch_size):
+        self.infaas_batch_size = batch_size
+        return
 
     
     def get_largest_batch_size(self):
@@ -159,7 +196,7 @@ class Predictor:
 
             if self.batch_processing_latency(1, first_request) > first_request.deadline:
                 print(f'Request cannot be processed even with batch size of 1')
-                # time.sleep(1)
+                time.sleep(10)
 
             max_waiting_time = first_request_expiration - self.batch_processing_latency(batch_size, first_request)
 
