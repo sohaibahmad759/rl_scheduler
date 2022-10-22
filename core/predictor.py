@@ -227,6 +227,9 @@ class Predictor:
 
         # TODO: Even after all the checks, make sure to track how many reqeusts
         #       finish after their deadline
+        logging.info(f'process_batch called with batch size of {batch_size}')
+        # time.sleep(1)
+
         logging.debug(f'Requests in queue before popping: {len(self.request_queue)}')
 
         if batch_size == -1:

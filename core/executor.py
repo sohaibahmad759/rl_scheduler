@@ -335,7 +335,7 @@ class Executor:
                             runtime = self.variant_runtimes[predictor_type][(isi_name, model_variant, batch_size)]
 
                             print(f'infaas, runtime: {runtime}, deadline: {event.deadline}')
-                            
+
                             largest_batch_size = self.get_largest_batch_size(model_variant=model_variant, acc_type=acc_type.value)
 
                             if math.isinf(runtime) or largest_batch_size == 0:
@@ -857,7 +857,7 @@ class Executor:
                     if new_throughput * infaas_slack > total_queued_requests:
                         print(f'removing gpu/fpga predictor and adding cpu/vpu predictor'
                               f' for {predictor.executor.isi}')
-                        time.sleep(1)
+                        # time.sleep(1)
                         total_peak_throughput = new_throughput
                         # remove this predictor
                         predictors_to_remove.append(predictor.id)
@@ -929,6 +929,9 @@ class Executor:
         appropriate predictor. The predictor will dequeue the request and process it
         with a batch of requests.
         '''
+        logging.info(f'enqueuing request for isi: {event.desc}')
+        # time.sleep(1)
+
         if len(self.predictors) == 0:
             self.add_predictor()
 
@@ -976,9 +979,169 @@ class Executor:
             selected_predictor.enqueue_request(event, clock)
             self.assigned_requests[event.id] = selected_predictor
             return
+        
+        elif self.task_assignment == TaskAssignment.INFAAS:
+            print(f'Selecting predictor for batch request processing with INFaaS')
 
+            accuracy_filtered_predictors = list(filter(lambda key: self.predictors[key].profiled_accuracy >= event.accuracy, self.predictors))
+            print(f'accuracy_filtered_predictors: {accuracy_filtered_predictors},'
+                  f' all predictors for this executor {self.isi}: {self.predictors}')
+            # time.sleep(1)
+            predictor = None
+            infaas_candidates = []
+            not_found_reason = 'None'
+            # There is atleast one predictor that matches the accuracy requirement of the request
+            if len(accuracy_filtered_predictors) > 0:
+                # If there is any predictor that can meet request
+                for key in accuracy_filtered_predictors:
+                    _predictor = self.predictors[key]
+                    print(f'infaas predictor profiled latencies: {_predictor.profiled_latencies}')
+                    batch_size = _predictor.get_infaas_batch_size()
+                    # peak_throughput = math.floor(1000 /  _predictor.profiled_latencies[(event.desc, 
+                    #                                 event.qos_level)])
+                    profiled_latency = _predictor.profiled_latencies[(_predictor.variant_name, batch_size)]
+                    # peak_throughput = math.floor(batch_size * 1000 /  _predictor.profiled_latencies[(event.desc, 
+                    #                                 event.qos_level)])
+                    queued_requests = len(_predictor.request_dict)
+
+                    logging.info(f'Throughput: {peak_throughput}')
+                    logging.info(f'Queued requests: {queued_requests}')
+                    if peak_throughput > queued_requests:
+                        _predictor.set_load(float(queued_requests)/peak_throughput)
+                        infaas_candidates.append(_predictor)
+                    else:
+                        continue
+                
+                # We have now found a list of candidate predictors that match both accuracy
+                # and deadline of the request, sorted by load
+                infaas_candidates.sort(key=lambda x: x.load)
+
+                # for candidate in infaas_candidates:
+                #     print('infaas candidate:' + str(candidate) + ', load:' + str(candidate.load))
+                # print('infaas candidates:' + str(infaas_candidates))
+                # time.sleep(5)
+
+                if len(infaas_candidates) > 0:
+                    # Select the least loaded candidate
+                    predictor = infaas_candidates[0]
+                    logging.info(f'predictor found: {predictor}')
+                else:
+                    # There is no candidate that meets deadline
+                    not_found_reason = 'latency_not_met'
+                    logging.info(f'predictor not found because latency SLO not met')
+            else:
+                # There is no predictor that even matches the accuracy requirement of the request
+                not_found_reason = 'accuracy_not_met'
+                logging.info(f'predictor not found because accuracy not met')
+            
+            # No predictor has been found yet, either because accuracy not met or deadline not met
+            if predictor is None:
+                # Now we try to find an inactive model variant that can meet accuracy+deadline
+                isi_name = event.desc
+                inactive_candidates = {}
+                checked_variants = set(map(lambda key: self.predictors[key].variant_name, self.predictors))
+                print(f'checked variants: {checked_variants}')
+                # time.sleep(1)
+
+                # print('model variants:' + str(self.model_variants))
+                # print()
+                # print('model variant accuracies:' + str(self.variant_accuracies))
+                # print()
+                # print('model variant runtimes:' + str(self.variant_runtimes))
+                # print()
+                # print('model variant loadtimes:' + str(self.variant_loadtimes))
+                # print()
+                for model_variant in self.model_variants[isi_name]:
+                    # If we already checked for this variant
+                    if model_variant in checked_variants:
+                        continue
+                    else:
+                        for acc_type in AccType:
+                            predictor_type = acc_type.value
+                            largest_batch_size = self.get_largest_batch_size(model_variant=model_variant, acc_type=acc_type.value)
+                            
+                            if largest_batch_size == 0:
+                                continue
+
+                            runtime = self.variant_runtimes[predictor_type][(isi_name, model_variant, largest_batch_size)]
+
+                            print(f'infaas, runtime: {runtime}, deadline: {event.deadline}')
+
+                            if math.isinf(runtime) or largest_batch_size == 0:
+                                print(f'largest_batch_size: {largest_batch_size}, runtime: {runtime}')
+                                # time.sleep(1)
+                                continue
+                            
+                            loadtime = self.variant_loadtimes[(isi_name, model_variant)]
+                            total_time = runtime + loadtime
+
+                            if total_time < event.deadline:
+                                inactive_candidates[(model_variant, acc_type)] = total_time
+                logging.info(f'inactive candidates: {inactive_candidates}')
+                # time.sleep(1)
+
+                for candidate in inactive_candidates:
+                    model_variant, acc_type = candidate
+
+                    if self.num_predictor_types[acc_type.value-1 + event.qos_level*4] < self.max_acc_per_type:
+                        predictor_id = self.add_predictor(acc_type=acc_type, variant_name=model_variant)
+                        predictor = self.predictors[predictor_id]
+                        logging.info(f'Predictor {predictor} added from inactive variants')
+                        # time.sleep(1)
+                        break
+
+            # (Line 8) If we still cannot find one, we try to serve with the closest
+            # possible accuracy and/or deadline
+            if predictor is None:
+                logging.info('No predictor found from inactive variants either')
+                closest_acc_candidates = sorted(self.predictors, key=lambda x: abs(self.predictors[x].profiled_accuracy - event.accuracy))
+                # print('event accuracy:' + str(event.accuracy))
+                # print('closest accuracy candidates:' + str(closest_acc_candidates))
+
+                for candidate in closest_acc_candidates:
+                    _predictor = self.predictors[candidate]
+                    variant_name = _predictor.variant_name
+                    acc_type = _predictor.acc_type
+                    batch_size = self.get_largest_batch_size(model_variant=variant_name, acc_type=acc_type)
+
+                    if batch_size == 0:
+                        continue
+
+                    runtime = self.variant_runtimes[acc_type][(isi_name, variant_name, batch_size)]
+
+                    # peak_throughput = math.floor(1000 /  _predictor.profiled_latencies[(event.desc, 
+                    #                                 event.qos_level)])
+                    # peak_throughput = math.floor(1000 /  _predictor.profiled_latencies[(event.desc, 
+                    #                                 _predictor.variant_name, batch_size)])
+                    peak_throughput = math.floor(batch_size * 1000 / runtime)
+                    queued_requests = len(_predictor.request_dict)
+
+                    logging.info(f'Throughput: {peak_throughput}')
+                    logging.info(f'Queued requests: {queued_requests}')
+                    if peak_throughput > queued_requests and runtime <= event.deadline:
+                        _predictor.set_load(float(queued_requests)/peak_throughput)
+                        predictor = _predictor
+                        logging.info(f'closest predictor {predictor} found')
+                        break
+                    else:
+                        continue
+
+            if predictor is None:
+                logging.info(f'infaas: predictor not found. not sure what to do here')
+                closest_acc_candidates = sorted(self.predictors, key=lambda x: abs(self.predictors[x].profiled_accuracy - event.accuracy))
+                predictor = self.predictors[random.choice(closest_acc_candidates)]
+                # time.sleep(1)
+            # else:
+
+            logging.info(f'enqueuing request at predictor {predictor}')
+            # time.sleep(1)
+            predictor.enqueue_request(event, clock)
+            self.assigned_requests[event.id] = predictor
+            return
+            
         else:
-            logging.error('Only canary routing is supported with batch request processing')
+            logging.error(f'Unrecognized task assignment/job scheduling algorithm '
+                          f'for batch request processing')
             exit(0)
 
     
