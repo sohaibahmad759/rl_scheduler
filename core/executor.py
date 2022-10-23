@@ -7,21 +7,8 @@ import uuid
 import numpy as np
 from types import NoneType
 from enum import Enum
+from core.common import Behavior, TaskAssignment
 from core.predictor import AccType, Predictor
-
-
-class Behavior(Enum):
-    BESTEFFORT = 1
-    STRICT = 2
-
-
-class TaskAssignment(Enum):
-    RANDOM = 1
-    ROUND_ROBIN = 2
-    EARLIEST_FINISH_TIME = 3
-    LATEST_FINISH_TIME = 4
-    INFAAS = 5
-    CANARY = 6
 
 
 class Executor:
@@ -260,8 +247,8 @@ class Executor:
             batch_size = 1
 
             accuracy_filtered_predictors = list(filter(lambda key: self.predictors[key].profiled_accuracy >= event.accuracy, self.predictors))
-            print(f'accuracy_filtered_predictors: {accuracy_filtered_predictors},'
-                  f' all predictors for this executor {self.isi}: {self.predictors}')
+            # print(f'accuracy_filtered_predictors: {accuracy_filtered_predictors},'
+            #       f' all predictors for this executor {self.isi}: {self.predictors}')
             # time.sleep(1)
             predictor = None
             infaas_candidates = []
@@ -984,8 +971,8 @@ class Executor:
             print(f'Selecting predictor for batch request processing with INFaaS')
 
             accuracy_filtered_predictors = list(filter(lambda key: self.predictors[key].profiled_accuracy >= event.accuracy, self.predictors))
-            print(f'accuracy_filtered_predictors: {accuracy_filtered_predictors},'
-                  f' all predictors for this executor {self.isi}: {self.predictors}')
+            # print(f'accuracy_filtered_predictors: {accuracy_filtered_predictors},'
+            #       f' all predictors for this executor {self.isi}: {self.predictors}')
             # time.sleep(1)
             predictor = None
             infaas_candidates = []

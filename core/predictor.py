@@ -3,6 +3,7 @@ import time
 import uuid
 import numpy as np
 from enum import Enum
+from core.common import TaskAssignment
 
 
 # TODO: the number of accelerator types should be parameterizable
@@ -58,6 +59,8 @@ class Predictor:
         self.infaas_batch_size = self.max_batch_size
         self.infaas_cost = np.inf
         self.set_infaas_cost()
+
+        self.task_assignment = self.executor.task_assignment
         
         # If the maximum batch size is 0, that means that predictor cannot even
         # serve a batch size of 1 without violating latency SLO
@@ -168,14 +171,23 @@ class Predictor:
             self.generate_head_slo_expiring()
             return
 
+        # if self.task_assignment == TaskAssignment.INFAAS:
+        #     if len(self.request_queue) >= self.infaas_batch_size:
+        #         self.process_batch(clock, self.infaas_batch_size)
+                
+        # elif self.task_assignment == TaskAssignment.CANARY:
+
         # If we are past t_w(q), execute queue with q-1 requests
         # If q-1 is 0 at this point, the request deadlines are not set properly
         # and request cannot possibly be executed within deadline
 
-        batch_size = self.find_batch_size(requests=len(self.request_queue))
-        print(f'enqueue_request: Trying to find appropriate batch size. Number '
-              f'of requests in queue: {len(self.request_queue)}, batch size '
-              f'returned: {batch_size}')
+        if self.task_assignment == TaskAssignment.CANARY:
+            batch_size = self.find_batch_size(requests=len(self.request_queue))
+            print(f'enqueue_request: Trying to find appropriate batch size. Number '
+                f'of requests in queue: {len(self.request_queue)}, batch size '
+                f'returned: {batch_size}')
+        elif self.task_assignment == TaskAssignment.INFAAS:
+            batch_size = self.infaas_batch_size
 
         if self.simulator.model_assignment == 'clipper':
             self.pop_while_first_expires(clock)
@@ -214,6 +226,10 @@ class Predictor:
                 print(f'Calling process batch from enqueue_request')
                 self.process_batch(clock, batch_size)
                 return
+        # else:
+        #     logging.error(f'enqueue_request received unexpected task assignment '
+        #                   f'algorithm: {self.task_assignment}')
+        #     time.sleep(10)
 
         return
 
@@ -239,7 +255,7 @@ class Predictor:
         if batch_size > self.max_batch_size:
             print(f'process_batch received batch size of {batch_size}, max '
                   f'batch size: {self.max_batch_size}')
-            if self.simulator.model_assignment != 'clipper':    
+            if self.simulator.model_assignment != 'clipper' and self.task_assignment != TaskAssignment.INFAAS:    
                 time.sleep(10)
             batch_size = self.max_batch_size
 
@@ -249,6 +265,9 @@ class Predictor:
         while dequeued_requests < batch_size and len(self.request_queue) > 0:
             temp_queue.append(self.request_queue.pop(0))
             dequeued_requests += 1
+
+        if dequeued_requests == 0:
+            return
 
         # Since requests have been popped from the queue, we need to generate an
         # SLO_EXPIRING event for the new request at the head of the queue
@@ -268,9 +287,13 @@ class Predictor:
 
         for request in temp_queue:
             if finish_time > request.start_time + request.deadline:
-                print('process_batch: Something is wrong, first request in queue '
-                      'will expire before batch finishes processing')
-                time.sleep(10)
+                if self.task_assignment == TaskAssignment.CANARY:
+                    print('process_batch: Something is wrong, first request in queue '
+                        'will expire before batch finishes processing')
+                    time.sleep(10)
+                elif self.task_assignment == TaskAssignment.INFAAS:
+                    self.simulator.bump_failed_request_stats(request)
+                    continue
             self.simulator.generate_end_request_event(request, finish_time,
                                                     accuracy_seen, qos_met)
         self.simulator.generate_finish_batch_event(finish_time=finish_time,
@@ -288,19 +311,30 @@ class Predictor:
         self.busy = False
         self.busy_till = None
 
-        # If we run the batch with the requests currently in the queue, we want to
-        # ensure that no request in the queue will expire by the time the batch
-        # finishes processing
-        self.pop_while_first_expires(clock)
+        logging.info(f'infaas batch size: {self.infaas_batch_size}')
 
-        # At this point, no request in the queue is past the point where it would
-        # expire if executed in a batch
-        # If we still have enough requests to fill the max batch size, we execute
-        # the batch. Otherwise, we wait to get more requests or until we reach an
-        # SLO_EXPIRING event
-        if len(self.request_queue) >= self.max_batch_size:
-            print(f'Calling process batch from finish_batch_callback')
-            self.process_batch(clock, self.max_batch_size)
+        if self.task_assignment == TaskAssignment.CANARY:
+            # If we run the batch with the requests currently in the queue, we want to
+            # ensure that no request in the queue will expire by the time the batch
+            # finishes processing
+
+            # At this point, no request in the queue is past the point where it would
+            # expire if executed in a batch
+            # If we still have enough requests to fill the max batch size, we execute
+            # the batch. Otherwise, we wait to get more requests or until we reach an
+            # SLO_EXPIRING event
+            self.pop_while_first_expires(clock)
+            if len(self.request_queue) >= self.max_batch_size:
+                print(f'Calling process_batch from finish_batch_callback')
+                self.process_batch(clock, self.max_batch_size)
+        elif self.task_assignment == TaskAssignment.INFAAS:
+            if len(self.request_queue) >= self.infaas_batch_size:
+                print(f'Calling process_batch from finish_batch_callback for INFaaS')
+                self.process_batch(clock, self.infaas_batch_size)
+        else:
+            logging.error(f'finish_batch_callback encountered unexpected task '
+                          f'assignment algorithm: {self.task_assignment}')
+            time.sleep(10)
 
         return
 
@@ -367,6 +401,10 @@ class Predictor:
     def slo_expiring_callback(self, event, clock):
         ''' Callback to handle an SLO_EXPIRING event
         '''
+        # if self.task_assignment == TaskAssignment.INFAAS:
+        #     logging.info('SLO expiring event encountered, ignoring for INFaaS')
+        #     return
+
         logging.debug(f'SLO expiring callback, Current clock: {clock}, event counter: '
             f'{event.event_counter}, slo_expiring_dict entry: {self.slo_expiring_dict[event.event_counter]}')
         if clock != self.slo_expiring_dict[event.event_counter]:
@@ -391,10 +429,13 @@ class Predictor:
             # SLO EXPIRING
             return
 
-        batch_size = self.find_batch_size(requests=len(self.request_queue))
-        print(f'slo_expiring_callback: Trying to find appropriate batch size. '
-            f'Number of requests in queue: {len(self.request_queue)}, '
-            f'batch size returned: {batch_size}')
+        if self.task_assignment == TaskAssignment.CANARY:
+            batch_size = self.find_batch_size(requests=len(self.request_queue))
+            print(f'slo_expiring_callback: Trying to find appropriate batch size. '
+                f'Number of requests in queue: {len(self.request_queue)}, '
+                f'batch size returned: {batch_size}')
+        elif self.task_assignment == TaskAssignment.INFAAS:
+            batch_size = self.infaas_batch_size
         
         if batch_size == -1:
             # requests in queue exceed maximum batch size, this should not happen

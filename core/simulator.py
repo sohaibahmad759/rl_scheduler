@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 from hashlib import new
 from pyexpat import model
-from core.event import Event, EventType
+from core.common import Event, EventType
 from core.executor import Executor, AccType
 
 
