@@ -14,7 +14,8 @@ class SchedulingEnv(gym.Env):
 
     def __init__(self, trace_dir, job_sched_algo, action_group_size,
                  reward_window_length=10, random_runtimes=False, fixed_seed=0,
-                 allocation_window=1000, model_assignment='', batching=False):
+                 allocation_window=1000, model_assignment='', batching=False,
+                 batching_algo=None):
         super(SchedulingEnv, self).__init__()
 
         logging.basicConfig(level=logging.INFO)
@@ -50,7 +51,8 @@ class SchedulingEnv(gym.Env):
                                    random_runtimes=random_runtimes,
                                    fixed_seed=fixed_seed,
                                    batching=batching,
-                                   model_assignment=model_assignment)
+                                   model_assignment=model_assignment,
+                                   batching_algo=batching_algo)
 
         # number of steps that we play into the future to get reward
         # Note: this is a tunable parameter
@@ -164,8 +166,8 @@ class SchedulingEnv(gym.Env):
         # so actions = {increase/decrease # of predictors for an executor (where?),
         #               re-allocate predictor to different hardware,
         #               what others?}
-        reward = self.simulator.evaluate_reward(self.K_steps)
-        self.logfile.write(str(reward) + '\n')
+        # reward = self.simulator.evaluate_reward(self.K_steps)
+        # self.logfile.write(str(reward) + '\n')
 
         # TODO: verifying that state is being correctly modified and there is no overflow
         # logging.debug('self.state: {}'.format(self.state))
@@ -181,6 +183,8 @@ class SchedulingEnv(gym.Env):
         if self.actions_taken == self.action_group_size:
             # after every 'group' of actions, wait `allocation_window` milliseconds before taking another action
             self.clock += self.allocation_window
+            # print(f'scheduling env clock: {self.clock}, simulator clock: {self.simulator.clock}')
+            # time.sleep(1)
             self.simulator.reset_request_count()
             self.simulator.simulate_until(self.clock)
             self.actions_taken = 0
@@ -193,7 +197,7 @@ class SchedulingEnv(gym.Env):
         done = self.simulator.is_done()
 
         # return observation, reward, done, self.failed_requests
-        return observation, reward, done, {}
+        return observation, 0, done, {}
 
     
     def populate_runtime_info(self):

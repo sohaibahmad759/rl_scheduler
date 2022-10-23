@@ -1,0 +1,7 @@
+onnx
+onnxruntime
+onnxruntime-gpu
+Pillow
+numpy
+torch
+torchvision

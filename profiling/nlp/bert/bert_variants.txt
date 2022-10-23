@@ -1,0 +1,48 @@
+-------
+bert.py
+-------
+'bert-base-uncased', 'bert-large-uncased'
+---------
+albert.py
+---------
+'albert-base-v2', 'albert-large-v2', 'albert-xlarge-v2', 'albert-xxlarge-v2'
+----------
+roberta.py
+----------
+'roberta-base', 'roberta-large'
+----------
+All above variants: `all_bert_variants.py` profiles all these variants with different
+batch sizes and outputs them to `bert_profiled.csv` (only for CPU, we need to run it
+separately for every accelerator type)
+-------------------------------
+
+-> Check the accuracy of each model and see if the models form a pareto-optimal boundary
+    -> Each model set could have a pareto-boundary of its own, but do all of them
+    combined form one?
+
+    -> Answer:  they don't, because some models are more optimized than others
+                but that's okay, because our solution will only use models at the
+                pareto-optimal boundary and discard the ones not at the boundary.
+                not every model is supposed to be at the pareto-optimal boundary
+
+-> See if the runtime of inference increases with input size
+
+    -> Answer:  It does, but for the purpose of our paper we can assume a fixed
+                size input since other papers do not mention variable size input
+                either
+
+-> How to change the batch size of the input?
+
+-> Running on CUDA
+
+    -> Getting CUDA error code 34 on both TensorFlow and PyTorch
+    -> Emailed hpc@umass.edu, awaiting response
+
+-> What task to use? What task does the tokenizer belong to?
+
+-> Are there any other details regarding NLP models we are missing?
+
+-> Other options for models:
+    -> GPT-2 also has 3-4 variants. Is it new enough and will we be questioned for it?
+    -> GNMT is another option
+    -> Check huggingface for other tasks (ASR?)

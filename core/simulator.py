@@ -12,18 +12,23 @@ from pyexpat import model
 from core.common import Event, EventType
 from core.executor import Executor, AccType
 
+MAX_CLOCK_VALUE = 1439934
+MAX_CLOCK_VALUE = 0
+
 
 class Simulator:
     def __init__(self, job_sched_algo, trace_path=None, mode='training', 
                  max_acc_per_type=0, predictors_max=[10, 10, 10, 10], n_qos_levels=1,
                  random_runtimes=False, fixed_seed=0, batching=False,
-                 model_assignment=None):
+                 model_assignment=None, batching_algo=None):
         self.clock = 0
         self.event_queue = []
         self.executors = {}
         self.idx_to_executor = {}
         self.isi_to_idx = {}
         self.failed_requests = 0
+        self.total_failed = 0
+        self.total_successful = 0
         self.failed_requests_arr = []
         self.successful_requests = 0
         self.successful_requests_arr = []
@@ -39,6 +44,8 @@ class Simulator:
 
         self.job_sched_algo = job_sched_algo
         self.n_qos_levels = n_qos_levels
+
+        self.test_stat = 0
 
         self.store_file_pointers = True
         self.requests_added = 0
@@ -71,17 +78,24 @@ class Simulator:
         self.failed_per_model = {}
         self.successful_per_model = {}
 
+        self.slo_timeouts = {'total': 0, 'succeeded': 0, 'timeouts': 0}
+
         self.accuracy_per_model = {}
 
         self.trace_files = {}
+        self.trace_file_finished = set()
 
         self.accuracy_logfile = open('logs/log_ilp_accuracy.txt', mode='w')
+        self.latency_logfilename = os.path.join('logs', 'latency',
+                                                f'{time.time()}_{model_assignment}.csv')
+        self.latency_logfile = open(self.latency_logfilename, mode='w')
 
         self.predictors_max = predictors_max
         # self.available_predictors = np.tile(copy.deepcopy(predictors_max), self.n_qos_levels)
         self.available_predictors = copy.deepcopy(predictors_max)
 
         self.batching_enabled = batching
+        self.batching_algo = batching_algo
         self.largest_batch_sizes = {}
         self.slo_dict = {}
         self.allowed_batch_sizes = [1, 2, 4, 8]
@@ -104,7 +118,7 @@ class Simulator:
                 # print(f'simulator: Using clipper model variants for debugging only')
                 # time.sleep(5)
             elif model_assignment == 'clipper':
-                variant_list_path = os.path.join(trace_path, '..', 'model_variants_clipper_highacc')
+                variant_list_path = os.path.join(trace_path, '..', 'model_variants_clipper_lowacc')
             elif 'infaas' in model_assignment:
                 variant_list_path = os.path.join(trace_path, '..', 'model_variants')
             else:
@@ -412,6 +426,9 @@ class Simulator:
             batch_size = batch_sizes[idx]
             latency = latencies[idx]
 
+            if batch_size not in self.allowed_batch_sizes:
+                continue
+
             # Since the profiled data does not have VPUs, we make the following
             # assumption to reconcile this data with the simulator experiment
             # setting: Assume that VPUs behave the same as CPUs. So effectively
@@ -608,33 +625,43 @@ class Simulator:
             # in case we are loading file pointers instead of entire file
             if self.store_file_pointers:
                 finished = self.refill_event_queue()
-                if finished:
-                    break
+                # if finished:
+                #     break
+        # print(f'ending simulate_until. until: {until}, queue length: {len(self.event_queue)}, '
+        #       f'first event start time: {self.event_queue[0].start_time}')
+        # time.sleep(5)
         return
 
     def refill_event_queue(self):
+        print(f'simulator clock: {self.clock}')
         if len(self.trace_files) == 0:
             # we are in a deepcopied simulator instance
             return False
-        if len(self.event_queue) < 10000:
-            finished = True
-            for isi_name in self.trace_files:
-                readfile = self.trace_files[isi_name]
-                # print('Adding requests from {}'.format(readfile))
-                file_finished = self.add_requests_from_trace_pointer(isi_name, readfile,
-                                                                     read_until=self.clock + 10000)
-                if file_finished:
-                    logging.debug('Trace file {} finished'.format(isi_name))
-                    # time.sleep(5000)
-                finished = finished and file_finished
-            return finished
-        return False
+        # if len(self.event_queue) < 10000:
+        finished = True
+        for isi_name in self.trace_files:
+            if isi_name in self.trace_file_finished:
+                continue
+            readfile = self.trace_files[isi_name]
+            # print('Adding requests from {}'.format(readfile))
+            file_finished = self.add_requests_from_trace_pointer(isi_name, readfile,
+                                                                    read_until=self.clock+10000)
+            if file_finished:
+                self.trace_file_finished.add(isi_name)
+                logging.info('Trace file {} finished'.format(isi_name))
+                time.sleep(1)
+            finished = finished and file_finished
+        return finished
+        # else:
+        #     print(f'refill_event_queue: unresolved simulator issue')
+        #     time.sleep(50)
+        # return False
 
     def is_done(self):
         '''
         Returns true if the request trace has finished, false otherwise.
         '''
-        if len(self.event_queue) == 0:
+        if len(self.event_queue) == 0 or (MAX_CLOCK_VALUE > 0 and self.clock > MAX_CLOCK_VALUE):
             return True
         else:
             return False
@@ -1134,7 +1161,8 @@ class Simulator:
         self.total_accuracy += accuracy_seen
         isi = event.desc
         self.insert_event(end_time, EventType.END_REQUEST,
-                                event.desc, id=event.id, qos_level=event.qos_level)
+                        event.desc, id=event.id, qos_level=event.qos_level,
+                        event_counter=event.start_time)
         self.accuracy_logfile.write(str(accuracy_seen) + '\n')
         self.accuracy_per_model[isi].append(accuracy_seen)
         
@@ -1147,7 +1175,7 @@ class Simulator:
         ''' Generate a FINISH_BATCH event and insert it into the simulator's
         event queue
         '''
-        self.insert_event(time=finish_time, type=EventType.FINISH_BATCH,
+        self.insert_event(start_time=finish_time, type=EventType.FINISH_BATCH,
                         desc='finish_batch', predictor=predictor,
                         executor=executor)
         return
@@ -1198,6 +1226,8 @@ class Simulator:
         request_finished = executor.finish_request(event, clock)
         if request_finished:
             self.bump_successful_request_stats(event)
+            finish_time = clock - event.event_counter
+            self.latency_logfile.write(f'{isi},{event.event_counter},{clock},{finish_time}\n')
         else:
             self.bump_failed_request_stats(event)
         return
@@ -1222,8 +1252,11 @@ class Simulator:
         # time.sleep(1)
         isi = event.desc
         self.failed_requests += 1
+        self.total_failed += 1
+        
         self.failed_requests_arr[self.isi_to_idx[isi]] += 1
         self.failed_per_model[isi] += 1
+        self.slo_timeouts['timeouts'] += 1
         self.bump_qos_unmet_stats(event)
         return
 
@@ -1232,6 +1265,7 @@ class Simulator:
         '''
         isi = event.desc
         self.qos_stats[self.isi_to_idx[isi], event.qos_level * 2 + 1] += 1
+        return
     
     def bump_successful_request_stats(self, event):
         ''' Bump stats for a successful request
@@ -1241,6 +1275,9 @@ class Simulator:
         self.successful_requests += 1
         self.successful_requests_arr[self.isi_to_idx[isi]] += 1
         self.successful_per_model[isi] += 1
+        self.slo_timeouts['succeeded'] += 1
+        self.total_successful += 1
+        return
 
     def bump_overall_request_stats(self, event):
         ''' Bump overall request stats, i.e., total requests per ISI, requests
@@ -1250,6 +1287,7 @@ class Simulator:
         self.total_requests_arr[self.isi_to_idx[isi]] += 1
         self.requests_per_model[isi] += 1
         self.qos_stats[self.isi_to_idx[isi], event.qos_level * 2] += 1
+        # self.test_stat += 1
         return
 
     def add_executor(self, isi, job_sched_algo, runtimes=None, model_variant_runtimes=None, 
@@ -1260,28 +1298,38 @@ class Simulator:
         self.executors[executor.isi] = executor
         return executor.id
 
-    def insert_event(self, time, type, desc, runtime=None, id='', deadline=1000,
+    def insert_event(self, start_time, type, desc, runtime=None, id='', deadline=1000,
                     qos_level=0, accuracy=None, predictor=None, executor=None,
                     event_counter=0):
         if type == EventType.END_REQUEST:
-            event = Event(time, type, desc, runtime, id=id, deadline=deadline,
-                            qos_level=qos_level)
+            event = Event(start_time, type, desc, runtime, id=id, deadline=deadline,
+                            qos_level=qos_level, event_counter=event_counter)
         elif type == EventType.FINISH_BATCH:
-            event = Event(time, type, desc, runtime, id=id, deadline=deadline,
+            event = Event(start_time, type, desc, runtime, id=id, deadline=deadline,
                             qos_level=qos_level, accuracy=accuracy, predictor=predictor,
                             executor=executor)
         elif type == EventType.SLO_EXPIRING:
-            event = Event(time, type, desc, runtime, id=id, deadline=deadline,
+            event = Event(start_time, type, desc, runtime, id=id, deadline=deadline,
                             qos_level=qos_level, accuracy=accuracy, predictor=predictor,
                             executor=executor, event_counter=event_counter)
+        elif type == EventType.START_REQUEST:
+            event = Event(start_time, type, desc, runtime, deadline=deadline,
+                            qos_level=qos_level, accuracy=accuracy)
         else:
-            event = Event(time, type, desc, runtime, deadline=deadline,
+            event = Event(start_time, type, desc, runtime, deadline=deadline,
                             qos_level=qos_level, accuracy=accuracy)
 
         # using binary search to reduce search time complexity
-        idx = self.binary_find_index(self.event_queue, time)
+        idx = self.binary_find_index(self.event_queue, start_time)
         self.event_queue.insert(idx, event)
         inserted = True
+
+        # if type == EventType.START_REQUEST:
+        #     print(f'idx: {idx}, length of event queue: {len(self.event_queue)}')
+        #     time.sleep(0.5)
+        # print(f'event_queue: {list(map(lambda x: (x.start_time, x.type), self.event_queue))}')
+        # print(f'length of event queue: {len(self.event_queue)}')
+        # time.sleep(0.0001)
 
         return inserted
 

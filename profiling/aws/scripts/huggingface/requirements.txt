@@ -1,0 +1,11 @@
+torch
+transformers
+Pillow
+opencv-python
+pandas
+psutil
+torchvision
+matplotlib
+seaborn
+sentencepiece
+

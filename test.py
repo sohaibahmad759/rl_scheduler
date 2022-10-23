@@ -32,11 +32,12 @@ def getargs():
                         dest='reward_window_length', help='The number of steps to look out into the future to ' +
                         'calculate the reward of an action. Default value is 10')
     parser.add_argument('--model_assignment', '-ma', required=True,
-                        choices=['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'],
+                        choices=['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13'],
                         dest='model_asn_algo', help='The model assignment algorithm. Select a number:\n' +
                         '1 - Random. 2 - Static. 3 - Least Frequently Used (LFU). 4 - Load proportional. ' +
                         '5 - RL. 6 - RL with warm start (load proportional). 7 - ILP Alpha. 8 - ILP (Max throughput). ' +
-                        '9 - INFaaS. 10 - Clipper. 11 - ILP. 12 - INFaaS (batching, cost=accuracy drop).')
+                        '9 - INFaaS. 10 - Clipper. 11 - ILP. 12 - INFaaS (batching, cost=accuracy drop). ' +
+                        '13 - Sommelier')
     parser.add_argument('--job_scheduling', '-js', required=True, choices=['1', '2', '3', '4', '5', '6'],
                         dest='job_sched_algo', help='The job scheduling algorithm. Select a number:\n' +
                         '1 - Random. 2 - Round robin. 3 - Earliest Finish Time with FIFO. ' +
@@ -49,6 +50,11 @@ def getargs():
                         dest='beta', help='beta parameter for ILP (minimum throughput constraint). Only needed if MA is ILP')
     parser.add_argument('--batching', required=False, action='store_true',
                         dest='enable_batching', help='Indicate that batching should be enabled. It is disabled by default')
+    parser.add_argument('--batching_algo', required=False, default='0', choices=['1', '2'],
+                        dest='batching_algo', help='Select the type of batching algorithm to be used. ' +
+                        'Default is AccScale\'s batching algorithm. INFaaS uses its own batching with its job ' +
+                        'scheduling algorithm. Options: 1 - AccScale batching. 2 - AIMD')
+    parser.add_argument('--config_file', required=True)
 
     parser.set_defaults(random_runtimes=False, batching=False)
 
@@ -60,7 +66,7 @@ def validate_parameters(model_asn_algos, args):
     '''
     model_asn_algos = ['random', 'static', 'lfu', 'load_proportional', 'rl', 'rl_warm',
                        'ilp_alpha', 'ilp_throughput', 'infaas', 'clipper', 'ilp',
-                       'infaas_v2']
+                       'infaas_v2', 'sommelier']
     model_assignment = model_asn_algos[int(args.model_asn_algo)-1]
 
     alpha = float(args.alpha)
@@ -81,6 +87,14 @@ def validate_parameters(model_asn_algos, args):
     if (model_assignment == 'ilp' or model_assignment == 'ilp_alpha') and (beta > 1 or beta < 0):
         print('Invalid parameters: --beta value must be in the range [0,1]')
         return False
+
+    if args.enable_batching and args.batching_algo == '0':
+        print('Batching enabled but batching algorithm not specified. Use --batching_algo {1,2}')
+        return False
+    
+    if not(args.enable_batching) and args.batching_algo != '0':
+        print('batching_algo is specified but batching is not enabled. Use --batching to enable batching')
+        return False
     
     return True
 
@@ -94,11 +108,15 @@ def main(args):
     allocation_window = int(args.allocation_window)
     alpha = float(args.alpha)
     beta = float(args.beta)
+    config = json.loads(args.config)
 
     model_asn_algos = ['random', 'static', 'lfu', 'load_proportional', 'rl', 'rl_warm',
                         'ilp_alpha', 'ilp_throughput', 'infaas', 'clipper', 'ilp',
-                        'infaas_v2']
+                        'infaas_v2', 'sommelier']
     model_assignment = model_asn_algos[int(args.model_asn_algo)-1]
+
+    batching_algos = ['accscale', 'aimd']
+    batching_algo = batching_algos[int(args.batching_algo)-1]
     
     if validate_parameters(model_asn_algos, args) is False:
         sys.exit(0)
@@ -107,7 +125,7 @@ def main(args):
                         action_group_size=action_group_size, reward_window_length=reward_window_length,
                         random_runtimes=args.random_runtimes, fixed_seed=fixed_seed,
                         allocation_window=allocation_window, model_assignment=model_assignment,
-                        batching=args.enable_batching)
+                        batching=args.enable_batching, batching_algo=batching_algo)
 
     policy_kwargs = dict(net_arch=[128, 128, dict(pi=[128, 128, 128],
                                         vf=[128, 128, 128])])
@@ -151,6 +169,12 @@ def main(args):
     elif model_assignment == 'clipper':
         clipper = Clipper(simulator=env.simulator)
         print('Testing with Clipper model assignment policy')
+    elif model_assignment == 'sommelier':
+        ilp = Ilp(allocation_window=allocation_window, beta=beta,
+                  starting_allocation='algorithms/sommelier_solutions/starting_uniform.txt',
+                  spec_acc=True)
+        ilp_applied = True
+        print('Testing with Sommelier model switching policy (spec_acc)')
     else:
         print('Undefined mode, exiting')
         sys.exit(0)
@@ -300,7 +324,7 @@ def main(args):
                     continue
                 action[receiving_acc+1] += 1
                 # print(observation)
-        elif model_assignment == 'ilp' or model_assignment == 'ilp_alpha' or model_assignment == 'ilp_throughput':
+        elif model_assignment == 'ilp' or model_assignment == 'ilp_alpha' or model_assignment == 'ilp_throughput' or model_assignment == 'sommelier':
             if ilp.is_simulator_set() is False:
                 ilp.set_simulator(env.simulator)
 
@@ -386,7 +410,7 @@ def main(args):
             # print('State: {}'.format(env.state))
         observation, reward, done, info = env.step(action)
         # read failed and total requests once every 5 actions
-        if (i-1) % action_group_size == 0:
+        if (i-1) % action_group_size == 0 or done:
             failed_requests += np.sum(observation[:,-1])
             total_requests += np.sum(observation[:,-2])
             successful_requests += env.simulator.get_successful_requests()
@@ -395,6 +419,8 @@ def main(args):
             requests_per_model, failed_per_model, accuracy_per_model, successful_per_model = env.simulator.get_thput_accuracy_per_model()
             utils.log_thput_accuracy_per_model(rate_logger_per_model, i, requests_per_model,
                                             failed_per_model, accuracy_per_model)
+        if done:
+            break
         rl_reward += reward
         env.render()
 
@@ -417,19 +443,20 @@ def main(args):
         f'Percentage of requests succeeded: {(successful_requests/total_requests*100)}%')
     print(f'Test time: {(end-start)} seconds')
     print(f'Requests added: {env.simulator.requests_added}')
-    # print(f'ILP made changes {ilp_rounds} times')
+    print(f'ILP made changes {ilp_rounds} times')
     logfile.close()
 
     completed_requests = env.simulator.completed_requests
     sim_time_elapsed = env.simulator.clock / 1000
     overall_throughput = completed_requests / sim_time_elapsed
 
-    total_accuracy = env.simulator.total_accuracy
-    effective_accuracy = total_accuracy / completed_requests
     print()
     print(f'Completed requests: {completed_requests}')
     print(f'Simulator time elapsed: {sim_time_elapsed}')
     print(f'Overall throughput (requests/sec): {overall_throughput}')
+
+    total_accuracy = env.simulator.total_accuracy
+    effective_accuracy = total_accuracy / completed_requests
     print(f'Effective accuracy (over served requests): {effective_accuracy}')
     print()
 
@@ -438,7 +465,25 @@ def main(args):
     print('---------------')
     print(f'Aggregate throughput and accuracy logs written to: {rate_loggerfile}')
     print(f'Per-model throughput and accuracy logs written to: {rate_logger_per_model_file}')
+    print(f'Latency (response time) logs written to: {env.simulator.latency_logfilename}')
+
+    bumped_succeeded = env.simulator.slo_timeouts['succeeded']
+    bumped_failed = env.simulator.slo_timeouts['timeouts']
+    bumped_total = bumped_failed + bumped_succeeded
+    bumped_violation_ratio = bumped_failed / bumped_total
+    print(f'SLO violation ratio based on bumped stats: {bumped_violation_ratio}')
+    # total_slo = env.simulator.slo_timeouts['total']
+    print(f'Total SLO: {bumped_total}, SLO timed out: {bumped_failed}, successful '
+          f'SLO: {bumped_succeeded}, timeout ratio: {bumped_violation_ratio}')
     print()
+
+    print(f'test stat: {env.simulator.test_stat}')
+
+    # bumped_failed = env.simulator.failed_requests
+    # bumped_succeeded = env.simulator.successful_requests
+    # bumped_total = bumped_failed + bumped_succeeded
+    # bumped_violation_ratio = bumped_failed / bumped_total
+    # print(f'SLO violation ratio based on bumped stats: {bumped_violation_ratio}')
 
 if __name__=='__main__':
     main(getargs())

@@ -186,7 +186,9 @@ class Executor:
             finish_times = []
             for key in filtered_predictors:
                 candidate = self.predictors[key]
-                potential_runtime = candidate.profiled_latencies[(event.desc, event.qos_level)]
+                # potential_runtime = candidate.profiled_latencies[(event.desc, event.qos_level)]
+                potential_runtime = candidate.profiled_latencies[(event.desc, candidate.variant_name, 1)]
+                print(f'busy till: {candidate.busy_till}, potential runtime: {potential_runtime}')
                 if candidate.busy:
                     finish_time = candidate.busy_till + potential_runtime
                 else:
@@ -243,9 +245,6 @@ class Executor:
 
 
         elif self.task_assignment == TaskAssignment.INFAAS:
-            # TODO: add dynamic batching to INFaaS
-            batch_size = 1
-
             accuracy_filtered_predictors = list(filter(lambda key: self.predictors[key].profiled_accuracy >= event.accuracy, self.predictors))
             # print(f'accuracy_filtered_predictors: {accuracy_filtered_predictors},'
             #       f' all predictors for this executor {self.isi}: {self.predictors}')
@@ -303,14 +302,6 @@ class Executor:
                 print(f'checked variants: {checked_variants}')
                 # time.sleep(1)
 
-                # print('model variants:' + str(self.model_variants))
-                # print()
-                # print('model variant accuracies:' + str(self.variant_accuracies))
-                # print()
-                # print('model variant runtimes:' + str(self.variant_runtimes))
-                # print()
-                # print('model variant loadtimes:' + str(self.variant_loadtimes))
-                # print()
                 for model_variant in self.model_variants[isi_name]:
                     # If we already checked for this variant
                     if model_variant in checked_variants:
@@ -327,7 +318,6 @@ class Executor:
 
                             if math.isinf(runtime) or largest_batch_size == 0:
                                 print(f'largest_batch_size: {largest_batch_size}, runtime: {runtime}')
-                                # time.sleep(1)
                                 continue
                             
                             loadtime = self.variant_loadtimes[(isi_name, model_variant)]
@@ -336,7 +326,6 @@ class Executor:
                             if total_time < event.deadline:
                                 inactive_candidates[(model_variant, acc_type)] = total_time
                 logging.info(f'inactive candidates: {inactive_candidates}')
-                # time.sleep(1)
 
                 for candidate in inactive_candidates:
                     model_variant, acc_type = candidate
@@ -395,6 +384,7 @@ class Executor:
             # selected by one of the heuristics above
 
             # Step 2: read up runtime based on the predictor type selected
+            batch_size = 1
             runtime = self.variant_runtimes[predictor.acc_type][(event.desc, predictor.variant_name, batch_size)]
             # runtime = runtimes[predictor.acc_type][(event.desc, event.qos_level)]
             event.runtime = runtime
@@ -531,10 +521,19 @@ class Executor:
 
     
     def trigger_infaas_v2_upscaling(self):
+        # # From the INFaaS paper:
+        # # Each worker runs a model-autoscaler that approximates ILP as follows:
+        # # (a) Identify whether the constraints are in
+        # # danger of being violated,
+        
+        # # (b) Consider two strategies, replicate
+        # # or upgrade/downgrade, to satisfy the constraints,
+
+        # # (c) Compute the objective for each of these scaling actions 
+        # # and pick the one that minimizes the objective cost function
+
         logging.info('infaas v2 upscaling triggered')
-        # TODO: how to decide the batch size? It is probably decided by the
-        #       model autoscaling policy
-        # TODO: Check if batch size variable is used in other places by mistake
+
         for key in self.predictors:
             predictor = self.predictors[key]
             batch_size = predictor.get_infaas_batch_size()
@@ -576,15 +575,8 @@ class Executor:
                 logging.info(f'incoming load: {incoming_load}')
                 replicas_needed = math.ceil(incoming_load / (peak_throughput * infaas_slack))
 
-                # In INFaaS v2, to calculate the cost of replicas_needed, we also
-                # need to know what type of replicas are needed, since the cost
-                # i.e. accuracy drop, depends on the model variant (not accelerator)
-
-                # Solution:
-                # well actually that makes it quite simple. If we don't need to know
-                # accelerators and just need model variant to calculate cost, replicating
-                # this given predictor will have as much cost as the cost of this predictor
-                # i.e., the accuracy drop of this predictor
+                # Replicating this given predictor will have as much cost as the
+                # cost of this predictor, i.e., the accuracy drop of this predictor
 
                 logging.info(f'replicas needed: {replicas_needed}, accuracy drop of '
                              f'this variant: {predictor.get_infaas_cost()}')
@@ -599,16 +591,16 @@ class Executor:
                 #      or upgrading to a model variant with different/higher accuracy
 
                 # Option 2a: Change to a different model variant
+                # Option 2b: Change to a different hardware accelerator and make multiple copies
 
                 # Consider the different model variants
-                # TODO: How do we compare the new peak throughput of a single variant change (2a)
-                # with the peak throughput of multiple potential predictors (2b)?
                 # Based on Section 4.2.2, "Scaling up algorithm", it seems we have to
                 # run (2b) for every model variant of this model family that can meet
                 # SLO and support a higher throughput than the currently running variant
                 # We calculate the cost_upgrade for each of these variants, then take
                 # the minimum cost_upgrade and compare that with cost_replication, to take
                 # the appropriate action
+
                 model_variants = dict(filter(lambda x: x[0][0]==self.isi, predictor.profiled_latencies.items()))
                 print(f'self.isi: {self.isi}, model_variants: {model_variants}')
                 cost_upgrade = np.inf
@@ -659,69 +651,10 @@ class Executor:
                         selected_variant = variant_name
                 print(f'selected variant for upgrade: {selected_variant}, cost '
                       f'of upgrade: {cost_upgrade}')
-                # time.sleep(1)
-
-                # Option 2b: Change to a different hardware accelerator and make multiple copies
-                # batch_size = predictor.get_infaas_batch_size()
-                # cpu_peak_throughput = self.variant_runtimes[AccType.CPU.value][(self.isi, predictor.variant_name, batch_size)]
-                # gpu_peak_throughput = self.variant_runtimes[AccType.GPU.value][(self.isi, predictor.variant_name, batch_size)]
-                # vpu_peak_throughput = self.variant_runtimes[AccType.VPU.value][(self.isi, predictor.variant_name, batch_size)]
-                # fpga_peak_throughput = self.variant_runtimes[AccType.FPGA.value][(self.isi, predictor.variant_name, batch_size)]
-                
-                # cpu_needed = math.ceil(incoming_load / (cpu_peak_throughput * infaas_slack))
-                # gpu_needed = math.ceil(incoming_load / (gpu_peak_throughput * infaas_slack))
-                # vpu_needed = math.ceil(incoming_load / (vpu_peak_throughput * infaas_slack))
-                # fpga_needed = math.ceil(incoming_load / (fpga_peak_throughput * infaas_slack))
-
-                # cpu_available = self.simulator.available_predictors[0]
-                # gpu_available = self.simulator.available_predictors[1]
-                # vpu_available = self.simulator.available_predictors[2]
-                # fpga_available = self.simulator.available_predictors[3]
-
-                # if cpu_available == 0:
-                #     cpu_needed = math.inf
-                # if gpu_available == 0:
-                #     gpu_needed = math.inf
-                # if vpu_available == 0:
-                #     vpu_needed = math.inf
-                # if fpga_available == 0:
-                #     fpga_needed = math.inf
-
-                # # This is where the unit cost is playing in: we are choosing the
-                # # minimum number of accelerators that can meet requirements,
-                # # rather than minimizing some non-uniform cost across them
-
-                # # If we were trying to minimize cost as dollar values...
-
-                # # If we were trying to minimize cost as accuracy drop, we would
-                # # sort the accelerators in order of increasing accuracy drop,
-                # # then choose accelerators sequentially from that ordering.
-                # # Problem: we do not consider throughput in that ordering.
-                # # Would this problem exist and is tolerated in dollar cost version
-                # # as well?
-
-                # # From INFaaS:
-                # # Each worker runs a model-autoscaler that approximates ILP as follows:
-                # # (a) Identify whether the constraints are in
-                # # danger of being violated,
-                
-                # # (b) Consider two strategies, replicate
-                # # or upgrade/downgrade, to satisfy the constraints,
-
-                # # (c) Compute the objective for each of these scaling actions 
-                # # and pick the one that minimizes the objective cost function
-
-                # # By this point, we are assuming that same variants need to be added
-                
-                # # TODO: can we have combinations of different types of accelerators?
-                # upgrade_needed = min([cpu_needed, gpu_needed, vpu_needed, fpga_needed])
-                # type_needed = [cpu_needed, gpu_needed, vpu_needed, fpga_needed].index(upgrade_needed)
 
                 logging.info(f'upgrade of type {type_needed} needed: {upgrade_needed},'
                              f'accuracy drop of this variant: {predictor.get_infaas_cost()}')
-                # cost_upgrade = predictor.get_infaas_cost() * upgrade_needed
                 logging.info(f'total cost of upgrade: {cost_upgrade}')
-                # time.sleep(1)
 
                 if cost_upgrade <= cost_replication:
                     logging.info(f'available predictors left: {self.simulator.available_predictors[type_needed]}')
@@ -732,7 +665,6 @@ class Executor:
                         self.simulator.available_predictors[type_needed] -= 1
                     logging.info(f'upgrade needed: {upgrade_needed}')
                     logging.info(f'available predictors left: {self.simulator.available_predictors[type_needed]}')
-                    # time.sleep(2)
                     return
                 else:
                     # add 'replicas_needed' predictors of type 'predictor.acc_type' or as many as possible
@@ -747,9 +679,7 @@ class Executor:
                         self.simulator.available_predictors[type_needed] -= 1
                     logging.info(f'replicas needed: {upgrade_needed}')
                     logging.info(f'available predictors left: {self.simulator.available_predictors[type_needed]}')
-                    # time.sleep(2)
                     return
-        # time.sleep(10)
 
     
     def trigger_infaas_downscaling(self):

@@ -397,7 +397,7 @@ class Ilp(SchedulingAlgorithm):
         # logging.info('canary dict: {}'.format(canary_dict))
         # time.sleep(1)
         self.simulator.apply_ilp_solution(required_predictors, canary_dict)
-        # print(f'required_predictors:\n{required_predictors}\ncanary_dict:\n{canary_dict}')
+        print(f'required_predictors:\n{required_predictors}\ncanary_dict:\n{canary_dict}')
 
         return None
 

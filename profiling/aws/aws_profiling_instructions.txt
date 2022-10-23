@@ -1,0 +1,32 @@
+Instructions for profiling ML models on AWS EC2
+-----------------------------------------------
+
+Date: 			Mar 2, 2023
+Project: 		Proteus (AccScale)
+AWS Instance: 	p3.2xlarge
+AMI:			Deep Learning AMI GPU PyTorch 1.13.1 (Amazon Linux 2) 20230226
+
+A. Keys
+-------
+
+1. Locate the key file used to setup the AWS EC2 instance
+2. Make sure to run `chmod 400 <keyname.pem>` on the file
+	We are using `accscaling.pem` for this
+
+B. Uploading files to EC2 instance
+----------------------------------
+
+1. In FileZilla, go to Setup -> SFTP -> Add key file
+2. Add the .pem key file
+3. Connect to EC2 instance by entering `sftp://<public-dns-name-of-ec2-instance>' in Host and 'ec2-user' in username, leave password blank
+4. Copy all files to EC2 instance from /Users/sohaib/Documents/Research/InferenceScheduling/rl_scheduler/profiling/aws/scripts
+
+C. Running the profiling
+------------------------
+
+1. Connect to EC2 instance using ssh: `ssh -i "accscaling.pem" ec2-user@<public-dns-name-of-ec2-instance>
+2. Go to the folder with the profiling scripts
+3. Run `python3 -m pip install -r requirements.txt`
+4. Run each file as `python3 <script.py`
+5. Copy all generated .csv files back from the EC2 instance using FileZilla
+

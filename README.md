@@ -69,3 +69,11 @@ Underway: We are implementing batch processing for canary routing job scheduling
 To run AccScale with batching (ILP with canary routing), run the following command. Make sure to check the `alpha` and `beta` parameters are set correctly.
 
 `./run_accscale_batching.sh`
+
+### AIMD
+
+`MAX_CLOCK_VALUE = 0`
+AccScale: `./run_accscale_batching.sh`, `./run_accscale_batching_aimd.sh`
+Clipper: `./run_clipper.sh`, `./run_clipper_aimd.sh`
+
+Clipper uses production traces, high throughput setting

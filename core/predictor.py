@@ -55,10 +55,12 @@ class Predictor:
         self.batch_sizes_allowed = self.simulator.allowed_batch_sizes
         self.max_batch_size = self.get_largest_batch_size()
 
+        self.batching_algo = self.simulator.batching_algo
         # Only needed if model assignment and job scheduling policies are INFaaS v2
         self.infaas_batch_size = self.max_batch_size
         self.infaas_cost = np.inf
         self.set_infaas_cost()
+        self.aimd_batch_size = 1
 
         self.task_assignment = self.executor.task_assignment
         
@@ -76,6 +78,36 @@ class Predictor:
     
     def set_load(self, load):
         self.load = load
+        return
+
+    
+    def increase_aimd_batch_size(self):
+        ''' Since we only allow batch sizes of [1, 2, 4, 8], AIMD can only
+         go one step up to the next available batch size
+        '''
+        print(f'increase_aimd_batch_size: current batch size: {self.aimd_batch_size}')
+        current_idx = self.batch_sizes_allowed.index(self.aimd_batch_size)
+        if current_idx < len(self.batch_sizes_allowed) - 1:
+            new_idx = current_idx + 1
+            self.aimd_batch_size = self.batch_sizes_allowed[new_idx]
+            current_idx = new_idx
+        if self.aimd_batch_size > self.max_batch_size and self.max_batch_size > 0:
+            self.aimd_batch_size = self.max_batch_size
+        print(f'increase_aimd_batch_size: batch size set: {self.aimd_batch_size}')
+        return
+
+    
+    def decrease_aimd_batch_size(self):
+        ''' Since we only allow batch sizes of [1, 2, 4, 8], AIMD can only
+         go one step down to the previous available batch size
+        '''
+        print(f'decrease_aimd_batch_size: current batch size: {self.aimd_batch_size}')
+        current_idx = self.batch_sizes_allowed.index(self.aimd_batch_size)
+        if current_idx > 0:
+            new_idx = current_idx - 1
+            self.aimd_batch_size = self.batch_sizes_allowed[new_idx]
+            current_idx = new_idx
+        print(f'decrease_aimd_batch_size: batch size set: {self.aimd_batch_size}')
         return
 
     
@@ -181,17 +213,37 @@ class Predictor:
         # If q-1 is 0 at this point, the request deadlines are not set properly
         # and request cannot possibly be executed within deadline
 
-        if self.task_assignment == TaskAssignment.CANARY:
+        if self.task_assignment == TaskAssignment.CANARY and self.batching_algo == 'accscale':
             batch_size = self.find_batch_size(requests=len(self.request_queue))
             print(f'enqueue_request: Trying to find appropriate batch size. Number '
                 f'of requests in queue: {len(self.request_queue)}, batch size '
                 f'returned: {batch_size}')
+        elif self.task_assignment == TaskAssignment.CANARY and self.batching_algo == 'aimd':
+            if len(self.request_queue) >= self.aimd_batch_size:
+                # print(f'Calling process_batch from enqueue_request')
+                # self.process_batch(clock, self.aimd_batch_size)
+                batch_size = self.aimd_batch_size
+                self.increase_aimd_batch_size()
+            else:
+                return
         elif self.task_assignment == TaskAssignment.INFAAS:
             batch_size = self.infaas_batch_size
+        else:
+            print(f'Unexpected situation')
+            time.sleep(10)
 
-        if self.simulator.model_assignment == 'clipper':
+        if self.simulator.model_assignment == 'aimd':
+            print(f'AIMD calling pop_while_first_expires')
             self.pop_while_first_expires(clock)
+            batch_size = self.aimd_batch_size
             if len(self.request_queue) == 0:
+                return
+            
+            if len(self.request_queue) >= batch_size:
+                print(f'aimd calling process_batch from enqueue_request')
+                self.process_batch(clock, batch_size)
+                return
+            else:
                 return
 
         if batch_size == -1:
@@ -222,7 +274,12 @@ class Predictor:
             else:
                 # if we execute a batch with the latest request, we will miss SLO
                 # of first request in the queue. therefore, execute batch size q-1 requests
-                batch_size = self.find_batch_size(requests=len(self.request_queue)-1)
+                if self.batching_algo == 'accscale':
+                    batch_size = self.find_batch_size(requests=len(self.request_queue)-1)
+                elif self.batching_algo == 'aimd':
+                    batch_size = self.aimd_batch_size
+                elif self.task_assignment == TaskAssignment.INFAAS:
+                    batch_size = self.infaas_batch_size
                 print(f'Calling process batch from enqueue_request')
                 self.process_batch(clock, batch_size)
                 return
@@ -251,6 +308,9 @@ class Predictor:
         if batch_size == -1:
             print(f'process_batch received batch size of -1')
             time.sleep(10)
+
+        # if self.max_batch_size == 0:
+        #     batch_size = 1
 
         if batch_size > self.max_batch_size:
             print(f'process_batch received batch size of {batch_size}, max '
@@ -288,9 +348,16 @@ class Predictor:
         for request in temp_queue:
             if finish_time > request.start_time + request.deadline:
                 if self.task_assignment == TaskAssignment.CANARY:
-                    print('process_batch: Something is wrong, first request in queue '
-                        'will expire before batch finishes processing')
-                    time.sleep(10)
+                    if self.batching_algo == 'accscale':
+                        print('process_batch: Something is wrong, first request in queue '
+                            'will expire before batch finishes processing')
+                        time.sleep(10)
+                    elif self.batching_algo == 'aimd':
+                        self.simulator.bump_failed_request_stats(request)
+                        continue
+                    else:
+                        print('process_batch: unexpected situation')
+                        time.sleep(10)
                 elif self.task_assignment == TaskAssignment.INFAAS:
                     self.simulator.bump_failed_request_stats(request)
                     continue
@@ -311,8 +378,6 @@ class Predictor:
         self.busy = False
         self.busy_till = None
 
-        logging.info(f'infaas batch size: {self.infaas_batch_size}')
-
         if self.task_assignment == TaskAssignment.CANARY:
             # If we run the batch with the requests currently in the queue, we want to
             # ensure that no request in the queue will expire by the time the batch
@@ -324,10 +389,21 @@ class Predictor:
             # the batch. Otherwise, we wait to get more requests or until we reach an
             # SLO_EXPIRING event
             self.pop_while_first_expires(clock)
-            if len(self.request_queue) >= self.max_batch_size:
-                print(f'Calling process_batch from finish_batch_callback')
-                self.process_batch(clock, self.max_batch_size)
+            if self.batching_algo == 'accscale':
+                if len(self.request_queue) >= self.max_batch_size:
+                    print(f'Calling process_batch from finish_batch_callback')
+                    self.process_batch(clock, self.max_batch_size)
+                    return
+            elif self.batching_algo == 'aimd':
+                if len(self.request_queue) >= self.aimd_batch_size:
+                    print(f'Calling process_batch from finish_batch_callback')
+                    self.process_batch(clock, self.aimd_batch_size)
+                    self.increase_aimd_batch_size()
+                    return
+            else:
+                print(f'finish_batch_callback: Unexpected batching algo: {self.batching_algo}')
         elif self.task_assignment == TaskAssignment.INFAAS:
+            logging.info(f'infaas batch size: {self.infaas_batch_size}')
             if len(self.request_queue) >= self.infaas_batch_size:
                 print(f'Calling process_batch from finish_batch_callback for INFaaS')
                 self.process_batch(clock, self.infaas_batch_size)
@@ -363,13 +439,21 @@ class Predictor:
                   f'time to process it will be {batch_processing_time} with batch '
                   f'size of {batch_size}, requests in queue: {queued_requests}')
 
+            popped = False
+
             if clock + batch_processing_time > first_request_expiration:
                 failed_request = self.request_queue.pop(0)
                 self.simulator.bump_failed_request_stats(failed_request)
                 queued_requests = len(self.request_queue)
+                self.simulator.slo_timeouts['timeouts'] += 1
+                self.simulator.slo_timeouts['total'] += 1
+                popped = True
                 # time.sleep(10)
             else:
                 first_request_expiring = False
+            
+            if self.batching_algo == 'aimd' and popped:
+                self.decrease_aimd_batch_size()
         
         # Since requests have been popped from the queue, we need to generate an
         # SLO_EXPIRING event for the new request at the head of the queue
@@ -429,11 +513,13 @@ class Predictor:
             # SLO EXPIRING
             return
 
-        if self.task_assignment == TaskAssignment.CANARY:
+        if self.task_assignment == TaskAssignment.CANARY and self.batching_algo == 'accscale':
             batch_size = self.find_batch_size(requests=len(self.request_queue))
             print(f'slo_expiring_callback: Trying to find appropriate batch size. '
                 f'Number of requests in queue: {len(self.request_queue)}, '
                 f'batch size returned: {batch_size}')
+        elif self.task_assignment == TaskAssignment.CANARY and self.batching_algo == 'aimd':
+            batch_size = self.aimd_batch_size
         elif self.task_assignment == TaskAssignment.INFAAS:
             batch_size = self.infaas_batch_size
         
@@ -449,6 +535,7 @@ class Predictor:
             batch_size = self.max_batch_size
             return
         
+        # if self.batching_algo is not 'aimd':
         print(f'Calling process_batch from slo_expiring_callback')
         self.process_batch(clock, batch_size)
         return
