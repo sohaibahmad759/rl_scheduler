@@ -1,7 +1,11 @@
 *.DS_Store
 *.bz2
 *.code-workspace
+*.ckpt.*
+*.pdf
+*.pt
 *.pyc
+*.zip
 *hash
 *pb2.py
 *pb2_grpc.py
