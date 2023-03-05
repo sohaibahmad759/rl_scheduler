@@ -9,7 +9,7 @@ import glob
 import numpy as np
 import pandas as pd
 
-log_path = '../logs/throughput_per_model/*.csv'
+log_path = '../logs/selected/*.csv'
 
 log_files = sorted(glob.glob(log_path))
 most_recent_file = log_files[-1]
@@ -18,12 +18,22 @@ most_recent_file = log_files[-1]
 log_file = most_recent_file
 
 # Alternatively, we could provide a direct path to the file we want to analyze
-log_file = '../logs/selected/infaas.csv'
-log_file = '../logs/selected/acc_scale_alpha.csv'
-log_file = '../logs/selected/clipper_lowacc.csv'
-log_file = '../logs/selected/clipper_highacc.csv'
+# log_file = '../logs/selected/acc_scale_alpha.csv'
+# log_file = '../logs/selected/clipper_lowacc.csv'
+# log_file = '../logs/selected/clipper_highacc.csv'
 # log_file = '../logs/selected/acc_scale.csv'
+# log_file = '../logs/selected/infaas_v2.csv'
+# log_file = '../logs/selected/infaas_v2_batching.csv'
+# log_file = '../logs/selected/infaas_batching.csv'
+
+log_file = '../logs/selected/acc_scale_alpha.csv'
 log_file = '../logs/selected/infaas_v2.csv'
+log_file = '../logs/selected/infaas_v2_batching.csv'
+log_file = '../logs/selected/infaas_batching.csv'
+log_file = '../logs/throughput_per_model/selected/low_load/accscale.csv'
+log_file = '../logs/throughput_per_model/selected/low_load/clipper_highacc.csv'
+log_file = '../logs/throughput_per_model/selected/bursty/accscale.csv'
+log_file = '../logs/throughput_per_model/selected/bursty/clipper_highacc.csv'
 
 df = pd.read_csv(log_file)
 

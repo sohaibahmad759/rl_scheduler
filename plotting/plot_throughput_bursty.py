@@ -15,16 +15,11 @@ logfile_list = sorted(glob.glob(os.path.join('..', 'logs', 'throughput', 'select
 logfile_list = sorted(glob.glob(os.path.join('..', 'logs', 'throughput', 'selected', 'bursty', 'clipper_lowacc.csv')))
 logfile_list = sorted(glob.glob(os.path.join('..', 'logs', 'throughput', 'selected', 'bursty', 'infaas_unit.csv')))
 logfile_list = sorted(glob.glob(os.path.join('..', 'logs', 'throughput', 'selected', 'bursty', '*.csv')))
-# logfile_list = ['../logs/throughput/selected/bursty/clipper_lowacc.csv',
-#                 '../logs/throughput/selected/bursty/clipper_highacc.csv',
-#                 '../logs/throughput/selected/bursty/infaas_unit.csv',
-#                 '../logs/throughput/selected/bursty/infaas_accuracy.csv',
-#                 '../logs/throughput/selected/bursty/accscale.csv']
-logfile_list = ['../logs/throughput/selected/clipper_high_throughput.csv',
-                '../logs/throughput/selected/clipper_high_accuracy.csv',
-                '../logs/throughput/selected/infaas_unit.csv',
-                '../logs/throughput/selected/infaas_accuracy.csv',
-                '../logs/throughput/selected/accscale.csv']
+logfile_list = ['../logs/throughput/selected/bursty/clipper_lowacc.csv',
+                '../logs/throughput/selected/bursty/clipper_highacc.csv',
+                '../logs/throughput/selected/bursty/infaas_unit.csv',
+                '../logs/throughput/selected/bursty/infaas_accuracy.csv',
+                '../logs/throughput/selected/bursty/accscale.csv']
 # logfile_list = sorted(glob.glob(os.path.join('..', 'logs', 'throughput', 'selected', 'bursty', 'infaas_accuracy.csv')))
 # logfile_list = sorted(glob.glob(os.path.join('..', 'logs', 'paper_jun13_onwards', 'infaas', '3', '*.csv')))
 # print(logfile_list)
