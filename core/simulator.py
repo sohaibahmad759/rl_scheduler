@@ -99,7 +99,7 @@ class Simulator:
         self.largest_batch_sizes = {}
         self.slo_dict = {}
         self.allowed_batch_sizes = [1, 2, 4, 8]
-        self.profiled_filename = 'profiling/batch_size_n.csv'
+        self.profiled_filename = 'profiling/blis/batch_size_n.csv'
 
         self.model_assignment = model_assignment
 

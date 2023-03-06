@@ -1,4 +1,5 @@
 import os
+import json
 import time
 import sys
 import logging
@@ -54,7 +55,7 @@ def getargs():
                         dest='batching_algo', help='Select the type of batching algorithm to be used. ' +
                         'Default is AccScale\'s batching algorithm. INFaaS uses its own batching with its job ' +
                         'scheduling algorithm. Options: 1 - AccScale batching. 2 - AIMD')
-    parser.add_argument('--config_file', required=True)
+    parser.add_argument('--config_file', required=False)
 
     parser.set_defaults(random_runtimes=False, batching=False)
 
@@ -108,7 +109,7 @@ def main(args):
     allocation_window = int(args.allocation_window)
     alpha = float(args.alpha)
     beta = float(args.beta)
-    config = json.loads(args.config)
+    # config = json.loads(args.config_file)
 
     model_asn_algos = ['random', 'static', 'lfu', 'load_proportional', 'rl', 'rl_warm',
                         'ilp_alpha', 'ilp_throughput', 'infaas', 'clipper', 'ilp',
