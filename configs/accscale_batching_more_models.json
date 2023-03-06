@@ -1,0 +1,10 @@
+{
+    "profiling_data": "profiling/aggregate_profiled.csv",
+    "trace_path": "traces/azure",
+    "model_allocation": "ilp",
+    "job_scheduling": "canary_routing",
+    "batching": "accscale",
+    "beta": 1.0,
+    "fixed_seed": true,
+    "seed": 10
+}
