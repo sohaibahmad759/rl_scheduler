@@ -108,67 +108,68 @@ class Simulator:
         logging.basicConfig(level=logging.INFO)
 
         idx = 0
-        if not trace_path is None:
-            logging.info('Reading trace files from: ' + trace_path)
+
+        if trace_path is None:
+            raise SimulatorException(f'No trace file provided. trace_path: {trace_path}')
             
-            if 'ilp' in model_assignment:
-                variant_list_path = os.path.join(trace_path, '..', 'model_variants')
-                # # The following lines are used to get a static solution for Clipper
-                # variant_list_path = os.path.join(trace_path, '..', 'model_variants_clipper_highacc')
-                # print(f'simulator: Using clipper model variants for debugging only')
-                # time.sleep(5)
-            elif model_assignment == 'clipper':
-                variant_list_path = os.path.join(trace_path, '..', 'model_variants_clipper_lowacc')
-            elif 'infaas' in model_assignment:
-                variant_list_path = os.path.join(trace_path, '..', 'model_variants')
+        logging.info(f'Reading trace files from: {trace_path}')
+        
+        if 'ilp' in model_assignment:
+            variant_list_path = os.path.join(trace_path, '..', 'model_variants')
+            # # The following lines are used to get a static solution for Clipper
+            # variant_list_path = os.path.join(trace_path, '..', 'model_variants_clipper_highacc')
+            # print(f'simulator: Using clipper model variants for debugging only')
+            # time.sleep(5)
+        elif model_assignment == 'clipper':
+            variant_list_path = os.path.join(trace_path, '..', 'model_variants_clipper_lowacc')
+        elif 'infaas' in model_assignment:
+            variant_list_path = os.path.join(trace_path, '..', 'model_variants')
+        else:
+            raise SimulatorException(f'simulator: No valid model assignment algorithm '
+                                     f'selected, exiting.')
+
+        trace_files = sorted(os.listdir(trace_path))
+
+        for file in trace_files:
+            filename = file.split('/')[-1]
+            if len(filename.split('.')) == 1:
+                # it is a directory
+                continue
+            isi_name, extension = filename.split('.')
+            if not extension == 'txt':
+                continue
+            logging.info('Filename: ' + file)
+
+            variant_list_filename = os.path.join(variant_list_path, isi_name)
+            logging.info('Variant list filename:' + variant_list_filename)
+
+            model_variant_list = self.read_variants_from_file(variant_list_filename)
+            self.set_model_variants(isi_name, model_variant_list)
+
+            self.initialize_model_variant_loadtimes(isi_name)
+
+            self.add_executor(isi_name, self.job_sched_algo, runtimes={},
+                                model_variant_runtimes={}, model_variant_loadtimes={},
+                                max_acc_per_type=self.max_acc_per_type, simulator=self)
+            self.idx_to_executor[idx] = isi_name
+            self.isi_to_idx[isi_name] = idx
+            self.failed_requests_arr.append(0)
+            self.successful_requests_arr.append(0)
+            self.total_requests_arr.append(0)
+            idx += 1
+
+            if self.store_file_pointers:
+                readfile = open(os.path.join(trace_path, file), mode='r')
+                self.trace_files[isi_name] = readfile
+                self.add_requests_from_trace_pointer(
+                    isi_name, readfile, read_until=10000)
             else:
-                print(f'simulator: No valid model assignment algorithm selected, exiting.')
-                exit(0)
-
-            trace_files = sorted(os.listdir(trace_path))
-
-            for file in trace_files:
-                filename = file.split('/')[-1]
-                if len(filename.split('.')) == 1:
-                    # it is a directory
-                    continue
-                isi_name, extension = filename.split('.')
-                if not extension == 'txt':
-                    continue
-                logging.info('Filename: ' + file)
-
-                variant_list_filename = os.path.join(variant_list_path, isi_name)
-                logging.info('Variant list filename:' + variant_list_filename)
-
-                model_variant_list = self.read_variants_from_file(variant_list_filename)
-                self.set_model_variants(isi_name, model_variant_list)
-
-                # self.initialize_dummy_runtimes(
-                #     isi_name, random_runtimes=random_runtimes)
-                self.initialize_model_variant_loadtimes(isi_name)
-
-                self.add_executor(isi_name, self.job_sched_algo, runtimes={},
-                                    model_variant_runtimes={}, model_variant_loadtimes={},
-                                    max_acc_per_type=self.max_acc_per_type, simulator=self)
-                self.idx_to_executor[idx] = isi_name
-                self.isi_to_idx[isi_name] = idx
-                self.failed_requests_arr.append(0)
-                self.successful_requests_arr.append(0)
-                self.total_requests_arr.append(0)
-                idx += 1
-
-                if self.store_file_pointers:
-                    readfile = open(os.path.join(trace_path, file), mode='r')
-                    self.trace_files[isi_name] = readfile
-                    self.add_requests_from_trace_pointer(
-                        isi_name, readfile, read_until=10000)
-                else:
-                    start = time.time()
-                    self.add_requests_from_trace(
-                        isi_name, os.path.join(trace_path, file))
-                    end = time.time()
-                    logging.debug(
-                        'Time to add trace file: {} seconds'.format(end - start))
+                start = time.time()
+                self.add_requests_from_trace(
+                    isi_name, os.path.join(trace_path, file))
+                end = time.time()
+                logging.debug(
+                    'Time to add trace file: {} seconds'.format(end - start))
         
         self.initialize_model_variant_runtimes()
 
@@ -251,7 +252,7 @@ class Simulator:
                     model_variants.append(model_variant)
                     self.model_variant_accuracies[(isi_name, model_variant)] = accuracy
         else:
-            logging.error('read_variants_from_file: no path {} found!'.format(filename))
+            raise SimulatorException(f'read_variants_from_file: no path {filename} found!')
         return model_variants
 
 
@@ -467,10 +468,9 @@ class Simulator:
 
         print(f'Total profiled entries: {profiled.shape[0]}')
         print(f'Total expected entries: {(22*4*3)}')
-        # time.sleep(10)
 
         self.model_variant_runtimes = {1: self.cpu_variant_runtimes, 2: self.gpu_variant_runtimes,
-                                        3: self.vpu_variant_runtimes, 4: self.fpga_variant_runtimes}
+                                       3: self.vpu_variant_runtimes, 4: self.fpga_variant_runtimes}
         return
 
     def set_largest_batch_sizes(self):
@@ -504,7 +504,6 @@ class Simulator:
                     max_batch_size_dict[(acc_type, model_variant)] = max_batch_size
                     print(f'({acc_type}, {model_variant}): {max_batch_size}')
         print(f'len(largest_batch_sizes): {len(max_batch_size_dict)}')
-        # time.sleep(10)
         self.largest_batch_sizes = max_batch_size_dict
         return
     
@@ -539,22 +538,23 @@ class Simulator:
             return 'GPU_PASCAL'
         elif element == 'onnxruntime_cpu':
             return 'CPU'
-        # Modify the 
         elif '.onnx' in element:
             return element.rstrip('.onnx').split('_')[0]
         else:
             return element
 
     def get_isi_from_variant_name(self, model_variant):
-        ''' Works for the following models: ResNet, ResNest, EfficientNet,
-        MobileNet, DenseNet
+        ''' Gets ISI name from the variant name based on filename
         '''
-        if 'efficientnet' in model_variant:
-            return model_variant.split('-')[0]
-        elif 'mobilenet' in model_variant:
-            return model_variant.split('.')[0].rstrip(string.digits)
-        else:
-            return model_variant.rstrip(string.digits)
+        if '_v1' in model_variant:
+            model_variant = model_variant.split('_')[0]
+            
+        for element in self.model_variant_accuracies:
+            (isi_name, variant) = element
+            if model_variant == variant:
+                return isi_name
+
+        raise SimulatorException(f'isi_name not found. model variant: {model_variant}')
 
     def import_profiled_data(self):
         ''' Reads and parses the profiled latency data
@@ -566,7 +566,7 @@ class Simulator:
         profiled = profiled.applymap(self.replace_profiled_strings)
         
         pd.set_option('display.max_columns', None)
-        logging.debug(f'profiled data: {profiled}')
+        logging.info(f'profiled data: {profiled}')
         
         return profiled
 

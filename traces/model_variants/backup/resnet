@@ -1,0 +1,5 @@
+resnet18,70.93
+resnet34,74.37
+resnet50,77.36
+resnet101,78.34
+resnet152,79.22

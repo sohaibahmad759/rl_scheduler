@@ -3,6 +3,7 @@
 
 import glob
 import pandas as pd
+import pprint
 
 def normalize_accuracy(accuracy_dict: dict, model_families: list[str]):
     '''
@@ -14,6 +15,8 @@ def normalize_accuracy(accuracy_dict: dict, model_families: list[str]):
         max_acc = 0
         for model in accuracy_dict:
             if model_family in model:
+                if model_family == 't5' and ('resnet' in model or 'resnest' in model):
+                    continue
                 accuracy = accuracy_dict[model]
                 max_acc = max(max_acc, accuracy)
         for model in accuracy_dict:
@@ -33,7 +36,7 @@ readfiles = sorted(glob.glob(f'{input_folder}/*.csv'))
 
 wf = open('aggregate_profiled.csv', mode='w')
 
-header = 'Model,Accelerator,Trials,Batch_size,50th_pct,90th_pct,Average,Min,Max,Accuracy,Normalized_Accuracy'
+header = 'Model,Accel,Trials,batchsize,50th_pct,90th_pct,avg_latency(ms),Min,Max,Accuracy,Normalized_Accuracy'
 wf.write(header + '\n')
 
 print(readfiles)

@@ -1,5 +1,5 @@
-efficientnet-b0,77.1
-efficientnet-b1,79.1
-efficientnet-b3,81.6
-efficientnet-b5,83.6
-efficientnet-b7,84.3
+efficientnet-b0,91.45907473
+efficientnet-b1,93.83155397
+efficientnet-b3,96.79715302
+efficientnet-b5,99.16963227
+efficientnet-b7,100

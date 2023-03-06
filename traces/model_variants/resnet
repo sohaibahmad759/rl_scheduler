@@ -1,5 +1,5 @@
-resnet18,70.93
-resnet34,74.37
-resnet50,77.36
-resnet101,78.34
-resnet152,79.22
+resnet18,89.53547084
+resnet34,93.87780863
+resnet50,97.65210805
+resnet101,98.8891694
+resnet152,100
