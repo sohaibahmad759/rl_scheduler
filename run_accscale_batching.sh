@@ -1,1 +1,1 @@
-python test.py -ma 11 -js 6 -r -f 10 -p traces/azure --beta 1.0 --batching --batching_algo 1
+python test.py --config_file configs/accscale_batching.json

@@ -134,12 +134,14 @@ def main(args):
     alpha = float(config['alpha']) if 'alpha' in config else -1
     beta = float(config['beta']) if 'beta' in config else -1
     enable_batching = False if batching_algo == 'disabled' else True
+    profiling_data = config['profiling_data']
 
     env = SchedulingEnv(trace_dir=trace_path, job_sched_algo=job_scheduling,
                         action_group_size=action_group_size, reward_window_length=reward_window_length,
                         random_runtimes=args.random_runtimes, fixed_seed=fixed_seed,
                         allocation_window=allocation_window, model_assignment=model_assignment,
-                        batching=enable_batching, batching_algo=batching_algo)
+                        batching=enable_batching, batching_algo=batching_algo,
+                        profiling_data=profiling_data)
 
     policy_kwargs = dict(net_arch=[128, 128, dict(pi=[128, 128, 128],
                                         vf=[128, 128, 128])])

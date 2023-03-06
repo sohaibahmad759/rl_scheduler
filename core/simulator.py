@@ -20,7 +20,7 @@ class Simulator:
     def __init__(self, job_sched_algo, trace_path=None, mode='training', 
                  max_acc_per_type=0, predictors_max=[10, 10, 10, 10], n_qos_levels=1,
                  random_runtimes=False, fixed_seed=0, batching=False,
-                 model_assignment=None, batching_algo=None):
+                 model_assignment=None, batching_algo=None, profiling_data=None):
         self.clock = 0
         self.event_queue = []
         self.executors = {}
@@ -99,7 +99,7 @@ class Simulator:
         self.largest_batch_sizes = {}
         self.slo_dict = {}
         self.allowed_batch_sizes = [1, 2, 4, 8]
-        self.profiled_filename = 'profiling/blis/batch_size_n.csv'
+        self.profiled_filename = profiling_data
 
         self.model_assignment = model_assignment
 
