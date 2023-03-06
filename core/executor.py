@@ -23,7 +23,9 @@ class Executor:
         self.assigned_requests = {}
         self.iterator = itertools.cycle(self.predictors)
         self.behavior = behavior
-        self.task_assignment = TaskAssignment(task_assignment)
+        job_sched_algos = {'random': 1, 'round_robin': 2, 'eft_fifo': 3,
+                           'lft_fifo': 4, 'infaas': 5, 'canary_routing': 6}
+        self.task_assignment = TaskAssignment(job_sched_algos[task_assignment])
         self.runtimes = runtimes
 
         self.variant_runtimes = variant_runtimes

@@ -1293,8 +1293,8 @@ class Simulator:
     def add_executor(self, isi, job_sched_algo, runtimes=None, model_variant_runtimes=None, 
                         model_variant_loadtimes=None, max_acc_per_type=0, simulator=None):
         executor = Executor(isi, job_sched_algo, self.n_qos_levels, runtimes,
-                                model_variant_runtimes, model_variant_loadtimes,
-                                max_acc_per_type=max_acc_per_type, simulator=simulator)
+                            model_variant_runtimes, model_variant_loadtimes,
+                            max_acc_per_type=max_acc_per_type, simulator=simulator)
         self.executors[executor.isi] = executor
         return executor.id
 

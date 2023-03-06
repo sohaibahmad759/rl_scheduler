@@ -12,6 +12,7 @@ from algorithms.clipper import Clipper
 from algorithms.ilp import Ilp
 from algorithms.ilp_alpha import IlpAlpha
 from algorithms.ilp_throughput import IlpThroughput
+from core.exceptions import ConfigException
 
 
 def getargs():
@@ -19,11 +20,6 @@ def getargs():
     parser.add_argument('--random_runtimes', '-r', required=False,
                         dest='random_runtimes', action='store_true',
                         help='Initializes random runtimes if used. Otherwise, uses static runtimes.')
-    parser.add_argument('--fixed_seed', '-f', required=False,
-                        dest='fixed_seed', default=0,
-                        help='Fix a seed for random behavior.')
-    parser.add_argument('--trace_path', '-p', required=False, default='traces/zipf_static_deadlines/',
-                        dest='trace_path', help='Path for trace files. Default is traces/zipf_static/')
     parser.add_argument('--test_steps', '-t', required=False, default=1000,
                         dest='test_steps', help='Number of steps to test for. Default value is 1000')
     parser.add_argument('--action_size', '-a', required=False, default=10,
@@ -32,105 +28,121 @@ def getargs():
     parser.add_argument('--reward_window_length', '-l', required=False, default=10,
                         dest='reward_window_length', help='The number of steps to look out into the future to ' +
                         'calculate the reward of an action. Default value is 10')
-    parser.add_argument('--model_assignment', '-ma', required=True,
-                        choices=['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13'],
-                        dest='model_asn_algo', help='The model assignment algorithm. Select a number:\n' +
-                        '1 - Random. 2 - Static. 3 - Least Frequently Used (LFU). 4 - Load proportional. ' +
-                        '5 - RL. 6 - RL with warm start (load proportional). 7 - ILP Alpha. 8 - ILP (Max throughput). ' +
-                        '9 - INFaaS. 10 - Clipper. 11 - ILP. 12 - INFaaS (batching, cost=accuracy drop). ' +
-                        '13 - Sommelier')
-    parser.add_argument('--job_scheduling', '-js', required=True, choices=['1', '2', '3', '4', '5', '6'],
-                        dest='job_sched_algo', help='The job scheduling algorithm. Select a number:\n' +
-                        '1 - Random. 2 - Round robin. 3 - Earliest Finish Time with FIFO. ' +
-                        '4 - Latest Finish Time with FIFO. 5 - INFAAS. 6 - Canary Routing')
     parser.add_argument('--allocation_window', '-w', required=False, default=1000,
                         dest='allocation_window', help='Milliseconds to wait before recalculating allocation. Default is 1000')
-    parser.add_argument('--alpha', required=False, default=-1,
-                        dest='alpha', help='alpha parameter for ILP (weightage of throughput vs accuracy). Only needed if MA is ILP')
-    parser.add_argument('--beta', required=False, default=-1,
-                        dest='beta', help='beta parameter for ILP (minimum throughput constraint). Only needed if MA is ILP')
-    parser.add_argument('--batching', required=False, action='store_true',
-                        dest='enable_batching', help='Indicate that batching should be enabled. It is disabled by default')
-    parser.add_argument('--batching_algo', required=False, default='0', choices=['1', '2'],
-                        dest='batching_algo', help='Select the type of batching algorithm to be used. ' +
-                        'Default is AccScale\'s batching algorithm. INFaaS uses its own batching with its job ' +
-                        'scheduling algorithm. Options: 1 - AccScale batching. 2 - AIMD')
-    parser.add_argument('--config_file', required=False)
+    parser.add_argument('--config_file', required=True)
 
     parser.set_defaults(random_runtimes=False, batching=False)
 
     return parser.parse_args()
 
 
-def validate_parameters(model_asn_algos, args):
-    ''' Validates the parameters provided. If invalid, prints reason.
-    '''
-    model_asn_algos = ['random', 'static', 'lfu', 'load_proportional', 'rl', 'rl_warm',
-                       'ilp_alpha', 'ilp_throughput', 'infaas', 'clipper', 'ilp',
-                       'infaas_v2', 'sommelier']
-    model_assignment = model_asn_algos[int(args.model_asn_algo)-1]
+def validate_config(config: dict, filename: str):
+    model_allocation_algos = ['random', 'static', 'lfu', 'load_proportional', 'rl',
+                              'rl_warm', 'ilp_alpha', 'ilp_throughput', 'infaas',
+                              'clipper', 'ilp', 'infaas_v2', 'sommelier']
+    job_sched_algos = ['random', 'round_robin', 'eft_fifo', 'lft_fifo', 'infaas',
+                       'canary_routing']
+    batching_algorithms = ['disabled', 'accscale', 'aimd']
 
-    alpha = float(args.alpha)
-    beta = float(args.beta)
+    if 'profiling_data' not in config:
+        raise ConfigException(f'profiling_data not specified in config file: {filename}')
 
-    if model_assignment == 'ilp_alpha' and alpha == -1:
-        print('Invalid parameters: --alpha flag must be specified when using ILP-Alpha model assignment algorithm')
-        return False
+    if 'trace_path' not in config:
+        raise ConfigException(f'trace_path not specified in config file: {filename}')
 
-    if (model_assignment == 'ilp' or model_assignment == 'ilp_alpha') and beta == -1:
-        print('Invalid parameters: --beta flag must be specified when using ILP model assignment algorithm')
-        return False
+    if 'model_allocation' not in config:
+        raise ConfigException(f'model_allocation algorithm not specified in config '
+                              f'file: {filename}')
 
-    if model_assignment == 'ilp_alpha' and (alpha > 1 or alpha < 0):
-        print('Invalid parameters: --alpha value must be in the range [0,1]')
-        return False
-
-    if (model_assignment == 'ilp' or model_assignment == 'ilp_alpha') and (beta > 1 or beta < 0):
-        print('Invalid parameters: --beta value must be in the range [0,1]')
-        return False
-
-    if args.enable_batching and args.batching_algo == '0':
-        print('Batching enabled but batching algorithm not specified. Use --batching_algo {1,2}')
-        return False
+    if 'job_scheduling' not in config:
+        raise ConfigException(f'job_scheduling algorithm (query assignment) not specified '
+                              f'in config file: {filename}')
     
-    if not(args.enable_batching) and args.batching_algo != '0':
-        print('batching_algo is specified but batching is not enabled. Use --batching to enable batching')
-        return False
+    if 'batching' not in config:
+        raise ConfigException(f'batching algorithm not specified in config file: {filename}'
+                              f'\nPossible choices: {batching_algorithms}')
+
+    model_allocation = config['model_allocation']
+    if model_allocation not in model_allocation_algos:
+        raise ConfigException(f'invalid model_allocation algorithm specified: {model_allocation}. '
+                              f'\nPossible choices: {model_allocation_algos}')
+
+    if (model_allocation == 'ilp' or model_allocation == 'ilp_alpha') and 'beta' not in config:
+        raise ConfigException(f'beta value for ILP model allocation not specified in '
+                              f'config file: {filename}')
+
+    if not(model_allocation == 'ilp' or model_allocation == 'ilp_alpha') and 'beta' in config:
+        raise ConfigException(f'unexpected parameter beta specificed in config: {filename}'
+                              f'beta is only needed for ILP or ILP-Alpha')
+
+    if 'beta' in config and 1 > float(config['beta']) < 0:
+        raise ConfigException(f'invalid value for beta parameter: {config["beta"]}'
+                              f'Expected a value between 0 and 1')
     
-    return True
+    if model_allocation == 'ilp_alpha' and 'alpha' not in config:
+        raise ConfigException(f'alpha value for ILP-alpha model allocation not specified '
+                              f'in config file: {filename}')
+    
+    if model_allocation != 'ilp_alpha' and 'alpha' in config:
+        raise ConfigException(f'unexpected parameter alpha specificed in config: {filename}'
+                              f'alpha is only needed for ILP-Alpha')
+    
+    if 'alpha' in config and 1 > float(config['alpha']) < 0:
+        raise ConfigException(f'invalid value for alpha parameter: {config["alpha"]}'
+                              f'Expected a value between 0 and 1')
+
+    job_scheduling = config['job_scheduling']
+    if job_scheduling not in job_sched_algos:
+        raise ConfigException(f'invalid job_scheduling algorithm specified: {job_scheduling}. '
+                              f'\nPossible choices: {job_sched_algos}')
+
+    batching = config['batching']
+    if batching not in batching_algorithms:
+        raise ConfigException(f'invalid batching algorithm specified: {batching}. '
+                              f'\nPossible choices: {model_allocation_algos}')
+    
+    if 'fixed_seed' in config:
+        if 'seed' not in config:
+            raise ConfigException(f'fixed_seed is set to true but seed value is not '
+                                  f'specified in config: {filename}')
+    else:
+        if 'seed' in config:
+            raise ConfigException(f'unexpected parameter seed specified in config: '
+                                  f'{filename} Seed is only expected when fixed_seed '
+                                  f'is true in config')
 
 
 def main(args):
     model_training_steps = 8000
     testing_steps = int(args.test_steps)
-    fixed_seed = int(args.fixed_seed)
     action_group_size = int(args.action_size)
     reward_window_length = args.reward_window_length
     allocation_window = int(args.allocation_window)
-    alpha = float(args.alpha)
-    beta = float(args.beta)
-    # config = json.loads(args.config_file)
 
-    model_asn_algos = ['random', 'static', 'lfu', 'load_proportional', 'rl', 'rl_warm',
-                        'ilp_alpha', 'ilp_throughput', 'infaas', 'clipper', 'ilp',
-                        'infaas_v2', 'sommelier']
-    model_assignment = model_asn_algos[int(args.model_asn_algo)-1]
+    with open(args.config_file) as cf:
+        config = json.load(cf)
 
-    batching_algos = ['accscale', 'aimd']
-    batching_algo = batching_algos[int(args.batching_algo)-1]
-    
-    if validate_parameters(model_asn_algos, args) is False:
-        sys.exit(0)
+    validate_config(config=config, filename=args.config_file)
 
-    env = SchedulingEnv(trace_dir=args.trace_path, job_sched_algo=int(args.job_sched_algo),
+    model_assignment = config['model_allocation']
+    job_scheduling = config['job_scheduling']
+    batching_algo = config['batching']
+
+    trace_path = config['trace_path']
+    fixed_seed = int(config['seed']) if 'seed' in config else 0
+    alpha = float(config['alpha']) if 'alpha' in config else -1
+    beta = float(config['beta']) if 'beta' in config else -1
+    enable_batching = False if batching_algo == 'disabled' else True
+
+    env = SchedulingEnv(trace_dir=trace_path, job_sched_algo=job_scheduling,
                         action_group_size=action_group_size, reward_window_length=reward_window_length,
                         random_runtimes=args.random_runtimes, fixed_seed=fixed_seed,
                         allocation_window=allocation_window, model_assignment=model_assignment,
-                        batching=args.enable_batching, batching_algo=batching_algo)
+                        batching=enable_batching, batching_algo=batching_algo)
 
     policy_kwargs = dict(net_arch=[128, 128, dict(pi=[128, 128, 128],
                                         vf=[128, 128, 128])])
-    # model = PPO('MlpPolicy', env, verbose=2)
     if 'rl' in model_assignment:
         model_name = 'train_' + str(model_training_steps) + '_action_size_' + str(action_group_size) + \
                         '_window_' + str(reward_window_length)
