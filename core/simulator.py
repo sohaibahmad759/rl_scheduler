@@ -11,6 +11,7 @@ from hashlib import new
 from pyexpat import model
 from core.common import Event, EventType
 from core.executor import Executor, AccType
+from core.exceptions import SimulatorException
 
 MAX_CLOCK_VALUE = 1439934
 MAX_CLOCK_VALUE = 0
@@ -125,8 +126,8 @@ class Simulator:
         elif 'infaas' in model_assignment:
             variant_list_path = os.path.join(trace_path, '..', 'model_variants')
         else:
-            raise SimulatorException(f'simulator: No valid model assignment algorithm '
-                                     f'selected, exiting.')
+            raise SimulatorException(f'Selected model assignment algorithm {model_assignment} '
+                                     f'is not valid')
 
         trace_files = sorted(os.listdir(trace_path))
 
@@ -243,6 +244,7 @@ class Simulator:
     def read_variants_from_file(self, filename):
         model_variants = []
         isi_name = filename.split('/')[-1]
+        print(f'filename: {filename}')
         if os.path.exists(filename):
             with open(filename, mode='r') as rf:
                 for line in rf.readlines():
@@ -252,7 +254,7 @@ class Simulator:
                     model_variants.append(model_variant)
                     self.model_variant_accuracies[(isi_name, model_variant)] = accuracy
         else:
-            raise SimulatorException(f'read_variants_from_file: no path {filename} found!')
+            raise SimulatorException(f'path not found: {filename}')
         return model_variants
 
 

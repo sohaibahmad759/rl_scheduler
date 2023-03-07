@@ -918,7 +918,8 @@ class Executor:
                     batch_size = _predictor.get_infaas_batch_size()
                     # peak_throughput = math.floor(1000 /  _predictor.profiled_latencies[(event.desc, 
                     #                                 event.qos_level)])
-                    profiled_latency = _predictor.profiled_latencies[(_predictor.variant_name, batch_size)]
+                    executor_isi = _predictor.executor.isi
+                    profiled_latency = _predictor.profiled_latencies[(executor_isi, _predictor.variant_name, batch_size)]
                     # peak_throughput = math.floor(batch_size * 1000 /  _predictor.profiled_latencies[(event.desc, 
                     #                                 event.qos_level)])
                     queued_requests = len(_predictor.request_dict)

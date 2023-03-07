@@ -43,7 +43,7 @@ def validate_config(config: dict, filename: str):
                               'clipper', 'ilp', 'infaas_v2', 'sommelier']
     job_sched_algos = ['random', 'round_robin', 'eft_fifo', 'lft_fifo', 'infaas',
                        'canary_routing']
-    batching_algorithms = ['disabled', 'accscale', 'aimd']
+    batching_algorithms = ['disabled', 'accscale', 'aimd', 'infaas']
 
     if 'profiling_data' not in config:
         raise ConfigException(f'profiling_data not specified in config file: {filename}')
