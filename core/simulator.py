@@ -115,25 +115,7 @@ class Simulator:
             raise SimulatorException(f'No trace file provided. trace_path: {trace_path}')
             
         logging.info(f'Reading trace files from: {trace_path}')
-
-        variant_list_path = allowed_variants_path
-        
-        # if 'ilp' in model_assignment:
-        #     variant_list_path = os.path.join(trace_path, '..', 'model_variants')
-        #     # # The following lines are used to get a static solution for Clipper
-        #     # variant_list_path = os.path.join(trace_path, '..', 'model_variants_clipper_highacc')
-        #     # print(f'simulator: Using clipper model variants for debugging only')
-        #     # time.sleep(5)
-        # elif model_assignment == 'clipper':
-        #     variant_list_path = os.path.join(trace_path, '..', 'model_variants_clipper_lowacc')
-        # elif 'infaas' in model_assignment:
-        #     variant_list_path = os.path.join(trace_path, '..', 'model_variants')
-        # else:
-        #     raise SimulatorException(f'Selected model assignment algorithm {model_assignment} '
-        #                              f'is not valid')
-
         trace_files = sorted(os.listdir(trace_path))
-
         for file in trace_files:
             filename = file.split('/')[-1]
             if len(filename.split('.')) == 1:
@@ -144,7 +126,7 @@ class Simulator:
                 continue
             logging.info('Filename: ' + file)
 
-            variant_list_filename = os.path.join(variant_list_path, isi_name)
+            variant_list_filename = os.path.join(allowed_variants_path, isi_name)
             logging.info('Variant list filename:' + variant_list_filename)
 
             model_variant_list = self.read_variants_from_file(variant_list_filename)
@@ -425,6 +407,9 @@ class Simulator:
         isi_list = []
         for idx in range(profiled.shape[0]):
             model_variant = model_variants[idx]
+            if model_variant not in sum(self.model_variants.values(), []):
+                # the model variant is profiled but not in allowed_variants from config
+                continue
             isi_name = self.get_isi_from_variant_name(model_variant)
             if isi_name not in isi_list:
                 isi_list.append(isi_name)
@@ -849,7 +834,9 @@ class Simulator:
                     executor = variant_to_executor[model_variant]
                     executor.add_predictor(acc_type=AccType(acc_type), variant_name=model_variant)
                     self.available_predictors[acc_type-1] -= 1
-                    print('added predictor of type {} for model variant {}'.format(acc_type, model_variant))
+                    print(f'added predictor of type {acc_type} for model variant '
+                          f'{model_variant} at isi: {executor.isi}, id: {executor.id}')
+                    print(f'isi {executor.isi} now has following predictors: {executor.predictors}')
                     added += 1
                 if (self.available_predictors[acc_type-1]) < 0:
                     print('Error! Available predictors {} for type {}'.format(self.available_predictors[acc_type-1], acc_type))

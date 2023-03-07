@@ -3,12 +3,11 @@ from algorithms.base import SchedulingAlgorithm
 
 
 class Clipper(SchedulingAlgorithm):
-    def __init__(self, simulator):
+    def __init__(self, simulator, solution_file):
         SchedulingAlgorithm.__init__(self, 'Clipper')
 
         self.simulator = simulator
-        self.solution_file = 'algorithms/clipper_solutions/clipper_lowload_highacc.txt'
-        self.solution_file = 'algorithms/clipper_solutions/clipper_production_lowacc.txt'
+        self.solution_file = solution_file
         self.solution_applied = False
 
         return

@@ -132,6 +132,7 @@ class Executor:
 
     
     def remove_predictor_by_id(self, id):
+        time.sleep(10)
         if id in self.predictors:
             predictor_type = self.predictors[id].acc_type
             predictor_qos = self.predictors[id].qos_level
@@ -148,6 +149,7 @@ class Executor:
         ''' If predictor of given type exists, remove it and return True.
             Otherwise, return False.
         '''
+        time.sleep(10)
         for id in self.predictors:
             predictor_type = self.predictors[id].acc_type
             predictor_qos = self.predictors[id].qos_level
@@ -849,14 +851,16 @@ class Executor:
         appropriate predictor. The predictor will dequeue the request and process it
         with a batch of requests.
         '''
-        logging.info(f'enqueuing request for isi: {event.desc}')
+        logging.info(f'enqueuing request for isi: {event.desc}, arrived at: {self.isi}, id: {self.id}')
+
+        print(f'self.predictors: {self.predictors}')
 
         if len(self.predictors) == 0:
             self.add_predictor()
 
         if self.task_assignment == TaskAssignment.CANARY:
-            logging.debug(f'Canary routing table, keys: {list(self.canary_routing_table.keys())}, '
-                  f'weights: {list(self.canary_routing_table.values())}, isi: {self.isi}')
+            logging.info(f'Canary routing table, keys: {list(self.canary_routing_table.keys())}, '
+                         f'weights: {list(self.canary_routing_table.values())}, isi: {self.isi}')
 
             selected_variant = random.choices(list(self.canary_routing_table.keys()),
                                     weights=list(self.canary_routing_table.values()),
@@ -874,7 +878,7 @@ class Executor:
             # So instead of evenly spreading out the requests, it would make more
             # sense to spread requests proportionally
 
-            logging.debug(f'self.predictors: {self.predictors}')
+            logging.info(f'self.predictors names: {list(map(lambda x: x[1].variant_name, self.predictors.items()))}')
             variants_dict = dict(filter(lambda x: x[1].variant_name == selected_variant,
                                         self.predictors.items()))
             variants = list(variants_dict.keys())

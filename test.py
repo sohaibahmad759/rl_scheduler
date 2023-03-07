@@ -82,6 +82,10 @@ def validate_config(config: dict, filename: str):
         raise ConfigException(f'unexpected parameter beta specificed in config: {filename}'
                               f'beta is only needed for ILP or ILP-Alpha')
 
+    if (model_allocation == 'clipper' or model_allocation == 'sommelier') and 'static_allocation' not in config:
+        raise ConfigException(f'expected static_allocation file path for model allocation '
+                              f'algorithm: {model_allocation}, in config: {filename}')
+
     if 'beta' in config and 1 > float(config['beta']) < 0:
         raise ConfigException(f'invalid value for beta parameter: {config["beta"]}'
                               f'Expected a value between 0 and 1')
@@ -189,7 +193,7 @@ def main(args):
     elif model_assignment == 'infaas_v2':
         print('Testing with INFaaS model assignment policy (batching, cost=accuracy drop)')
     elif model_assignment == 'clipper':
-        clipper = Clipper(simulator=env.simulator)
+        clipper = Clipper(simulator=env.simulator, solution_file=config['static_allocation'])
         print('Testing with Clipper model assignment policy')
     elif model_assignment == 'sommelier':
         ilp = Ilp(allocation_window=allocation_window, beta=beta,
@@ -424,6 +428,7 @@ def main(args):
             action = env.action_space.sample()
             action[0] = 0
             action[1:5] = observation[0, 0:4]
+            print(f'from test.py: action: {action}')
             # time.sleep(2)
 
         if i % 100 == 0:
