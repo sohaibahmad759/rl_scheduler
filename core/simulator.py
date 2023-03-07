@@ -21,7 +21,8 @@ class Simulator:
     def __init__(self, job_sched_algo, trace_path=None, mode='training', 
                  max_acc_per_type=0, predictors_max=[10, 10, 10, 10], n_qos_levels=1,
                  random_runtimes=False, fixed_seed=0, batching=False,
-                 model_assignment=None, batching_algo=None, profiling_data=None):
+                 model_assignment=None, batching_algo=None, profiling_data=None,
+                 allowed_variants_path=None):
         self.clock = 0
         self.event_queue = []
         self.executors = {}
@@ -114,20 +115,22 @@ class Simulator:
             raise SimulatorException(f'No trace file provided. trace_path: {trace_path}')
             
         logging.info(f'Reading trace files from: {trace_path}')
+
+        variant_list_path = allowed_variants_path
         
-        if 'ilp' in model_assignment:
-            variant_list_path = os.path.join(trace_path, '..', 'model_variants')
-            # # The following lines are used to get a static solution for Clipper
-            # variant_list_path = os.path.join(trace_path, '..', 'model_variants_clipper_highacc')
-            # print(f'simulator: Using clipper model variants for debugging only')
-            # time.sleep(5)
-        elif model_assignment == 'clipper':
-            variant_list_path = os.path.join(trace_path, '..', 'model_variants_clipper_lowacc')
-        elif 'infaas' in model_assignment:
-            variant_list_path = os.path.join(trace_path, '..', 'model_variants')
-        else:
-            raise SimulatorException(f'Selected model assignment algorithm {model_assignment} '
-                                     f'is not valid')
+        # if 'ilp' in model_assignment:
+        #     variant_list_path = os.path.join(trace_path, '..', 'model_variants')
+        #     # # The following lines are used to get a static solution for Clipper
+        #     # variant_list_path = os.path.join(trace_path, '..', 'model_variants_clipper_highacc')
+        #     # print(f'simulator: Using clipper model variants for debugging only')
+        #     # time.sleep(5)
+        # elif model_assignment == 'clipper':
+        #     variant_list_path = os.path.join(trace_path, '..', 'model_variants_clipper_lowacc')
+        # elif 'infaas' in model_assignment:
+        #     variant_list_path = os.path.join(trace_path, '..', 'model_variants')
+        # else:
+        #     raise SimulatorException(f'Selected model assignment algorithm {model_assignment} '
+        #                              f'is not valid')
 
         trace_files = sorted(os.listdir(trace_path))
 

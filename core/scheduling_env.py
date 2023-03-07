@@ -15,7 +15,7 @@ class SchedulingEnv(gym.Env):
     def __init__(self, trace_dir, job_sched_algo, action_group_size,
                  reward_window_length=10, random_runtimes=False, fixed_seed=0,
                  allocation_window=1000, model_assignment='', batching=False,
-                 batching_algo=None, profiling_data=None):
+                 batching_algo=None, profiling_data=None, allowed_variants_path=None):
         super(SchedulingEnv, self).__init__()
 
         logging.basicConfig(level=logging.INFO)
@@ -53,7 +53,8 @@ class SchedulingEnv(gym.Env):
                                    batching=batching,
                                    model_assignment=model_assignment,
                                    batching_algo=batching_algo,
-                                   profiling_data=profiling_data)
+                                   profiling_data=profiling_data,
+                                   allowed_variants_path=allowed_variants_path)
 
         # number of steps that we play into the future to get reward
         # Note: this is a tunable parameter

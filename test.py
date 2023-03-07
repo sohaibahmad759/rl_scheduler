@@ -63,6 +63,12 @@ def validate_config(config: dict, filename: str):
         raise ConfigException(f'batching algorithm not specified in config file: {filename}'
                               f'\nPossible choices: {batching_algorithms}')
 
+    if 'allowed_variants' not in config:
+        raise ConfigException(f'allowed_variants not specified in config file: {filename}')
+
+    if not(os.path.exists(config['allowed_variants'])):
+        raise ConfigException(f'allowed_variants path not found: {config["allowed_variants"]}')
+
     model_allocation = config['model_allocation']
     if model_allocation not in model_allocation_algos:
         raise ConfigException(f'invalid model_allocation algorithm specified: {model_allocation}. '
@@ -135,13 +141,14 @@ def main(args):
     beta = float(config['beta']) if 'beta' in config else -1
     enable_batching = False if batching_algo == 'disabled' else True
     profiling_data = config['profiling_data']
+    allowed_variants_path = config['allowed_variants']
 
     env = SchedulingEnv(trace_dir=trace_path, job_sched_algo=job_scheduling,
                         action_group_size=action_group_size, reward_window_length=reward_window_length,
                         random_runtimes=args.random_runtimes, fixed_seed=fixed_seed,
                         allocation_window=allocation_window, model_assignment=model_assignment,
                         batching=enable_batching, batching_algo=batching_algo,
-                        profiling_data=profiling_data)
+                        profiling_data=profiling_data, allowed_variants_path=allowed_variants_path)
 
     policy_kwargs = dict(net_arch=[128, 128, dict(pi=[128, 128, 128],
                                         vf=[128, 128, 128])])

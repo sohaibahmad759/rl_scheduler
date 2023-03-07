@@ -1,6 +1,7 @@
 {
     "profiling_data": "profiling/aggregate_profiled.csv",
     "trace_path": "traces/azure",
+    "allowed_variants": "traces/model_variants",
     "model_allocation": "ilp",
     "job_scheduling": "canary_routing",
     "batching": "accscale",
