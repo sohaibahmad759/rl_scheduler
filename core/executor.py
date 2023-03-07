@@ -605,6 +605,8 @@ class Executor:
 
                 model_variants = dict(filter(lambda x: x[0][0]==self.isi, predictor.profiled_latencies.items()))
                 print(f'self.isi: {self.isi}, model_variants: {model_variants}')
+                # if 'resnet' in self.isi:
+                #     time.sleep(5)
                 cost_upgrade = np.inf
                 upgrade_needed = None
                 type_needed = None
@@ -914,14 +916,11 @@ class Executor:
                 # If there is any predictor that can meet request
                 for key in accuracy_filtered_predictors:
                     _predictor = self.predictors[key]
-                    print(f'infaas predictor profiled latencies: {_predictor.profiled_latencies}')
+                    # print(f'infaas predictor profiled latencies: {_predictor.profiled_latencies}')
                     batch_size = _predictor.get_infaas_batch_size()
-                    # peak_throughput = math.floor(1000 /  _predictor.profiled_latencies[(event.desc, 
-                    #                                 event.qos_level)])
                     executor_isi = _predictor.executor.isi
                     profiled_latency = _predictor.profiled_latencies[(executor_isi, _predictor.variant_name, batch_size)]
-                    # peak_throughput = math.floor(batch_size * 1000 /  _predictor.profiled_latencies[(event.desc, 
-                    #                                 event.qos_level)])
+                    peak_throughput = math.floor(batch_size * 1000 / profiled_latency)
                     queued_requests = len(_predictor.request_dict)
 
                     logging.info(f'Throughput: {peak_throughput}')
@@ -931,10 +930,6 @@ class Executor:
                         infaas_candidates.append(_predictor)
                     else:
                         continue
-                
-                # We have now found a list of candidate predictors that match both accuracy
-                # and deadline of the request, sorted by load
-                infaas_candidates.sort(key=lambda x: x.load)
 
                 # for candidate in infaas_candidates:
                 #     print('infaas candidate:' + str(candidate) + ', load:' + str(candidate.load))
@@ -942,6 +937,10 @@ class Executor:
                 # time.sleep(5)
 
                 if len(infaas_candidates) > 0:
+                    # We have now found a list of candidate predictors that match
+                    # both accuracy and deadline of the request, sorted by load
+                    infaas_candidates.sort(key=lambda x: x.load)
+
                     # Select the least loaded candidate
                     predictor = infaas_candidates[0]
                     logging.info(f'predictor found: {predictor}')

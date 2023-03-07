@@ -548,8 +548,8 @@ class Simulator:
     def get_isi_from_variant_name(self, model_variant):
         ''' Gets ISI name from the variant name based on filename
         '''
-        if '_v1' in model_variant:
-            model_variant = model_variant.split('_')[0]
+        # if '_v1' in model_variant:
+        #     model_variant = model_variant.split('_')[0]
             
         for element in self.model_variant_accuracies:
             (isi_name, variant) = element
