@@ -9,6 +9,7 @@ from types import NoneType
 from enum import Enum
 from core.common import Behavior, TaskAssignment
 from core.predictor import AccType, Predictor
+from core.exceptions import SimulatorException
 
 
 class Executor:
@@ -605,8 +606,6 @@ class Executor:
 
                 model_variants = dict(filter(lambda x: x[0][0]==self.isi, predictor.profiled_latencies.items()))
                 print(f'self.isi: {self.isi}, model_variants: {model_variants}')
-                # if 'resnet' in self.isi:
-                #     time.sleep(5)
                 cost_upgrade = np.inf
                 upgrade_needed = None
                 type_needed = None
@@ -687,7 +686,7 @@ class Executor:
 
     
     def trigger_infaas_downscaling(self):
-        logging.info('infaas downscaling not implemented')
+        logging.info('infaas v1 downscaling not implemented')
         # TODO: Each worker determines if the incoming query load can be supported
         #       by removing this instance or downgrading to a cheaper variant (lower
         #       batch size or running on different hardware, perhaps in v2 consider
@@ -851,7 +850,6 @@ class Executor:
         with a batch of requests.
         '''
         logging.info(f'enqueuing request for isi: {event.desc}')
-        # time.sleep(1)
 
         if len(self.predictors) == 0:
             self.add_predictor()
@@ -877,9 +875,6 @@ class Executor:
             # sense to spread requests proportionally
 
             logging.debug(f'self.predictors: {self.predictors}')
-            # variants = list(filter(lambda x: x.variant_name == selected_variant, self.predictors))
-            # variants = list(filter(lambda x: self.predictors[x].variant_name == self.predictors[selected_variant].variant_name,
-            #                         self.predictors))
             variants_dict = dict(filter(lambda x: x[1].variant_name == selected_variant,
                                         self.predictors.items()))
             variants = list(variants_dict.keys())
@@ -895,7 +890,6 @@ class Executor:
             logging.debug(f'Selected predictor id: {selected_predictor_id}')
             selected_predictor = self.predictors[selected_predictor_id]
             logging.debug(f'Selected predictor: {selected_predictor}')
-            # time.sleep(10)
 
             selected_predictor.enqueue_request(event, clock)
             self.assigned_requests[event.id] = selected_predictor
@@ -905,9 +899,7 @@ class Executor:
             print(f'Selecting predictor for batch request processing with INFaaS')
 
             accuracy_filtered_predictors = list(filter(lambda key: self.predictors[key].profiled_accuracy >= event.accuracy, self.predictors))
-            # print(f'accuracy_filtered_predictors: {accuracy_filtered_predictors},'
-            #       f' all predictors for this executor {self.isi}: {self.predictors}')
-            # time.sleep(1)
+
             predictor = None
             infaas_candidates = []
             not_found_reason = 'None'
@@ -916,7 +908,6 @@ class Executor:
                 # If there is any predictor that can meet request
                 for key in accuracy_filtered_predictors:
                     _predictor = self.predictors[key]
-                    # print(f'infaas predictor profiled latencies: {_predictor.profiled_latencies}')
                     batch_size = _predictor.get_infaas_batch_size()
                     executor_isi = _predictor.executor.isi
                     profiled_latency = _predictor.profiled_latencies[(executor_isi, _predictor.variant_name, batch_size)]
@@ -930,11 +921,6 @@ class Executor:
                         infaas_candidates.append(_predictor)
                     else:
                         continue
-
-                # for candidate in infaas_candidates:
-                #     print('infaas candidate:' + str(candidate) + ', load:' + str(candidate.load))
-                # print('infaas candidates:' + str(infaas_candidates))
-                # time.sleep(5)
 
                 if len(infaas_candidates) > 0:
                     # We have now found a list of candidate predictors that match
@@ -960,16 +946,7 @@ class Executor:
                 inactive_candidates = {}
                 checked_variants = set(map(lambda key: self.predictors[key].variant_name, self.predictors))
                 print(f'checked variants: {checked_variants}')
-                # time.sleep(1)
 
-                # print('model variants:' + str(self.model_variants))
-                # print()
-                # print('model variant accuracies:' + str(self.variant_accuracies))
-                # print()
-                # print('model variant runtimes:' + str(self.variant_runtimes))
-                # print()
-                # print('model variant loadtimes:' + str(self.variant_loadtimes))
-                # print()
                 for model_variant in self.model_variants[isi_name]:
                     # If we already checked for this variant
                     if model_variant in checked_variants:
@@ -988,7 +965,6 @@ class Executor:
 
                             if math.isinf(runtime) or largest_batch_size == 0:
                                 print(f'largest_batch_size: {largest_batch_size}, runtime: {runtime}')
-                                # time.sleep(1)
                                 continue
                             
                             loadtime = self.variant_loadtimes[(isi_name, model_variant)]
@@ -997,7 +973,6 @@ class Executor:
                             if total_time < event.deadline:
                                 inactive_candidates[(model_variant, acc_type)] = total_time
                 logging.info(f'inactive candidates: {inactive_candidates}')
-                # time.sleep(1)
 
                 for candidate in inactive_candidates:
                     model_variant, acc_type = candidate
@@ -1006,7 +981,6 @@ class Executor:
                         predictor_id = self.add_predictor(acc_type=acc_type, variant_name=model_variant)
                         predictor = self.predictors[predictor_id]
                         logging.info(f'Predictor {predictor} added from inactive variants')
-                        # time.sleep(1)
                         break
 
             # (Line 8) If we still cannot find one, we try to serve with the closest
@@ -1014,8 +988,6 @@ class Executor:
             if predictor is None:
                 logging.info('No predictor found from inactive variants either')
                 closest_acc_candidates = sorted(self.predictors, key=lambda x: abs(self.predictors[x].profiled_accuracy - event.accuracy))
-                # print('event accuracy:' + str(event.accuracy))
-                # print('closest accuracy candidates:' + str(closest_acc_candidates))
 
                 for candidate in closest_acc_candidates:
                     _predictor = self.predictors[candidate]
@@ -1028,10 +1000,6 @@ class Executor:
 
                     runtime = self.variant_runtimes[acc_type][(isi_name, variant_name, batch_size)]
 
-                    # peak_throughput = math.floor(1000 /  _predictor.profiled_latencies[(event.desc, 
-                    #                                 event.qos_level)])
-                    # peak_throughput = math.floor(1000 /  _predictor.profiled_latencies[(event.desc, 
-                    #                                 _predictor.variant_name, batch_size)])
                     peak_throughput = math.floor(batch_size * 1000 / runtime)
                     queued_requests = len(_predictor.request_dict)
 
@@ -1049,19 +1017,15 @@ class Executor:
                 logging.info(f'infaas: predictor not found. not sure what to do here')
                 closest_acc_candidates = sorted(self.predictors, key=lambda x: abs(self.predictors[x].profiled_accuracy - event.accuracy))
                 predictor = self.predictors[random.choice(closest_acc_candidates)]
-                # time.sleep(1)
-            # else:
 
             logging.info(f'enqueuing request at predictor {predictor}')
-            # time.sleep(1)
             predictor.enqueue_request(event, clock)
             self.assigned_requests[event.id] = predictor
             return
             
         else:
-            logging.error(f'Unrecognized task assignment/job scheduling algorithm '
-                          f'for batch request processing')
-            exit(0)
+            raise SimulatorException(f'Unrecognized task assignment/job scheduling '
+                                     f'algorithm for batch request processing')
 
     
     def apply_routing_table(self, routing_table={}):
