@@ -132,7 +132,6 @@ class Executor:
 
     
     def remove_predictor_by_id(self, id):
-        time.sleep(10)
         if id in self.predictors:
             predictor_type = self.predictors[id].acc_type
             predictor_qos = self.predictors[id].qos_level
@@ -149,7 +148,6 @@ class Executor:
         ''' If predictor of given type exists, remove it and return True.
             Otherwise, return False.
         '''
-        time.sleep(10)
         for id in self.predictors:
             predictor_type = self.predictors[id].acc_type
             predictor_qos = self.predictors[id].qos_level

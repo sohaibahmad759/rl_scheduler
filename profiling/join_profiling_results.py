@@ -45,6 +45,9 @@ for filename in readfiles:
     with open(filename, mode='r') as rf:
         print(f'model_family: {model_family}, accelerator: {accelerator}')
         lines = rf.readlines()
+        lines = list(map(lambda x: x.replace('onnxruntime', accelerator), lines))
+        lines = list(map(lambda x: x.replace('models/', ''), lines))
+        lines = list(map(lambda x: x.replace('.onnx', ''), lines))
         lines = list(map(lambda x: x.replace('PyTorch', accelerator), lines))
         lines = list(map(lambda x: x.replace('cpu', 'onnxruntime_cpu'), lines))
         lines = list(map(lambda x: x.replace('1080ti', 'onnxruntime_gpu_pascal'), lines))

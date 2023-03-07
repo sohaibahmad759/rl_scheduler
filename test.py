@@ -425,11 +425,7 @@ def main(args):
             # time.sleep(2)
         elif model_assignment == 'clipper':
             clipper.apply_solution()
-            action = env.action_space.sample()
-            action[0] = 0
-            action[1:5] = observation[0, 0:4]
-            print(f'from test.py: action: {action}')
-            # time.sleep(2)
+            action = env.simulator.null_action(env.action_space.sample(), 1)
 
         if i % 100 == 0:
             print('Testing step: {} of {}'.format(i, testing_steps))

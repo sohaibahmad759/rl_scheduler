@@ -4,6 +4,7 @@ import uuid
 import numpy as np
 from enum import Enum
 from core.common import TaskAssignment
+from core.exceptions import PredictorException
 
 
 # TODO: the number of accelerator types should be parameterizable
@@ -259,7 +260,9 @@ class Predictor:
                 time.sleep(10)
 
             if self.batch_processing_latency(1, first_request) > first_request.deadline:
-                print(f'Request cannot be processed even with batch size of 1')
+                raise PredictorException(f'Request cannot be processed even with batch size '
+                                         f'of 1. deadline: {first_request.deadline}, processing '
+                                         f'latency: {self.batch_processing_latency(1, first_request)}')
                 time.sleep(10)
 
             max_waiting_time = first_request_expiration - self.batch_processing_latency(batch_size, first_request)

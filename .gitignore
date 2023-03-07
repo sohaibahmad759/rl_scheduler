@@ -2,6 +2,7 @@
 *.bz2
 *.code-workspace
 *.ckpt.*
+*.onnx
 *.pdf
 *.pt
 *.pyc
