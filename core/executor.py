@@ -9,12 +9,17 @@ from types import NoneType
 from enum import Enum
 from core.common import Behavior, TaskAssignment
 from core.predictor import AccType, Predictor
-from core.exceptions import SimulatorException
+from core.exceptions import ExecutorException
 
 
 class Executor:
-    def __init__(self, isi, task_assignment, n_qos_levels=1, behavior=Behavior.BESTEFFORT, runtimes=None,
-                    variant_runtimes=None, variant_loadtimes=None, max_acc_per_type=0, simulator=None):
+    def __init__(self, isi, task_assignment, logging_level, n_qos_levels=1,
+                 behavior=Behavior.BESTEFFORT, runtimes=None, variant_runtimes=None,
+                 variant_loadtimes=None, max_acc_per_type=0, simulator=None):
+        self.log = logging.getLogger(__name__)
+        self.log.setLevel(logging_level)
+        self.logging_level = logging_level
+
         self.id = uuid.uuid4().hex
         self.isi = isi
         self.n_qos_levels = n_qos_levels
@@ -68,9 +73,10 @@ class Executor:
         # print(self.variant_accuracies)
         # time.sleep(5)
 
-        predictor = Predictor(acc_type.value, qos_level=qos_level, profiled_accuracy=profiled_accuracy,
-                                profiled_latencies=profiled_latencies, variant_name=variant_name,
-                                executor=self, simulator=self.simulator)
+        predictor = Predictor(logging_level=self.logging_level, acc_type=acc_type.value,
+                              qos_level=qos_level, profiled_accuracy=profiled_accuracy,
+                              profiled_latencies=profiled_latencies, variant_name=variant_name,
+                              executor=self, simulator=self.simulator)
         self.predictors[predictor.id] = predictor
         self.num_predictor_types[acc_type.value-1 + qos_level*4] += 1
         self.iterator = itertools.cycle(self.predictors)
@@ -104,7 +110,7 @@ class Executor:
         model variants
         '''
         if len(self.model_variants) == 0:
-            print(f'initialize_routing_table: no model variants set for executor {self}')
+            raise ExecutorException(f'initialize_routing_table: no model variants set for executor {self}')
             time.sleep(10)
             return
 
@@ -191,7 +197,7 @@ class Executor:
                 candidate = self.predictors[key]
                 # potential_runtime = candidate.profiled_latencies[(event.desc, event.qos_level)]
                 potential_runtime = candidate.profiled_latencies[(event.desc, candidate.variant_name, 1)]
-                print(f'busy till: {candidate.busy_till}, potential runtime: {potential_runtime}')
+                self.log.debug(f'busy till: {candidate.busy_till}, potential runtime: {potential_runtime}')
                 if candidate.busy:
                     finish_time = candidate.busy_till + potential_runtime
                 else:
@@ -260,7 +266,7 @@ class Executor:
                 # If there is any predictor that can meet request
                 for key in accuracy_filtered_predictors:
                     _predictor = self.predictors[key]
-                    print(f'infaas predictor profiled latencies: {_predictor.profiled_latencies}')
+                    self.log.debug(f'infaas predictor profiled latencies: {_predictor.profiled_latencies}')
                     time.sleep(10)
                     peak_throughput = math.floor(1000 /  _predictor.profiled_latencies[(event.desc, 
                                                     event.qos_level)])
@@ -302,7 +308,7 @@ class Executor:
                 isi_name = event.desc
                 inactive_candidates = {}
                 checked_variants = set(map(lambda key: self.predictors[key].variant_name, self.predictors))
-                print(f'checked variants: {checked_variants}')
+                self.log.debug(f'checked variants: {checked_variants}')
                 # time.sleep(1)
 
                 for model_variant in self.model_variants[isi_name]:
@@ -315,12 +321,12 @@ class Executor:
                             # TODO: this should not just use the batch_size variable from before, especially 1
                             runtime = self.variant_runtimes[predictor_type][(isi_name, model_variant, batch_size)]
 
-                            print(f'infaas, runtime: {runtime}, deadline: {event.deadline}')
+                            self.log.debug(f'infaas, runtime: {runtime}, deadline: {event.deadline}')
 
                             largest_batch_size = self.get_largest_batch_size(model_variant=model_variant, acc_type=acc_type.value)
 
                             if math.isinf(runtime) or largest_batch_size == 0:
-                                print(f'largest_batch_size: {largest_batch_size}, runtime: {runtime}')
+                                self.log.debug(f'largest_batch_size: {largest_batch_size}, runtime: {runtime}')
                                 continue
                             
                             loadtime = self.variant_loadtimes[(isi_name, model_variant)]
@@ -328,7 +334,7 @@ class Executor:
 
                             if total_time < event.deadline:
                                 inactive_candidates[(model_variant, acc_type)] = total_time
-                logging.info(f'inactive candidates: {inactive_candidates}')
+                logging.debug(f'inactive candidates: {inactive_candidates}')
 
                 for candidate in inactive_candidates:
                     model_variant, acc_type = candidate
@@ -336,7 +342,7 @@ class Executor:
                     if self.num_predictor_types[acc_type.value-1 + event.qos_level*4] < self.max_acc_per_type:
                         predictor_id = self.add_predictor(acc_type=acc_type, variant_name=model_variant)
                         predictor = self.predictors[predictor_id]
-                        logging.info(f'Predictor {predictor} added from inactive variants')
+                        logging.debug(f'Predictor {predictor} added from inactive variants')
                         # time.sleep(1)
                         break
 
@@ -372,7 +378,7 @@ class Executor:
             
         if predictor is None:
             # No predictor, there is literally nothing that can be done at this point except to drop request
-            logging.info('No predictor available whatsoever')
+            logging.debug('No predictor available whatsoever')
             assigned = None
             qos_met = False
             return assigned, qos_met, 0
@@ -420,17 +426,17 @@ class Executor:
                 # no need for scaling
                 logging.debug('no need for scaling')
             else:
-                logging.info(f'INFaaS autoscaling triggered at predictor {predictor.id}, '
+                logging.debug(f'INFaaS autoscaling triggered at predictor {predictor.id}, '
                              f'executor {self.isi}')
-                logging.info(f'floor(peak_throughput * infaas_slack): {(math.floor(peak_throughput * infaas_slack))}')
-                logging.info(f'queued requests: {queued_requests}')
+                logging.debug(f'floor(peak_throughput * infaas_slack): {(math.floor(peak_throughput * infaas_slack))}')
+                logging.debug(f'queued requests: {queued_requests}')
 
                 # Now we have two options: (1) replication, (2) upgrading to meet SLO
                 # Calculate the cost for both and choose the cheaper option
 
                 # Option 1: Replication
                 incoming_load = self.simulator.total_requests_arr[self.simulator.isi_to_idx[self.isi]]
-                logging.info('incoming load:' + str(incoming_load))
+                logging.debug(f'incoming load: {incoming_load}')
                 replicas_needed = math.ceil(incoming_load / (peak_throughput * infaas_slack))
 
                 # Option 2: Upgrade
@@ -490,35 +496,31 @@ class Executor:
                 if upgrade_needed <= replicas_needed:
                     type_needed = [cpu_needed, gpu_needed, vpu_needed, fpga_needed].index(upgrade_needed)
 
-                    logging.info('upgrade needed:' + str(upgrade_needed))
-                    logging.info('type needed:' + str(type_needed))
-                    logging.info('available predictors left:' +
-                                 str(self.simulator.available_predictors[type_needed]))
+                    logging.debug(f'upgrade needed: {upgrade_needed}')
+                    logging.debug(f'type needed: {type_needed}')
+                    logging.debug(f'available predictors left: {self.simulator.available_predictors[type_needed]}')
                     # add 'upgrade_needed' predictors of type 'type_needed' or as many as possible
                     while self.simulator.available_predictors[type_needed] > 0 and upgrade_needed > 0:
                         self.add_predictor(acc_type=AccType(type_needed+1))
                         upgrade_needed -= 1
                         self.simulator.available_predictors[type_needed] -= 1
-                    logging.info('upgrade needed:' + str(upgrade_needed))
-                    logging.info('available predictors left:' +
-                                 str(self.simulator.available_predictors[type_needed]))
+                    logging.debug(f'upgrade needed: {upgrade_needed}')
+                    logging.debug(f'available predictors left: {self.simulator.available_predictors[type_needed]}')
                     # time.sleep(2)
                     return
                 else:
                     # add 'replicas_needed' predictors of type 'predictor.acc_type' or as many as possible
                     type_needed = predictor.acc_type
-                    logging.info('replicas needed:' + str(replicas_needed))
-                    logging.info('type needed:' + str(type_needed))
-                    logging.info('available predictors left:' +
-                                 str(self.simulator.available_predictors[type_needed]))
+                    logging.debug(f'replicas needed: {replicas_needed}')
+                    logging.debug(f'type needed: {type_needed}')
+                    logging.debug(f'available predictors left: {self.simulator.available_predictors[type_needed]}')
                     # add 'upgrade_needed' predictors of type 'type_needed' or as many as possible
                     while self.simulator.available_predictors[type_needed] > 0 and replicas_needed > 0:
                         self.add_predictor(acc_type=type_needed)
                         replicas_needed -= 1
                         self.simulator.available_predictors[type_needed] -= 1
-                    logging.info('replicas needed:' + str(upgrade_needed))
-                    logging.info('available predictors left:' +
-                                 str(self.simulator.available_predictors[type_needed]))
+                    logging.debug(f'replicas needed: {replicas_needed}')
+                    logging.debug(f'available predictors left: {self.simulator.available_predictors[type_needed]}')
                     # time.sleep(2)
                     return
 
@@ -535,7 +537,7 @@ class Executor:
         # # (c) Compute the objective for each of these scaling actions 
         # # and pick the one that minimizes the objective cost function
 
-        logging.info('infaas v2 upscaling triggered')
+        logging.debug('infaas v2 upscaling triggered')
 
         for key in self.predictors:
             predictor = self.predictors[key]
@@ -551,13 +553,13 @@ class Executor:
             #       is 0
             if math.floor(peak_throughput * infaas_slack) >= queued_requests:
                 # no need for scaling
-                logging.info(f'no need for upscaling, queued_requests: {queued_requests}')
+                logging.debug(f'no need for upscaling, queued_requests: {queued_requests}')
             else:
-                logging.info(f'INFaaS autoscaling triggered at predictor {predictor.id}, '
+                logging.debug(f'INFaaS autoscaling triggered at predictor {predictor.id}, '
                              f'executor {self.isi}')
-                logging.info(f'peak_throughput: {peak_throughput}')
-                logging.info(f'floor(peak_throughput * infaas_slack): {(math.floor(peak_throughput * infaas_slack))}')
-                logging.info(f'queued requests: {queued_requests}')
+                logging.debug(f'peak_throughput: {peak_throughput}')
+                logging.debug(f'floor(peak_throughput * infaas_slack): {(math.floor(peak_throughput * infaas_slack))}')
+                logging.debug(f'queued requests: {queued_requests}')
 
                 # First we consider batch size increase, which costs 0 to change
                 # Technically it is an upgrade, but we can increase it first and
@@ -575,17 +577,17 @@ class Executor:
 
                 # Option 1: Replication
                 incoming_load = self.simulator.total_requests_arr[self.simulator.isi_to_idx[self.isi]]
-                logging.info(f'incoming load: {incoming_load}')
+                logging.debug(f'incoming load: {incoming_load}')
                 replicas_needed = math.ceil(incoming_load / (peak_throughput * infaas_slack))
 
                 # Replicating this given predictor will have as much cost as the
                 # cost of this predictor, i.e., the accuracy drop of this predictor
 
-                logging.info(f'replicas needed: {replicas_needed}, accuracy drop of '
+                logging.debug(f'replicas needed: {replicas_needed}, accuracy drop of '
                              f'this variant: {predictor.get_infaas_cost()}')
                 # The cost for all replicas of this predictor is the same
                 cost_replication = predictor.get_infaas_cost() * replicas_needed
-                logging.info(f'total cost of replication: {cost_replication}')
+                logging.debug(f'total cost of replication: {cost_replication}')
 
                 # Option 2: Upgrade
                 # Old: We might not upgrade to a model variant with higher accuracy, but we
@@ -605,7 +607,7 @@ class Executor:
                 # the appropriate action
 
                 model_variants = dict(filter(lambda x: x[0][0]==self.isi, predictor.profiled_latencies.items()))
-                print(f'self.isi: {self.isi}, model_variants: {model_variants}')
+                self.log.debug(f'self.isi: {self.isi}, model_variants: {model_variants}')
                 cost_upgrade = np.inf
                 upgrade_needed = None
                 type_needed = None
@@ -643,7 +645,7 @@ class Executor:
                     upgrade_needed_variant = min([cpu_needed, gpu_needed, vpu_needed, fpga_needed])
                     type_needed_variant = [cpu_needed, gpu_needed, vpu_needed, fpga_needed].index(upgrade_needed_variant)
                     cost_upgrade_variant = self.model_variant_infaas_cost(variant_name) * upgrade_needed_variant
-                    logging.info(f'variant: {model_variant}, upgrade_needed_variant: {upgrade_needed_variant},' 
+                    logging.debug(f'variant: {model_variant}, upgrade_needed_variant: {upgrade_needed_variant},' 
                                  f' type_needed_variant: {type_needed_variant}, cost per instance: '
                                  f'{self.model_variant_infaas_cost(variant_name)}')
 
@@ -652,41 +654,41 @@ class Executor:
                         upgrade_needed = upgrade_needed_variant
                         type_needed = type_needed_variant
                         selected_variant = variant_name
-                print(f'selected variant for upgrade: {selected_variant}, cost '
-                      f'of upgrade: {cost_upgrade}')
+                logging.debug(f'selected variant for upgrade: {selected_variant}, cost '
+                              f'of upgrade: {cost_upgrade}')
 
-                logging.info(f'upgrade of type {type_needed} needed: {upgrade_needed},'
+                logging.debug(f'upgrade of type {type_needed} needed: {upgrade_needed},'
                              f'accuracy drop of this variant: {predictor.get_infaas_cost()}')
-                logging.info(f'total cost of upgrade: {cost_upgrade}')
+                logging.debug(f'total cost of upgrade: {cost_upgrade}')
 
                 if cost_upgrade <= cost_replication:
-                    logging.info(f'available predictors left: {self.simulator.available_predictors[type_needed]}')
+                    logging.debug(f'available predictors left: {self.simulator.available_predictors[type_needed]}')
                     # add 'upgrade_needed' predictors of type 'type_needed' or as many as possible
                     while self.simulator.available_predictors[type_needed] > 0 and upgrade_needed > 0:
                         self.add_predictor(acc_type=AccType(type_needed+1), variant_name=selected_variant)
                         upgrade_needed -= 1
                         self.simulator.available_predictors[type_needed] -= 1
-                    logging.info(f'upgrade needed: {upgrade_needed}')
-                    logging.info(f'available predictors left: {self.simulator.available_predictors[type_needed]}')
+                    logging.debug(f'upgrade needed: {upgrade_needed}')
+                    logging.debug(f'available predictors left: {self.simulator.available_predictors[type_needed]}')
                     return
                 else:
                     # add 'replicas_needed' predictors of type 'predictor.acc_type' or as many as possible
                     type_needed = predictor.acc_type - 1
-                    logging.info(f'replicas needed: {replicas_needed}')
-                    logging.info(f'type needed: {type_needed}')
-                    logging.info(f'available predictors left: {self.simulator.available_predictors[type_needed]}')
+                    logging.debug(f'replicas needed: {replicas_needed}')
+                    logging.debug(f'type needed: {type_needed}')
+                    logging.debug(f'available predictors left: {self.simulator.available_predictors[type_needed]}')
                     # add 'upgrade_needed' predictors of type 'type_needed' or as many as possible
                     while self.simulator.available_predictors[type_needed] > 0 and replicas_needed > 0:
                         self.add_predictor(acc_type=type_needed)
                         replicas_needed -= 1
                         self.simulator.available_predictors[type_needed] -= 1
-                    logging.info(f'replicas needed: {upgrade_needed}')
-                    logging.info(f'available predictors left: {self.simulator.available_predictors[type_needed]}')
+                    logging.debug(f'replicas needed: {upgrade_needed}')
+                    logging.debug(f'available predictors left: {self.simulator.available_predictors[type_needed]}')
                     return
 
     
     def trigger_infaas_downscaling(self):
-        logging.info('infaas v1 downscaling not implemented')
+        logging.error('infaas v1 downscaling not implemented')
         # TODO: Each worker determines if the incoming query load can be supported
         #       by removing this instance or downgrading to a cheaper variant (lower
         #       batch size or running on different hardware, perhaps in v2 consider
@@ -695,7 +697,7 @@ class Executor:
     
 
     def trigger_infaas_v2_downscaling(self):
-        logging.info('infaas v2 downscaling triggered')
+        logging.debug('infaas v2 downscaling triggered')
         infaas_slack = self.simulator.infaas_slack
 
         # First find the total load and the capacity of the system
@@ -775,7 +777,7 @@ class Executor:
                     new_throughput = total_peak_throughput - predictor_peak_throughput + cpu_peak_throughput
 
                     if new_throughput * infaas_slack > total_queued_requests:
-                        print(f'removing gpu/fpga predictor and adding cpu/vpu predictor'
+                        self.log.debug(f'removing gpu/fpga predictor and adding cpu/vpu predictor'
                               f' for {predictor.executor.isi}')
                         # time.sleep(1)
                         total_peak_throughput = new_throughput
@@ -849,13 +851,13 @@ class Executor:
         appropriate predictor. The predictor will dequeue the request and process it
         with a batch of requests.
         '''
-        logging.info(f'enqueuing request for isi: {event.desc}, arrived at: {self.isi}, id: {self.id}')
+        logging.debug(f'enqueuing request for isi: {event.desc}, arrived at: {self.isi}, id: {self.id}')
 
         if len(self.predictors) == 0:
             self.add_predictor()
 
         if self.task_assignment == TaskAssignment.CANARY:
-            logging.info(f'Canary routing table, keys: {list(self.canary_routing_table.keys())}, '
+            logging.debug(f'Canary routing table, keys: {list(self.canary_routing_table.keys())}, '
                          f'weights: {list(self.canary_routing_table.values())}, isi: {self.isi}')
 
             selected_variant = random.choices(list(self.canary_routing_table.keys()),
@@ -874,7 +876,7 @@ class Executor:
             # So instead of evenly spreading out the requests, it would make more
             # sense to spread requests proportionally
 
-            logging.info(f'self.predictors names: {list(map(lambda x: x[1].variant_name, self.predictors.items()))}')
+            logging.debug(f'self.predictors names: {list(map(lambda x: x[1].variant_name, self.predictors.items()))}')
             variants_dict = dict(filter(lambda x: x[1].variant_name == selected_variant,
                                         self.predictors.items()))
             variants = list(variants_dict.keys())
@@ -896,7 +898,7 @@ class Executor:
             return
         
         elif self.task_assignment == TaskAssignment.INFAAS:
-            print(f'Selecting predictor for batch request processing with INFaaS')
+            self.log.debug(f'Selecting predictor for batch request processing with INFaaS')
 
             accuracy_filtered_predictors = list(filter(lambda key: self.predictors[key].profiled_accuracy >= event.accuracy, self.predictors))
 
@@ -914,8 +916,8 @@ class Executor:
                     peak_throughput = math.floor(batch_size * 1000 / profiled_latency)
                     queued_requests = len(_predictor.request_dict)
 
-                    logging.info(f'Throughput: {peak_throughput}')
-                    logging.info(f'Queued requests: {queued_requests}')
+                    logging.debug(f'Throughput: {peak_throughput}')
+                    logging.debug(f'Queued requests: {queued_requests}')
                     if peak_throughput > queued_requests:
                         _predictor.set_load(float(queued_requests)/peak_throughput)
                         infaas_candidates.append(_predictor)
@@ -929,15 +931,15 @@ class Executor:
 
                     # Select the least loaded candidate
                     predictor = infaas_candidates[0]
-                    logging.info(f'predictor found: {predictor}')
+                    logging.debug(f'predictor found: {predictor}')
                 else:
                     # There is no candidate that meets deadline
                     not_found_reason = 'latency_not_met'
-                    logging.info(f'predictor not found because latency SLO not met')
+                    logging.debug(f'predictor not found because latency SLO not met')
             else:
                 # There is no predictor that even matches the accuracy requirement of the request
                 not_found_reason = 'accuracy_not_met'
-                logging.info(f'predictor not found because accuracy not met')
+                logging.debug(f'predictor not found because accuracy not met')
             
             # No predictor has been found yet, either because accuracy not met or deadline not met
             if predictor is None:
@@ -945,7 +947,7 @@ class Executor:
                 isi_name = event.desc
                 inactive_candidates = {}
                 checked_variants = set(map(lambda key: self.predictors[key].variant_name, self.predictors))
-                print(f'checked variants: {checked_variants}')
+                self.log.debug(f'checked variants: {checked_variants}')
 
                 for model_variant in self.model_variants[isi_name]:
                     # If we already checked for this variant
@@ -961,10 +963,10 @@ class Executor:
 
                             runtime = self.variant_runtimes[predictor_type][(isi_name, model_variant, largest_batch_size)]
 
-                            print(f'infaas, runtime: {runtime}, deadline: {event.deadline}')
+                            self.log.debug(f'infaas, runtime: {runtime}, deadline: {event.deadline}')
 
                             if math.isinf(runtime) or largest_batch_size == 0:
-                                print(f'largest_batch_size: {largest_batch_size}, runtime: {runtime}')
+                                self.log.debug(f'largest_batch_size: {largest_batch_size}, runtime: {runtime}')
                                 continue
                             
                             loadtime = self.variant_loadtimes[(isi_name, model_variant)]
@@ -972,7 +974,7 @@ class Executor:
 
                             if total_time < event.deadline:
                                 inactive_candidates[(model_variant, acc_type)] = total_time
-                logging.info(f'inactive candidates: {inactive_candidates}')
+                logging.debug(f'inactive candidates: {inactive_candidates}')
 
                 for candidate in inactive_candidates:
                     model_variant, acc_type = candidate
@@ -980,13 +982,13 @@ class Executor:
                     if self.num_predictor_types[acc_type.value-1 + event.qos_level*4] < self.max_acc_per_type:
                         predictor_id = self.add_predictor(acc_type=acc_type, variant_name=model_variant)
                         predictor = self.predictors[predictor_id]
-                        logging.info(f'Predictor {predictor} added from inactive variants')
+                        logging.debug(f'Predictor {predictor} added from inactive variants')
                         break
 
             # (Line 8) If we still cannot find one, we try to serve with the closest
             # possible accuracy and/or deadline
             if predictor is None:
-                logging.info('No predictor found from inactive variants either')
+                logging.debug('No predictor found from inactive variants either')
                 closest_acc_candidates = sorted(self.predictors, key=lambda x: abs(self.predictors[x].profiled_accuracy - event.accuracy))
 
                 for candidate in closest_acc_candidates:
@@ -1003,29 +1005,29 @@ class Executor:
                     peak_throughput = math.floor(batch_size * 1000 / runtime)
                     queued_requests = len(_predictor.request_dict)
 
-                    logging.info(f'Throughput: {peak_throughput}')
-                    logging.info(f'Queued requests: {queued_requests}')
+                    logging.debug(f'Throughput: {peak_throughput}')
+                    logging.debug(f'Queued requests: {queued_requests}')
                     if peak_throughput > queued_requests and runtime <= event.deadline:
                         _predictor.set_load(float(queued_requests)/peak_throughput)
                         predictor = _predictor
-                        logging.info(f'closest predictor {predictor} found')
+                        logging.debug(f'closest predictor {predictor} found')
                         break
                     else:
                         continue
 
             if predictor is None:
-                logging.info(f'infaas: predictor not found. not sure what to do here')
+                logging.debug(f'infaas: predictor not found. not sure what to do here')
                 closest_acc_candidates = sorted(self.predictors, key=lambda x: abs(self.predictors[x].profiled_accuracy - event.accuracy))
                 predictor = self.predictors[random.choice(closest_acc_candidates)]
 
-            logging.info(f'enqueuing request at predictor {predictor}')
+            logging.debug(f'enqueuing request at predictor {predictor}')
             predictor.enqueue_request(event, clock)
             self.assigned_requests[event.id] = predictor
             return
             
         else:
-            raise SimulatorException(f'Unrecognized task assignment/job scheduling '
-                                     f'algorithm for batch request processing')
+            raise ExecutorException(f'Unrecognized task assignment/job scheduling '
+                                    f'algorithm for batch request processing')
 
     
     def apply_routing_table(self, routing_table={}):
@@ -1035,10 +1037,8 @@ class Executor:
         logging.debug(f'Executor: {self.isi}, Previous routing table: {self.canary_routing_table},'
                       f' new routing table: {routing_table}')
         if len(routing_table) == 0:
-            # TODO: this should not be happening if there are still predictors for this isi
-            print(f'Empty routing table passed for isi {self.isi}')
-            # time.sleep(10)
-            return
+            # this should not be happening if there are still predictors for this isi
+            raise ExecutorException(f'Empty routing table passed for isi {self.isi}')
 
         self.canary_routing_table = routing_table
         return

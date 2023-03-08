@@ -31,6 +31,7 @@ def getargs():
     parser.add_argument('--allocation_window', '-w', required=False, default=1000,
                         dest='allocation_window', help='Milliseconds to wait before recalculating allocation. Default is 1000')
     parser.add_argument('--config_file', required=True)
+    parser.add_argument('--logging_level', required=False, default=logging.INFO)
 
     parser.set_defaults(random_runtimes=False, batching=False)
 
@@ -131,6 +132,7 @@ def main(args):
     action_group_size = int(args.action_size)
     reward_window_length = args.reward_window_length
     allocation_window = int(args.allocation_window)
+    logging_level = args.logging_level
 
     with open(args.config_file) as cf:
         config = json.load(cf)
@@ -150,7 +152,8 @@ def main(args):
     allowed_variants_path = config['allowed_variants']
 
     env = SchedulingEnv(trace_dir=trace_path, job_sched_algo=job_scheduling,
-                        action_group_size=action_group_size, reward_window_length=reward_window_length,
+                        action_group_size=action_group_size, logging_level=logging_level,
+                        reward_window_length=reward_window_length,
                         random_runtimes=args.random_runtimes, fixed_seed=fixed_seed,
                         allocation_window=allocation_window, model_assignment=model_assignment,
                         batching=enable_batching, batching_algo=batching_algo,
@@ -179,7 +182,7 @@ def main(args):
     elif model_assignment == 'load_proportional':
         print('Testing with load proportional algorithm')
     elif model_assignment == 'ilp':
-        ilp = Ilp(allocation_window=allocation_window, beta=beta)
+        ilp = Ilp(allocation_window=allocation_window, beta=beta, logging_level=logging_level)
         ilp_applied = True
         print(f'Testing with solution given by ILP (no alpha, beta={beta})')
     elif model_assignment == 'ilp_alpha':
@@ -198,7 +201,7 @@ def main(args):
         clipper = Clipper(simulator=env.simulator, solution_file=config['static_allocation'])
         print('Testing with Clipper model assignment policy')
     elif model_assignment == 'sommelier':
-        ilp = Ilp(allocation_window=allocation_window, beta=beta,
+        ilp = Ilp(allocation_window=allocation_window, beta=beta, logging_level=logging_level,
                   starting_allocation=config['static_allocation'],
                   static='spec_acc')
         ilp_applied = True
@@ -217,14 +220,14 @@ def main(args):
     rate_logger = logging.getLogger('Rate logger')
     rate_loggerfile = os.path.join('logs', 'throughput', str(time.time()) + '_' +  model_assignment + '.csv')
     rate_logger.addHandler(logging.FileHandler(rate_loggerfile, mode='w'))
-    rate_logger.setLevel(logging.DEBUG)
+    rate_logger.setLevel(logging_level)
     rate_logger.info('wallclock_time,simulation_time,demand,throughput,capacity')
 
     rate_logger_per_model = logging.getLogger('Rate logger per model')
     rate_logger_per_model_file = os.path.join('logs', 'throughput_per_model', str(time.time()) + '_' + model_assignment + '.csv')
     rate_logger_per_model.addHandler(
         logging.FileHandler(rate_logger_per_model_file, mode='w'))
-    rate_logger_per_model.setLevel(logging.DEBUG)
+    rate_logger_per_model.setLevel(logging_level)
     rate_logger_per_model.info(
         'wallclock_time,simulation_time,demand_nth_model,throughput_nth_model,normalized_throughput_nth_model,accuracy_nth_model,,,,,,,,,,,,,,,,')
 
@@ -451,7 +454,7 @@ def main(args):
 
 
         utils.log_throughput(rate_logger, observation, i, allocation_window)
-        print('observation:', observation)
+        # print('observation:', observation)
 
     end = time.time()
 

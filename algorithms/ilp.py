@@ -8,14 +8,13 @@ from core.exceptions import IlpException
 
 
 class Ilp(SchedulingAlgorithm):
-    def __init__(self, allocation_window, beta, starting_allocation=None,
+    def __init__(self, allocation_window, beta, logging_level, starting_allocation=None,
                  static=None):
         SchedulingAlgorithm.__init__(self, 'ILP')
 
         self.log = logging.getLogger(__name__)
-
         self.log.addHandler(logging.FileHandler('logs/ilp/output.log', mode='w'))
-        self.log.setLevel(logging.DEBUG)
+        self.log.setLevel(logging.ERROR)
 
         self.allocation_window = allocation_window
 
@@ -94,14 +93,14 @@ class Ilp(SchedulingAlgorithm):
                             max_batch_size = batch_size
 
                     max_batch_size_dict[(acc_type, model_variant)] = max_batch_size
-                    print(f'({acc_type}, {model_variant}): {max_batch_size}')
-        print(f'len(max_batch_size_dict): {len(max_batch_size_dict)}')
+                    self.log.debug(f'({acc_type}, {model_variant}): {max_batch_size}')
+        self.log.debug(f'len(max_batch_size_dict): {len(max_batch_size_dict)}')
         time.sleep(10)
         return max_batch_size_dict
 
     def add_spec_acc_constraints(self, model, x, accelerators, required_predictors):
-        print(f'model: {model}')
-        print(f'accelerators: {accelerators}')
+        self.log.debug(f'model: {model}')
+        self.log.debug(f'accelerators: {accelerators}')
 
         indices = {}
         constraints_added = 0
@@ -266,6 +265,7 @@ class Ilp(SchedulingAlgorithm):
 
         # Set up the optimization model
         m = gp.Model('Accuracy Throughput MILP')
+        m.setParam("LogToConsole", 0)
 
         m.setParam('NonConvex', 2)
         m.setParam('TimeLimit', 200)
@@ -287,7 +287,7 @@ class Ilp(SchedulingAlgorithm):
             self.log.error('No requests received, terminating ILP.')
             return None
         else:
-            print('\nIncoming requests:' + str(sum(s.values())))
+            self.log.debug('\nIncoming requests:' + str(sum(s.values())))
         
         # TODO: how to set accelerators for each model variant (and specify model variant while doing so)?
         # Set the objective
@@ -376,7 +376,7 @@ class Ilp(SchedulingAlgorithm):
         m.optimize()
         end_time = time.time()
         ilp_overhead = end_time - start_time
-        print(f'Time to solve ILP: {ilp_overhead} seconds')
+        self.log.debug(f'Time to solve ILP: {ilp_overhead} seconds')
 
         # Measuring routing table overhead for reporting in paper
         # measure_routing_table_overhead()
@@ -460,14 +460,13 @@ class Ilp(SchedulingAlgorithm):
                     canary_dict[(model_variant, isi)] = canary_pct
                 
                 if canary_pct > 0.0 and canary_pct <= 1.0:
-                    logging.info(f'variant: {model_variant}, isi: {isi}, canary pct: {canary_pct}')
-                    logging.info('TODO: Update the canary routing table based on this value')
+                    self.log.debug(f'variant: {model_variant}, isi: {isi}, canary pct: {canary_pct}')
 
         # logging.info('required_predictors: {}'.format(required_predictors))
         # logging.info('canary dict: {}'.format(canary_dict))
         # time.sleep(1)
         self.simulator.apply_ilp_solution(required_predictors, canary_dict)
-        print(f'required_predictors:\n{required_predictors}\ncanary_dict:\n{canary_dict}')
+        self.log.debug(f'required_predictors:\n{required_predictors}\ncanary_dict:\n{canary_dict}')
 
         return None
 
@@ -484,11 +483,11 @@ class Ilp(SchedulingAlgorithm):
 
     def print_cached_solution(self):
         if self.cached_solution is None:
-            print('ilp: No solution has been cached yet')
+            self.log.debug('ilp: No solution has been cached yet')
             return
         
-        print('ilp: Printing cached solution..')
-        print('\nx:')
+        self.log.info('ilp: Printing cached solution..')
+        self.log.info('\nx:')
         x = self.cached_solution['x']
         accelerators = self.cached_solution['accelerators']
         models = self.cached_solution['models']
@@ -496,7 +495,7 @@ class Ilp(SchedulingAlgorithm):
         for i in accelerators:
             for j in models:
                 if x[i, j].X > 0.0001:
-                    print(f'{i}, {j}, x: {x[i, j].X}')
+                    self.log.info(f'{i}, {j}, x: {x[i, j].X}')
         return
     
     def measure_routing_table_overhead(self):

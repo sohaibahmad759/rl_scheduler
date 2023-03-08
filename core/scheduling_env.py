@@ -13,9 +13,10 @@ class SchedulingEnv(gym.Env):
     metadata = {'render.modes': ['human']}
 
     def __init__(self, trace_dir, job_sched_algo, action_group_size,
-                 reward_window_length=10, random_runtimes=False, fixed_seed=0,
-                 allocation_window=1000, model_assignment='', batching=False,
-                 batching_algo=None, profiling_data=None, allowed_variants_path=None):
+                 logging_level, reward_window_length=10, random_runtimes=False,
+                 fixed_seed=0, allocation_window=1000, model_assignment='',
+                 batching=False, batching_algo=None, profiling_data=None,
+                 allowed_variants_path=None):
         super(SchedulingEnv, self).__init__()
 
         logging.basicConfig(level=logging.INFO)
@@ -45,6 +46,7 @@ class SchedulingEnv(gym.Env):
         # simulator environment that our RL agent will interact with
         self.simulator = Simulator(trace_path=trace_dir, mode='debugging',
                                    job_sched_algo=job_sched_algo,
+                                   logging_level=logging_level,
                                    max_acc_per_type=self.max_no_of_accelerators,
                                    predictors_max=self.total_predictors,
                                    n_qos_levels=self.n_qos_levels,

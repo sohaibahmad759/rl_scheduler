@@ -23,10 +23,12 @@ class AccType(Enum):
 
 
 class Predictor:
-    def __init__(self, acc_type=AccType.CPU, qos_level=0, profiled_accuracy=100.0,
-                 profiled_latencies={}, variant_name=None, executor=None,
-                 simulator=None):
+    def __init__(self, logging_level, acc_type=AccType.CPU, qos_level=0,
+                 profiled_accuracy=100.0, profiled_latencies={}, variant_name=None,
+                 executor=None, simulator=None):
         # attributes related to predictor hardware
+        self.log = logging.getLogger(__name__)
+
         self.id = uuid.uuid4().hex
         self.acc_type = acc_type
         self.variant_name = variant_name
@@ -70,7 +72,7 @@ class Predictor:
         if self.max_batch_size == 0:
             if self.simulator.model_assignment != 'clipper':
                 self.busy = True
-                print(f'Predictor cannot be used as it will exceed latency SLO, '
+                self.log.error(f'Predictor cannot be used as it will exceed latency SLO, '
                     f'model variant: {self.variant_name}, accelerator type: '
                     f'{self.acc_type}')
                 time.sleep(10)
@@ -86,7 +88,7 @@ class Predictor:
         ''' Since we only allow batch sizes of [1, 2, 4, 8], AIMD can only
          go one step up to the next available batch size
         '''
-        print(f'increase_aimd_batch_size: current batch size: {self.aimd_batch_size}')
+        self.log.debug(f'increase_aimd_batch_size: current batch size: {self.aimd_batch_size}')
         current_idx = self.batch_sizes_allowed.index(self.aimd_batch_size)
         if current_idx < len(self.batch_sizes_allowed) - 1:
             new_idx = current_idx + 1
@@ -94,7 +96,7 @@ class Predictor:
             current_idx = new_idx
         if self.aimd_batch_size > self.max_batch_size and self.max_batch_size > 0:
             self.aimd_batch_size = self.max_batch_size
-        print(f'increase_aimd_batch_size: batch size set: {self.aimd_batch_size}')
+        self.log.debug(f'increase_aimd_batch_size: batch size set: {self.aimd_batch_size}')
         return
 
     
@@ -102,13 +104,13 @@ class Predictor:
         ''' Since we only allow batch sizes of [1, 2, 4, 8], AIMD can only
          go one step down to the previous available batch size
         '''
-        print(f'decrease_aimd_batch_size: current batch size: {self.aimd_batch_size}')
+        self.log.debug(f'decrease_aimd_batch_size: current batch size: {self.aimd_batch_size}')
         current_idx = self.batch_sizes_allowed.index(self.aimd_batch_size)
         if current_idx > 0:
             new_idx = current_idx - 1
             self.aimd_batch_size = self.batch_sizes_allowed[new_idx]
             current_idx = new_idx
-        print(f'decrease_aimd_batch_size: batch size set: {self.aimd_batch_size}')
+        self.log.debug(f'decrease_aimd_batch_size: batch size set: {self.aimd_batch_size}')
         return
 
     
@@ -216,9 +218,9 @@ class Predictor:
 
         if self.task_assignment == TaskAssignment.CANARY and self.batching_algo == 'accscale':
             batch_size = self.find_batch_size(requests=len(self.request_queue))
-            print(f'enqueue_request: Trying to find appropriate batch size. Number '
-                f'of requests in queue: {len(self.request_queue)}, batch size '
-                f'returned: {batch_size}')
+            self.log.debug(f'enqueue_request: Trying to find appropriate batch size. Number '
+                           f'of requests in queue: {len(self.request_queue)}, batch size '
+                           f'returned: {batch_size}')
         elif self.task_assignment == TaskAssignment.CANARY and self.batching_algo == 'aimd':
             if len(self.request_queue) >= self.aimd_batch_size:
                 # print(f'Calling process_batch from enqueue_request')
@@ -233,14 +235,14 @@ class Predictor:
             raise PredictorException(f'Unexpected situation')
 
         if self.batching_algo == 'aimd':
-            print(f'AIMD calling pop_while_first_expires')
+            self.log.debug(f'AIMD calling pop_while_first_expires')
             self.pop_while_first_expires(clock)
             batch_size = self.aimd_batch_size
             if len(self.request_queue) == 0:
                 return
             
             if len(self.request_queue) >= batch_size:
-                print(f'aimd calling process_batch from enqueue_request')
+                self.log.debug(f'aimd calling process_batch from enqueue_request')
                 self.process_batch(clock, batch_size)
                 return
             else:
@@ -270,7 +272,8 @@ class Predictor:
             if clock < max_waiting_time:
                 # we can still wait with new request in queue
                 self.generate_slo_expiring(first_request, max_waiting_time)
-                print(f'Generated SLO_EXPIRING event for request {event.desc} to expire at {max_waiting_time}')
+                self.log.debug(f'Generated SLO_EXPIRING event for request {event.desc} '
+                               f'to expire at {max_waiting_time}')
             else:
                 # if we execute a batch with the latest request, we will miss SLO
                 # of first request in the queue. therefore, execute batch size q-1 requests
@@ -280,7 +283,7 @@ class Predictor:
                     batch_size = self.aimd_batch_size
                 elif self.task_assignment == TaskAssignment.INFAAS:
                     batch_size = self.infaas_batch_size
-                print(f'Calling process batch from enqueue_request')
+                self.log.debug(f'Calling process batch from enqueue_request')
                 self.process_batch(clock, batch_size)
                 return
         # else:
@@ -300,21 +303,21 @@ class Predictor:
 
         # TODO: Even after all the checks, make sure to track how many reqeusts
         #       finish after their deadline
-        logging.info(f'process_batch called with batch size of {batch_size}')
+        self.log.debug(f'process_batch called with batch size of {batch_size}')
         # time.sleep(1)
 
-        logging.debug(f'Requests in queue before popping: {len(self.request_queue)}')
+        self.log.debug(f'Requests in queue before popping: {len(self.request_queue)}')
 
         if batch_size == -1:
-            print(f'process_batch received batch size of -1')
+            self.log.error(f'process_batch received batch size of -1')
             time.sleep(10)
 
         # if self.max_batch_size == 0:
         #     batch_size = 1
 
         if batch_size > self.max_batch_size:
-            print(f'process_batch received batch size of {batch_size}, max '
-                  f'batch size: {self.max_batch_size}')
+            self.log.debug(f'process_batch received batch size of {batch_size}, max '
+                           f'batch size: {self.max_batch_size}')
             if self.simulator.model_assignment != 'clipper' and self.task_assignment != TaskAssignment.INFAAS:    
                 time.sleep(10)
             batch_size = self.max_batch_size
@@ -334,8 +337,8 @@ class Predictor:
         if len(self.request_queue) > 0:
             self.generate_head_slo_expiring()
 
-        logging.debug(f'Batch size given: {batch_size}, requests in queue after popping: '
-                      f'{len(self.request_queue)}, dequeued_requests: {dequeued_requests}')
+        self.log.debug(f'Batch size given: {batch_size}, requests in queue after popping: '
+                       f'{len(self.request_queue)}, dequeued_requests: {dequeued_requests}')
 
         batch_processing_time = self.batch_processing_latency(batch_size, temp_queue[0])
         finish_time = clock + batch_processing_time
@@ -349,14 +352,14 @@ class Predictor:
             if finish_time > request.start_time + request.deadline:
                 if self.task_assignment == TaskAssignment.CANARY:
                     if self.batching_algo == 'accscale':
-                        print('process_batch: Something is wrong, first request in queue '
+                        raise PredictorException('process_batch: Something is wrong, first request in queue '
                             'will expire before batch finishes processing')
                         time.sleep(10)
                     elif self.batching_algo == 'aimd':
                         self.simulator.bump_failed_request_stats(request)
                         continue
                     else:
-                        print('process_batch: unexpected situation')
+                        raise PredictorException('process_batch: unexpected situation')
                         time.sleep(10)
                 elif self.task_assignment == TaskAssignment.INFAAS:
                     self.simulator.bump_failed_request_stats(request)
@@ -391,24 +394,24 @@ class Predictor:
             self.pop_while_first_expires(clock)
             if self.batching_algo == 'accscale':
                 if len(self.request_queue) >= self.max_batch_size:
-                    print(f'Calling process_batch from finish_batch_callback')
+                    self.log.debug(f'Calling process_batch from finish_batch_callback')
                     self.process_batch(clock, self.max_batch_size)
                     return
             elif self.batching_algo == 'aimd':
                 if len(self.request_queue) >= self.aimd_batch_size:
-                    print(f'Calling process_batch from finish_batch_callback')
+                    self.log.debug(f'Calling process_batch from finish_batch_callback')
                     self.process_batch(clock, self.aimd_batch_size)
                     self.increase_aimd_batch_size()
                     return
             else:
-                print(f'finish_batch_callback: Unexpected batching algo: {self.batching_algo}')
+                self.log.error(f'finish_batch_callback: Unexpected batching algo: {self.batching_algo}')
         elif self.task_assignment == TaskAssignment.INFAAS:
-            logging.info(f'infaas batch size: {self.infaas_batch_size}')
+            self.log.debug(f'infaas batch size: {self.infaas_batch_size}')
             if len(self.request_queue) >= self.infaas_batch_size:
-                print(f'Calling process_batch from finish_batch_callback for INFaaS')
+                self.log.debug(f'Calling process_batch from finish_batch_callback for INFaaS')
                 self.process_batch(clock, self.infaas_batch_size)
         else:
-            logging.error(f'finish_batch_callback encountered unexpected task '
+            self.log.error(f'finish_batch_callback encountered unexpected task '
                           f'assignment algorithm: {self.task_assignment}')
             time.sleep(10)
 
@@ -434,10 +437,10 @@ class Predictor:
                 batch_size = self.max_batch_size
             batch_processing_time = self.batch_processing_latency(batch_size, first_request)
 
-            logging.debug(f'FINISH_BATCH callback: current time: {clock}, first request '
-                  f'starts at {first_request.start_time} and expires at {first_request_expiration}, '
-                  f'time to process it will be {batch_processing_time} with batch '
-                  f'size of {batch_size}, requests in queue: {queued_requests}')
+            self.log.debug(f'FINISH_BATCH callback: current time: {clock}, first request '
+                           f'starts at {first_request.start_time} and expires at {first_request_expiration}, '
+                           f'time to process it will be {batch_processing_time} with batch '
+                           f'size of {batch_size}, requests in queue: {queued_requests}')
 
             popped = False
 
@@ -470,7 +473,7 @@ class Predictor:
             # We don't need to generate a new SLO_EXPIRING event since we already have
             # an event with the same expiration time (because batch size hasn't changed)
             return
-        logging.debug(f'Generating SLO_EXPIRING event for request {event.id} '
+        self.log.debug(f'Generating SLO_EXPIRING event for request {event.id} '
                       f'to expire at {time}')
         self.simulator.generate_slo_expiring_event(time, event,
                                                 predictor=self,
@@ -489,12 +492,12 @@ class Predictor:
         #     logging.info('SLO expiring event encountered, ignoring for INFaaS')
         #     return
 
-        logging.debug(f'SLO expiring callback, Current clock: {clock}, event counter: '
+        self.log.debug(f'SLO expiring callback, Current clock: {clock}, event counter: '
             f'{event.event_counter}, slo_expiring_dict entry: {self.slo_expiring_dict[event.event_counter]}')
         if clock != self.slo_expiring_dict[event.event_counter]:
             # this means we have encountered an older SLO_EXPIRING callback
             # we do not need to handle it
-            logging.debug(f'slo_expiring_callback: Encountered an older SLO_EXPIRING '
+            self.log.debug(f'slo_expiring_callback: Encountered an older SLO_EXPIRING '
                 f'event for request {event.event_counter}. Latest value: '
                 f'{self.slo_expiring_dict[event.event_counter]}, Value in '
                 f'current event: {clock}')
@@ -502,9 +505,9 @@ class Predictor:
             return
 
         if len(self.request_queue) > 0 and self.request_queue[0].id != event.event_counter:
-            logging.debug(f'Request at head of queue: {self.request_queue[0].id}, SLO_EXPIRING event '
-                f'received for request: {event.event_counter}. Previous request: '
-                f'{(event.event_counter in self.slo_expiring_dict)}')
+            self.log.debug(f'Request at head of queue: {self.request_queue[0].id}, SLO_EXPIRING event '
+                           f'received for request: {event.event_counter}. Previous request: '
+                           f'{(event.event_counter in self.slo_expiring_dict)}')
             # time.sleep(5)
             return
 
@@ -515,9 +518,9 @@ class Predictor:
 
         if self.task_assignment == TaskAssignment.CANARY and self.batching_algo == 'accscale':
             batch_size = self.find_batch_size(requests=len(self.request_queue))
-            print(f'slo_expiring_callback: Trying to find appropriate batch size. '
-                f'Number of requests in queue: {len(self.request_queue)}, '
-                f'batch size returned: {batch_size}')
+            self.log.debug(f'slo_expiring_callback: Trying to find appropriate batch size. '
+                           f'Number of requests in queue: {len(self.request_queue)}, '
+                           f'batch size returned: {batch_size}')
         elif self.task_assignment == TaskAssignment.CANARY and self.batching_algo == 'aimd':
             batch_size = self.aimd_batch_size
         elif self.task_assignment == TaskAssignment.INFAAS:
@@ -530,13 +533,13 @@ class Predictor:
             # 1. if we added new requests while the predictor was busy processing another batch
             # 2. if the requests in batch were already more than max batch size when head
             #   SLO was generated
-            print('slo_expiring_callback: Something is wrong, find_batch_size returned -1')
+            self.log.error('slo_expiring_callback: Something is wrong, find_batch_size returned -1')
             # time.sleep(10)
             batch_size = self.max_batch_size
             return
         
         # if self.batching_algo is not 'aimd':
-        print(f'Calling process_batch from slo_expiring_callback')
+        self.log.debug(f'Calling process_batch from slo_expiring_callback')
         self.process_batch(clock, batch_size)
         return
 
@@ -553,7 +556,7 @@ class Predictor:
         first_request_expiration = first_request.start_time + first_request.deadline
 
         if self.batch_processing_latency(batch_size=1, request=first_request) > first_request.deadline:
-            print(f'Request cannot be processed even with batch size of 1')
+            raise PredictorException(f'Request cannot be processed even with batch size of 1')
             time.sleep(10)
         
         # TODO: what if we are already past the t_w for this batch size?
@@ -565,17 +568,17 @@ class Predictor:
         max_waiting_time = first_request_expiration - self.batch_processing_latency(batch_size, first_request)
 
         self.generate_slo_expiring(first_request, max_waiting_time)
-        logging.debug(f'head: Generated SLO_EXPIRING event for request {first_request.desc} '
-              f'to expire at {max_waiting_time}')
+        self.log.debug(f'head: Generated SLO_EXPIRING event for request {first_request.desc} '
+                      f'to expire at {max_waiting_time}')
         return
 
     
     def batch_processing_latency(self, batch_size, request):
         ''' Return the latency to process a batch of a given size
         '''
-        logging.debug('batch_processing_latency()')
-        logging.debug(f'Profiled latencies: {self.profiled_latencies}')
-        logging.debug(f'Request desc: {request.desc}, qos_level: {request.qos_level}, '
+        self.log.debug('batch_processing_latency()')
+        self.log.debug(f'Profiled latencies: {self.profiled_latencies}')
+        self.log.debug(f'Request desc: {request.desc}, qos_level: {request.qos_level}, '
                       f'profiled latency: {self.profiled_latencies[(request.desc, self.variant_name, batch_size)]}')
         processing_latency = self.profiled_latencies[(request.desc, self.variant_name, batch_size)] * batch_size
         return processing_latency

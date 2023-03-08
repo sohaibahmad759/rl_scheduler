@@ -23,6 +23,10 @@ class SimulatorException(Exception):
         super().__init__(self.message)
 
 
+class ExecutorException(SimulatorException):
+    pass
+
+
 class PredictorException(SimulatorException):
     pass
 

@@ -18,11 +18,15 @@ MAX_CLOCK_VALUE = 0
 
 
 class Simulator:
-    def __init__(self, job_sched_algo, trace_path=None, mode='training', 
-                 max_acc_per_type=0, predictors_max=[10, 10, 10, 10], n_qos_levels=1,
-                 random_runtimes=False, fixed_seed=0, batching=False,
+    def __init__(self, job_sched_algo, logging_level, trace_path=None,
+                 mode='training', max_acc_per_type=0, predictors_max=[10, 10, 10, 10],
+                 n_qos_levels=1, random_runtimes=False, fixed_seed=0, batching=False,
                  model_assignment=None, batching_algo=None, profiling_data=None,
                  allowed_variants_path=None):
+        self.log = logging.getLogger(__name__)
+        self.log.setLevel(logging_level)
+        self.logging_level=logging_level
+
         self.clock = 0
         self.event_queue = []
         self.executors = {}
@@ -107,14 +111,12 @@ class Simulator:
 
         self.infaas_slack = 0.95
 
-        logging.basicConfig(level=logging.INFO)
-
         idx = 0
 
         if trace_path is None:
             raise SimulatorException(f'No trace file provided. trace_path: {trace_path}')
             
-        logging.info(f'Reading trace files from: {trace_path}')
+        self.log.info(f'Reading trace files from: {trace_path}')
         trace_files = sorted(os.listdir(trace_path))
         for file in trace_files:
             filename = file.split('/')[-1]
@@ -124,10 +126,10 @@ class Simulator:
             isi_name, extension = filename.split('.')
             if not extension == 'txt':
                 continue
-            logging.info('Filename: ' + file)
+            self.log.info('Filename: ' + file)
 
             variant_list_filename = os.path.join(allowed_variants_path, isi_name)
-            logging.info('Variant list filename:' + variant_list_filename)
+            self.log.info('Variant list filename:' + variant_list_filename)
 
             model_variant_list = self.read_variants_from_file(variant_list_filename)
             self.set_model_variants(isi_name, model_variant_list)
@@ -135,8 +137,8 @@ class Simulator:
             self.initialize_model_variant_loadtimes(isi_name)
 
             self.add_executor(isi_name, self.job_sched_algo, runtimes={},
-                                model_variant_runtimes={}, model_variant_loadtimes={},
-                                max_acc_per_type=self.max_acc_per_type, simulator=self)
+                              model_variant_runtimes={}, model_variant_loadtimes={},
+                              max_acc_per_type=self.max_acc_per_type, simulator=self)
             self.idx_to_executor[idx] = isi_name
             self.isi_to_idx[isi_name] = idx
             self.failed_requests_arr.append(0)
@@ -154,7 +156,7 @@ class Simulator:
                 self.add_requests_from_trace(
                     isi_name, os.path.join(trace_path, file))
                 end = time.time()
-                logging.debug(
+                self.log.debug(
                     'Time to add trace file: {} seconds'.format(end - start))
         
         self.initialize_model_variant_runtimes()
@@ -167,7 +169,7 @@ class Simulator:
 
         self.set_executor_runtimes()
         self.set_executor_loadtimes()
-        logging.info('Model variant accuracies: {}'.format(self.model_variant_accuracies))
+        self.log.info(f'Model variant accuracies: {self.model_variant_accuracies}')
 
         self.set_executor_model_variants()
 
@@ -433,7 +435,7 @@ class Simulator:
             elif acc_type == 'GPU_PASCAL':
                 self.fpga_variant_runtimes[tuple] = latency
 
-            print(f'({isi_name}, {model_variant}, {batch_size}): {latency}, {acc_type}')
+            self.log.debug(f'({isi_name}, {model_variant}, {batch_size}): {latency}, {acc_type}')
         
         # If there are unfilled entries that have not been profiled, set their
         # latencies to be effectively infinite so we don't use them
@@ -445,19 +447,19 @@ class Simulator:
 
                     if tuple not in self.cpu_variant_runtimes:
                         self.cpu_variant_runtimes[tuple] = batch_size*100
-                        print(f'{tuple} not found in cpu variant runtimes')
+                        self.log.error(f'{tuple} not found in cpu variant runtimes')
                     if tuple not in self.gpu_variant_runtimes:
                         self.gpu_variant_runtimes[tuple] = batch_size*100
-                        print(f'{tuple} not found in gpu_ampere variant runtimes')
+                        self.log.error(f'{tuple} not found in gpu_ampere variant runtimes')
                     if tuple not in self.vpu_variant_runtimes:
                         self.vpu_variant_runtimes[tuple] = batch_size*100
                         # print(f'{tuple} not found in vpu variant runtimes')
                     if tuple not in self.fpga_variant_runtimes:
                         self.fpga_variant_runtimes[tuple] = batch_size*100
-                        print(f'{tuple} not found in gpu_pascal variant runtimes')
+                        self.log.error(f'{tuple} not found in gpu_pascal variant runtimes')
 
-        print(f'Total profiled entries: {profiled.shape[0]}')
-        print(f'Total expected entries: {(22*4*3)}')
+        self.log.debug(f'Total profiled entries: {profiled.shape[0]}')
+        self.log.debug(f'Total expected entries: {(22*4*3)}')
 
         self.model_variant_runtimes = {1: self.cpu_variant_runtimes, 2: self.gpu_variant_runtimes,
                                        3: self.vpu_variant_runtimes, 4: self.fpga_variant_runtimes}
@@ -492,8 +494,8 @@ class Simulator:
                             max_batch_size = batch_size
 
                     max_batch_size_dict[(acc_type, model_variant)] = max_batch_size
-                    print(f'({acc_type}, {model_variant}): {max_batch_size}')
-        print(f'len(largest_batch_sizes): {len(max_batch_size_dict)}')
+                    self.log.debug(f'({acc_type}, {model_variant}): {max_batch_size}')
+        self.log.debug(f'len(largest_batch_sizes): {len(max_batch_size_dict)}')
         self.largest_batch_sizes = max_batch_size_dict
         return
     
@@ -556,7 +558,7 @@ class Simulator:
         profiled = profiled.applymap(self.replace_profiled_strings)
         
         pd.set_option('display.max_columns', None)
-        logging.info(f'profiled data: {profiled}')
+        self.log.info(f'profiled data: {profiled}')
         
         return profiled
 
@@ -623,7 +625,7 @@ class Simulator:
         return
 
     def refill_event_queue(self):
-        print(f'simulator clock: {self.clock}')
+        # self.log.debug(f'simulator clock: {self.clock}')
         if len(self.trace_files) == 0:
             # we are in a deepcopied simulator instance
             return False
@@ -638,7 +640,7 @@ class Simulator:
                                                                     read_until=self.clock+10000)
             if file_finished:
                 self.trace_file_finished.add(isi_name)
-                logging.info('Trace file {} finished'.format(isi_name))
+                self.log.info('Trace file {} finished'.format(isi_name))
                 time.sleep(1)
             finished = finished and file_finished
         return finished
@@ -709,10 +711,10 @@ class Simulator:
         # self.qos_stats = np.zeros((len(self.executors), self.n_qos_levels))
 
     def print_assignment(self):
-        logging.debug('Printing assignment in simulator...')
+        self.log.debug('Printing assignment in simulator...')
         for isi in self.executors:
             assignment = self.executors[isi].num_predictor_types
-            logging.debug(
+            self.log.debug(
                 'Executor {} has assignment: {}'.format(isi, assignment))
         return
 
@@ -732,11 +734,11 @@ class Simulator:
         And applies the assignment to current system
         """
         if len(required_predictors) == 0:
-            logging.error('No required predictors passed')
+            raise SimulatorException('No required predictors passed')
             time.sleep(5)
             return
 
-        logging.debug(f'apply_predictor_dict: required_predictors: {required_predictors}')
+        self.log.debug(f'apply_predictor_dict: required_predictors: {required_predictors}')
 
         ilp_to_acc_type = {}
         ilp_to_acc_type['CPU'] = 1
@@ -777,7 +779,7 @@ class Simulator:
         # if (total_required > 40):
         #     time.sleep(10)
 
-        logging.debug(f'Existing predictors: {existing_predictors}')
+        self.log.debug(f'Existing predictors: {existing_predictors}')
 
         existing_count = {}
         for key in existing_predictors:
@@ -787,7 +789,7 @@ class Simulator:
         # print('required predictors:', sorted(required_predictors))
         # time.sleep(3)
 
-        logging.debug(f'Existing count: {existing_count}')
+        self.log.debug(f'Existing count: {existing_count}')
 
         all_tuple_combinations = self.generate_all_model_acc_keys()
 
@@ -800,18 +802,18 @@ class Simulator:
             existing_key = (model_variant, acc_type)
             existing = len(existing_predictors.get(existing_key, {}))
             required = required_predictors.get(tuple_key, 0)
-            logging.debug(f'tuple_key: {tuple_key}, existing: {existing}, required: {required}')
+            self.log.debug(f'tuple_key: {tuple_key}, existing: {existing}, required: {required}')
 
             while existing > required:
                 predictor = existing_predictors[(model_variant, acc_type)].pop()
                 id = predictor.id
                 executor = predictor.executor
                 if (executor.remove_predictor_by_id(id)):
-                    print(f'removed predictor {id} of type {predictor.acc_type} for '
+                    self.log.debug(f'removed predictor {id} of type {predictor.acc_type} for '
                           f'model variant {model_variant}')
                     self.available_predictors[acc_type-1] += 1
                 else:
-                    print('no predictor found with id:', id)
+                    self.log.debug('no predictor found with id:', id)
                     time.sleep(2)
 
                 existing -= 1
@@ -834,15 +836,14 @@ class Simulator:
                     executor = variant_to_executor[model_variant]
                     executor.add_predictor(acc_type=AccType(acc_type), variant_name=model_variant)
                     self.available_predictors[acc_type-1] -= 1
-                    print(f'added predictor of type {acc_type} for model variant '
-                          f'{model_variant} at isi: {executor.isi}, id: {executor.id}')
-                    print(f'isi {executor.isi} now has following predictors: {executor.predictors}')
+                    self.log.debug(f'added predictor of type {acc_type} for model variant '
+                                   f'{model_variant} at isi: {executor.isi}, id: {executor.id}')
+                    self.log.debug(f'isi {executor.isi} now has following predictors: {executor.predictors}')
                     added += 1
                 if (self.available_predictors[acc_type-1]) < 0:
-                    print('Error! Available predictors {} for type {}'.format(self.available_predictors[acc_type-1], acc_type))
-                    time.sleep(5)
+                    raise SimulatorException(f'Available predictors {self.available_predictors[acc_type-1]} for type {acc_type}')
                 required -= 1
-        print('added predictors:', added)
+        self.log.debug('added predictors:', added)
         
         return
 
@@ -870,11 +871,11 @@ class Simulator:
         And applies it to the canary routing table for each ISI (executor)
         '''
         if len(canary_dict) == 0:
-            logging.error('apply_canary_dict: No canary dictionary passed')
+            self.log.error('apply_canary_dict: No canary dictionary passed')
             time.sleep(5)
             return
         
-        logging.debug(f'Canary dict: {canary_dict}')
+        self.log.debug(f'Canary dict: {canary_dict}')
         for idx in self.idx_to_executor:
             isi = self.idx_to_executor[idx]
             executor = self.executors[isi]
@@ -883,8 +884,8 @@ class Simulator:
             # we want to modify this table from {(model_variant, isi number) -> canary_pct}
             # to {model_variant -> canary_pct}
             executor_routing_table = dict(map(lambda x: (x[0][0], x[1]), executor_routing_table.items()))
-            logging.debug(f'Executor: {isi}, routing table: {executor_routing_table}')
-            logging.debug(f'predictors by variant name: {executor.predictors_by_variant_name()}')
+            self.log.debug(f'Executor: {isi}, routing table: {executor_routing_table}')
+            self.log.debug(f'predictors by variant name: {executor.predictors_by_variant_name()}')
 
             executor.apply_routing_table(executor_routing_table)
         return
@@ -894,7 +895,7 @@ class Simulator:
         action[1:] = np.zeros(len(action)-1)
         executor_idx = self.idx_to_executor[idx]
         executor = self.executors[executor_idx]
-        print('isi:', executor.isi)
+        self.log.debug('isi:', executor.isi)
         predictor_list = executor.predictors
         for predictor_key in predictor_list:
             predictor = predictor_list[predictor_key]
@@ -902,7 +903,7 @@ class Simulator:
         return action
 
     def apply_assignment(self, assignment):
-        logging.debug('Applying assignment: {}'.format(assignment))
+        self.log.debug(f'Applying assignment: {assignment}')
         assignment = np.round(np.nan_to_num(
             assignment / np.sum(assignment, axis=0)) * self.predictors_max)
         new_assignment = np.zeros(assignment.shape)
@@ -942,24 +943,24 @@ class Simulator:
                 executor.remove_predictor_by_type(acc_type=AccType.FPGA)
             new_assignment[idx][3] = executor.num_predictor_types[AccType.FPGA.value - 1]
 
-        logging.debug('New applied assignment: {}'.format(new_assignment))
+        self.log.debug(f'New applied assignment: {new_assignment}')
 
         if np.array_equal(new_assignment, assignment):
-            logging.debug('Was able to match given assignment exactly')
+            self.log.debug('Was able to match given assignment exactly')
         else:
-            logging.debug(
+            self.log.debug(
                 'Could not match given assignment exactly, had to scale')
         return
 
     def apply_assignment_vector(self, assignment):
         ''' Vector version of apply_assignment.
         '''
-        logging.debug('Assignment: {}'.format(assignment))
+        self.log.debug(f'Assignment: {assignment}')
         idx = assignment[0]
         new_assignment = np.zeros(assignment.shape[0] - 1)
 
         for qos_level in range(self.n_qos_levels):
-            logging.debug('Assignment for QoS {}: {}'.format(
+            self.log.debug('Assignment for QoS {}: {}'.format(
                 qos_level, assignment[qos_level * 4 + 1:qos_level * 4 + 5]))
             cpu_pred, gpu_pred, vpu_pred, fpga_pred = assignment[qos_level *
                                                                  4 + 1:qos_level * 4 + 5]
@@ -1027,10 +1028,10 @@ class Simulator:
             new_assignment[3 + qos_level *
                            4] = executor.num_predictor_types[AccType.FPGA.value - 1 + qos_level * 4]
 
-        logging.debug('Old assignment for executor {}: {}'.format(
+        self.log.debug('Old assignment for executor {}: {}'.format(
             assignment[0], assignment[1:]))
-        logging.debug('New applied assignment: {}'.format(new_assignment))
-        logging.debug('Remaining available predictors: {}'.format(
+        self.log.debug('New applied assignment: {}'.format(new_assignment))
+        self.log.debug('Remaining available predictors: {}'.format(
             self.available_predictors))
 
         return new_assignment
@@ -1043,11 +1044,11 @@ class Simulator:
         RL-Cache version of reward: play the trace out K steps into the future,
         find the # of missed requests, and then roll back
         '''
-        logging.debug(
+        self.log.debug(
             '--- temp_simulator: Playing trace into the future to evaluate reward ---')
 
         if len(self.event_queue) == 0:
-            logging.warn('WARN: Ran out of requests while evaluating reward.')
+            self.log.warn('WARN: Ran out of requests while evaluating reward.')
 
         # TODO: turn back on when using RL
         return 0
@@ -1068,9 +1069,9 @@ class Simulator:
 
         # TODO: only play forward for that particular ISI
         temp_simulator.simulate_requests(requests=K)
-        logging.debug('Failed requests: {}'.format(
+        self.log.debug('Failed requests: {}'.format(
             temp_simulator.failed_requests))
-        logging.debug('--- temp_simulator: Rolling back ---')
+        self.log.debug('--- temp_simulator: Rolling back ---')
         reward = -temp_simulator.failed_requests
         return reward
 
@@ -1094,7 +1095,7 @@ class Simulator:
     def process_start_event(self, event, clock):
         ''' Process EventType.START_REQUEST
         '''
-        logging.debug('Starting event {}. (Time: {})'.format(event.desc, clock))
+        self.log.debug('Starting event {}. (Time: {})'.format(event.desc, clock))
         isi = event.desc
         if isi not in self.executors:
             self.add_executor(isi, self.job_sched_algo, self.runtimes, self.model_variant_runtimes,
@@ -1127,7 +1128,7 @@ class Simulator:
         if end_time is None:
             # Cannot process request, no end event generated, bump failure stats
             self.bump_failed_request_stats(event)
-            logging.debug('WARN: Request id {} for {} failed. (Time: {})'.format(
+            self.log.debug('WARN: Request id {} for {} failed. (Time: {})'.format(
                 event.id, event.desc, clock))
         else:
             # Request can be processed, generate an end event for it
@@ -1211,8 +1212,8 @@ class Simulator:
     def process_end_event(self, event, clock):
         ''' Process EventType.END_REQUEST
         '''
-        logging.debug('Event {} ended. (Time: {})'.format(
-            event.desc, event.start_time))
+        # self.log.debug('Event {} ended. (Time: {})'.format(
+        #     event.desc, event.start_time))
         isi = event.desc
         executor = self.executors[isi]
         request_finished = executor.finish_request(event, clock)
@@ -1229,9 +1230,9 @@ class Simulator:
         '''
         sched_decision = self.invoke_scheduling_agent()
         if sched_decision is not None:
-            logging.debug(sched_decision)
+            self.log.debug(sched_decision)
         else:
-            logging.error('ERROR: The scheduling agent returned an exception. (Time: {})'.format(
+            self.log.error('ERROR: The scheduling agent returned an exception. (Time: {})'.format(
                 event.start_time))
         self.insert_event(clock + self.sched_interval,
                             EventType.SCHEDULING, event.desc)
@@ -1240,7 +1241,7 @@ class Simulator:
     def bump_failed_request_stats(self, event):
         ''' Bump stats for a failed request
         '''
-        logging.debug(f'Failed request: {event.desc}')
+        self.log.debug(f'Failed request: {event.desc}')
         # time.sleep(1)
         isi = event.desc
         self.failed_requests += 1
@@ -1284,8 +1285,8 @@ class Simulator:
 
     def add_executor(self, isi, job_sched_algo, runtimes=None, model_variant_runtimes=None, 
                         model_variant_loadtimes=None, max_acc_per_type=0, simulator=None):
-        executor = Executor(isi, job_sched_algo, self.n_qos_levels, runtimes,
-                            model_variant_runtimes, model_variant_loadtimes,
+        executor = Executor(isi, job_sched_algo, self.logging_level, self.n_qos_levels,
+                            runtimes, model_variant_runtimes, model_variant_loadtimes,
                             max_acc_per_type=max_acc_per_type, simulator=simulator)
         self.executors[executor.isi] = executor
         return executor.id
@@ -1360,24 +1361,24 @@ class Simulator:
             # just for readability purposes
             time.sleep(2)
 
-        logging.info('Invoking scheduling event on scheduling_agent')
+        self.log.info('Invoking scheduling event on scheduling_agent')
         print('Invoking scheduling event on scheduling_agent')
 
         request_url = self.sched_agent_uri + '/scheduling_event'
         request = None
         try:
             request = requests.get(request_url)
-            print(request.content)
+            self.log.debug(request.content)
             # TODO: perhaps parse request content before passing back?
             return request.content
         except requests.exceptions.ConnectionError as connException:
-            print(connException)
+            self.log.error(connException)
             return None
 
     def print(self):
         for i in range(len(self.event_queue)):
             event = self.event_queue[i]
-            print('Time: {}, event {} of type {}'.format(
+            self.log.debug('Time: {}, event {} of type {}'.format(
                 event.start_time, event.desc, event.type))
 
 
