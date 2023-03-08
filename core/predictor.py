@@ -233,7 +233,7 @@ class Predictor:
             print(f'Unexpected situation')
             time.sleep(10)
 
-        if self.simulator.model_assignment == 'aimd':
+        if self.simulator.batching_algo == 'aimd':
             print(f'AIMD calling pop_while_first_expires')
             self.pop_while_first_expires(clock)
             batch_size = self.aimd_batch_size
@@ -256,7 +256,7 @@ class Predictor:
 
             # TODO: this is only for debugging purposes. Remove when debugging complete
             if clock > first_request_expiration:
-                print('Problem: expired request has not been removed from the queue')
+                raise PredictorException('Expired request has not been removed from the queue')
                 time.sleep(10)
 
             if self.batch_processing_latency(1, first_request) > first_request.deadline:

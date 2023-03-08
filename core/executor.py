@@ -851,8 +851,6 @@ class Executor:
         '''
         logging.info(f'enqueuing request for isi: {event.desc}, arrived at: {self.isi}, id: {self.id}')
 
-        print(f'self.predictors: {self.predictors}')
-
         if len(self.predictors) == 0:
             self.add_predictor()
 
