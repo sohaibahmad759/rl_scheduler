@@ -1,0 +1,12 @@
+{
+    "profiling_data": "profiling/aggregate_profiled.csv",
+    "trace_path": "traces/azure",
+    "allowed_variants": "traces/model_variants",
+    "model_allocation": "sommelier",
+    "static_allocation": "algorithms/sommelier_solutions/starting_uniform.txt",
+    "job_scheduling": "canary_routing",
+    "batching": "aimd",
+    "beta": 0.8,
+    "fixed_seed": true,
+    "seed": 10
+}

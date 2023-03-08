@@ -4,10 +4,12 @@ import numpy as np
 import gurobipy as gp
 from gurobipy import GRB
 from algorithms.base import SchedulingAlgorithm
+from core.exceptions import IlpException
 
 
 class Ilp(SchedulingAlgorithm):
-    def __init__(self, allocation_window, beta):
+    def __init__(self, allocation_window, beta, starting_allocation=None,
+                 static=None):
         SchedulingAlgorithm.__init__(self, 'ILP')
 
         self.log = logging.getLogger(__name__)
@@ -24,6 +26,9 @@ class Ilp(SchedulingAlgorithm):
         
         # We cache the latest solution from run()
         self.cached_solution = None
+
+        self.starting_allocation = starting_allocation
+        self.static = static
 
         # logging.basicConfig(filename='output.log',
         #                     mode='w',
@@ -49,6 +54,14 @@ class Ilp(SchedulingAlgorithm):
             slo_dict[isi_name] = 5000
 
         return slo_dict
+
+    def get_solution_from_file(self, file):
+        with open(file, mode='r') as rf:
+            lines = rf.readlines()
+            required_predictors = eval(lines[1].rstrip('\n'))
+            canary_dict = eval(lines[3].rstrip('\n'))
+
+            return required_predictors, canary_dict
 
     def set_largest_batch_sizes(self, slo_dict, all_model_variants, accelerators):
         ''' Accesses the profiled data from the simulator to establish the maximum
@@ -85,6 +98,49 @@ class Ilp(SchedulingAlgorithm):
         print(f'len(max_batch_size_dict): {len(max_batch_size_dict)}')
         time.sleep(10)
         return max_batch_size_dict
+
+    def add_spec_acc_constraints(self, model, x, accelerators, required_predictors):
+        print(f'model: {model}')
+        print(f'accelerators: {accelerators}')
+
+        indices = {}
+        constraints_added = 0
+
+        for key in required_predictors:
+            variant, accelerator_type = key
+            instances = required_predictors[key]
+
+            model_family = self.simulator.get_isi_from_variant_name(variant)
+            model_variants = set(self.simulator.model_variants[model_family])
+            all_variants = set(sum(self.simulator.model_variants.values(), []))
+            # print(f'all_variants: {len(all_variants)}')
+
+            disallowed_variants = all_variants.difference(model_variants)
+            # print(f'disallowed_variants: {len(disallowed_variants)}')
+
+            for inst in range(instances):
+                idx = indices.get(accelerator_type, 0)
+
+                for disallowed_variant in disallowed_variants:
+                    accelerator = f'{accelerator_type}-{idx}'
+                    model.addConstr(x[accelerator, disallowed_variant] == 0, f'c_zero_{accelerator}_{disallowed_variant}')
+                    # print(f'x[{accelerator},{disallowed_variant}] == 0')
+                    constraints_added += 1
+
+                    # if constraints_added > 1000:
+                    #     return model
+
+                idx += 1
+                indices[accelerator_type] = idx
+
+        # raise IlpException(f'required_predictors: {required_predictors}')
+        # for each predictor, fix the allowed model variants to only be from the family
+        # of the given variant
+        # why make sommelier_solution.txt so complicated? perhaps rename the model variant
+        # to model family
+        # print(f'constraints added: {constraints_added}')
+        # time.sleep(1)
+        return model
 
     def run(self, observation, num_acc_types, num_max_acc):
         # print('observation shape:', observation.shape)
@@ -299,6 +355,14 @@ class Ilp(SchedulingAlgorithm):
             # m.addConstr(y[j] == sum(y_prime[j,k] for k in rtypes))
             # y_prime[j,k] = 
 
+        # As of now, canary_dict plays no role in spec_acc
+        # Since model variant can be changed, there is no point of fixing the canary dict at start
+        # Though we could constrain canary_dict to split load equally if it does not do so
+        # TODO: Check solution to see if load is being split equally as per Sommelier's description
+        if self.static is 'spec_acc':
+            required_predictors, canary_dict = self.get_solution_from_file(self.starting_allocation)
+            m = self.add_spec_acc_constraints(m, x, accelerators, required_predictors)
+
         # # ct4(j) .. y(j) =l= sum(i, x(i,j) * p(i,j));
         # m.addConstrs((y[j] <= sum(p[i, j]*x[i, j]
         #              for i in accelerators) for j in models), 'c4')
@@ -350,9 +414,15 @@ class Ilp(SchedulingAlgorithm):
             actions = self.generate_actions(current_alloc=current_alloc, ilp_solution=x,
                                             canary_solution=z, accelerators=accelerators,
                                             models=models)
+            # print(f'cached_solution[x]: {self.cached_solution["x"]}')
+            # self.print_cached_solution()
+            # time.sleep(10)
         else:
             actions = np.zeros(current_alloc.shape)
-            self.log.error('No solution')
+            # self.log.error('No solution')
+            # TODO: perhaps we should use cached solution in this case
+            #       what if cached solution is also empty?
+            raise IlpException('No solution')
             time.sleep(10)
         
         return actions

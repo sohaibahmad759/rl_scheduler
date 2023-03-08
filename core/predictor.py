@@ -230,10 +230,9 @@ class Predictor:
         elif self.task_assignment == TaskAssignment.INFAAS:
             batch_size = self.infaas_batch_size
         else:
-            print(f'Unexpected situation')
-            time.sleep(10)
+            raise PredictorException(f'Unexpected situation')
 
-        if self.simulator.batching_algo == 'aimd':
+        if self.batching_algo == 'aimd':
             print(f'AIMD calling pop_while_first_expires')
             self.pop_while_first_expires(clock)
             batch_size = self.aimd_batch_size
@@ -257,13 +256,11 @@ class Predictor:
             # TODO: this is only for debugging purposes. Remove when debugging complete
             if clock > first_request_expiration:
                 raise PredictorException('Expired request has not been removed from the queue')
-                time.sleep(10)
 
             if self.batch_processing_latency(1, first_request) > first_request.deadline:
                 raise PredictorException(f'Request cannot be processed even with batch size '
                                          f'of 1. deadline: {first_request.deadline}, processing '
                                          f'latency: {self.batch_processing_latency(1, first_request)}')
-                time.sleep(10)
 
             max_waiting_time = first_request_expiration - self.batch_processing_latency(batch_size, first_request)
 

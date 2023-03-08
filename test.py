@@ -74,13 +74,15 @@ def validate_config(config: dict, filename: str):
         raise ConfigException(f'invalid model_allocation algorithm specified: {model_allocation}. '
                               f'\nPossible choices: {model_allocation_algos}')
 
-    if (model_allocation == 'ilp' or model_allocation == 'ilp_alpha') and 'beta' not in config:
-        raise ConfigException(f'beta value for ILP model allocation not specified in '
-                              f'config file: {filename}')
+    if model_allocation in ['ilp', 'ilp_alpha', 'sommelier'] and 'beta' not in config:
+        raise ConfigException(f'beta value for model allocation not specified in '
+                              f'config file: {filename}\nbeta value is needed if '
+                              f'model allocation is one of the following: ilp, ilp_alpha, '
+                              f'sommelier')
 
-    if not(model_allocation == 'ilp' or model_allocation == 'ilp_alpha') and 'beta' in config:
+    if not(model_allocation in ['ilp', 'ilp_alpha', 'sommelier']) and 'beta' in config:
         raise ConfigException(f'unexpected parameter beta specificed in config: {filename}'
-                              f'beta is only needed for ILP or ILP-Alpha')
+                              f'\nbeta is only needed for ILP or ILP-Alpha')
 
     if (model_allocation == 'clipper' or model_allocation == 'sommelier') and 'static_allocation' not in config:
         raise ConfigException(f'expected static_allocation file path for model allocation '
@@ -197,8 +199,8 @@ def main(args):
         print('Testing with Clipper model assignment policy')
     elif model_assignment == 'sommelier':
         ilp = Ilp(allocation_window=allocation_window, beta=beta,
-                  starting_allocation='algorithms/sommelier_solutions/starting_uniform.txt',
-                  spec_acc=True)
+                  starting_allocation=config['static_allocation'],
+                  static='spec_acc')
         ilp_applied = True
         print('Testing with Sommelier model switching policy (spec_acc)')
     else:

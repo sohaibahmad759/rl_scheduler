@@ -25,4 +25,8 @@ class SimulatorException(Exception):
 
 class PredictorException(SimulatorException):
     pass
+
+
+class IlpException(Exception):
+    pass
         
