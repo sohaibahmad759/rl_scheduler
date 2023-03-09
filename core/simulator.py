@@ -5,6 +5,7 @@ import requests
 import string
 import os
 import time
+import pprint
 import numpy as np
 import pandas as pd
 from hashlib import new
@@ -446,20 +447,24 @@ class Simulator:
                     tuple = (isi_name, model_variant, batch_size)
 
                     if tuple not in self.cpu_variant_runtimes:
-                        self.cpu_variant_runtimes[tuple] = batch_size*100
-                        self.log.error(f'{tuple} not found in cpu variant runtimes')
+                        # self.cpu_variant_runtimes[tuple] = batch_size*100
+                        # self.log.error(f'{tuple} not found in cpu variant runtimes')
+                        raise SimulatorException(f'{tuple} not found in cpu variant runtimes')
                     if tuple not in self.gpu_variant_runtimes:
-                        self.gpu_variant_runtimes[tuple] = batch_size*100
-                        self.log.error(f'{tuple} not found in gpu_ampere variant runtimes')
+                        # self.gpu_variant_runtimes[tuple] = batch_size*100
+                        # self.log.error(f'{tuple} not found in gpu_ampere variant runtimes')
+                        raise SimulatorException(f'{tuple} not found in gpu_ampere variant runtimes')
                     if tuple not in self.vpu_variant_runtimes:
-                        self.vpu_variant_runtimes[tuple] = batch_size*100
+                        # self.vpu_variant_runtimes[tuple] = batch_size*100
                         # print(f'{tuple} not found in vpu variant runtimes')
+                        raise SimulatorException(f'{tuple} not found in vpu variant runtimes')
                     if tuple not in self.fpga_variant_runtimes:
-                        self.fpga_variant_runtimes[tuple] = batch_size*100
+                        # self.fpga_variant_runtimes[tuple] = batch_size*100
                         self.log.error(f'{tuple} not found in gpu_pascal variant runtimes')
+                        # raise SimulatorException(f'{tuple} not found in gpu_pascal variant runtimes')
 
         self.log.debug(f'Total profiled entries: {profiled.shape[0]}')
-        self.log.debug(f'Total expected entries: {(22*4*3)}')
+        # self.log.debug(f'Total expected entries: {(22*4*3)}')
 
         self.model_variant_runtimes = {1: self.cpu_variant_runtimes, 2: self.gpu_variant_runtimes,
                                        3: self.vpu_variant_runtimes, 4: self.fpga_variant_runtimes}
@@ -488,7 +493,9 @@ class Simulator:
 
                     max_batch_size = 0
                     for batch_size in self.allowed_batch_sizes:
-                        latency = acc_latencies[(isi_name, model_variant, batch_size)]
+                        if (isi_name, model_variant, batch_size) not in acc_latencies:
+                            acc_latencies[(isi_name, model_variant, batch_size)] = np.inf
+                        latency = acc_latencies.get((isi_name, model_variant, batch_size), np.inf)
 
                         if batch_size > max_batch_size and latency < self.slo_dict[isi_name] / 2:
                             max_batch_size = batch_size
@@ -496,6 +503,10 @@ class Simulator:
                     max_batch_size_dict[(acc_type, model_variant)] = max_batch_size
                     self.log.debug(f'({acc_type}, {model_variant}): {max_batch_size}')
         self.log.debug(f'len(largest_batch_sizes): {len(max_batch_size_dict)}')
+        self.log.info(f'largest_batch_sizes:')
+        pprint.pprint(max_batch_size_dict)
+        # raise SimulatorException(f'if latency data is not present (OOM while profiling), '
+        #                          f'it is assuming largest batch size (8) for some reason')
         self.largest_batch_sizes = max_batch_size_dict
         return
     

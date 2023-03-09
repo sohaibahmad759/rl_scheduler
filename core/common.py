@@ -31,6 +31,13 @@ class Event:
         # event counter is only set if event is SLO_EXPIRING
         self.event_counter = event_counter
 
+    def __lt__(self, other):
+        # return self.start_time < other.start_time
+        if self.__class__ is other.__class__:
+            return self.start_time < other.start_time
+        else:
+            return NotImplemented
+
         
 class Behavior(Enum):
     BESTEFFORT = 1

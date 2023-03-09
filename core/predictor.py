@@ -1,6 +1,7 @@
 import logging
 import time
 import uuid
+import pprint
 import numpy as np
 from enum import Enum
 from core.common import TaskAssignment
@@ -316,7 +317,7 @@ class Predictor:
         #     batch_size = 1
 
         if batch_size > self.max_batch_size:
-            self.log.debug(f'process_batch received batch size of {batch_size}, max '
+            self.log.error(f'process_batch received batch size of {batch_size}, max '
                            f'batch size: {self.max_batch_size}')
             if self.simulator.model_assignment != 'clipper' and self.task_assignment != TaskAssignment.INFAAS:    
                 time.sleep(10)
@@ -348,7 +349,11 @@ class Predictor:
         #       if request is processed within deadline
         qos_met = True
 
+        # self.log.error(f'going through temp_queue')
         for request in temp_queue:
+            # self.log.error(f'request: {request}')
+            # self.log.error(f'finish_time: {finish_time}, request.start_time: {request.start_time}, '
+                        #    f'request.deadline: {request.deadline}')
             if finish_time > request.start_time + request.deadline:
                 if self.task_assignment == TaskAssignment.CANARY:
                     if self.batching_algo == 'accscale':
@@ -395,6 +400,13 @@ class Predictor:
             if self.batching_algo == 'accscale':
                 if len(self.request_queue) >= self.max_batch_size:
                     self.log.debug(f'Calling process_batch from finish_batch_callback')
+
+                    # approp = self.find_batch_size(len(self.request_queue))
+                    # self.log.error(f'appropriate batch size: {approp}')
+                    # first_request = self.request_queue[0]
+                    # self.log.error(f'clock: {clock}, first request expires at: {(clock+first_request.deadline)}, '
+                    #                f'batch processing latency: {self.batch_processing_latency(approp, first_request)}')
+
                     self.process_batch(clock, self.max_batch_size)
                     return
             elif self.batching_algo == 'aimd':
@@ -427,6 +439,18 @@ class Predictor:
         # Assume first request is expiring
         first_request_expiring = True
         queued_requests = len(self.request_queue)
+        # sorted_request_queue = sorted(self.request_queue)
+        # if self.request_queue != sorted_request_queue:
+        #     # self.log.error(f'request_queue start times: {list(map(lambda x: x.start_time, self.request_queue))}')
+        #     # raise PredictorException('request queue is not sorted')
+        #     self.log.warn(f'Request queue is not sorted, this should not be happening. '
+        #                   f'For now a temporary fix has been made to sort the request '
+        #                   f'queue every time a popping operation is done, but this may '
+        #                   f'slow down code, although it should still be correct. If code '
+        #                   f'is very slow with this but fast without sorting, find why this '
+        #                   f'is happening and fix it.')
+        #     self.request_queue = sorted_request_queue
+
 
         while first_request_expiring and queued_requests > 0:
             first_request = self.request_queue[0]
@@ -581,6 +605,9 @@ class Predictor:
         self.log.debug(f'Request desc: {request.desc}, qos_level: {request.qos_level}, '
                       f'profiled latency: {self.profiled_latencies[(request.desc, self.variant_name, batch_size)]}')
         processing_latency = self.profiled_latencies[(request.desc, self.variant_name, batch_size)] * batch_size
+        # if self.acc_type == 4:
+        #     print(f'predictor type: {self.acc_type}, self.profiled_latencies:')
+        #     pprint.pprint(self.profiled_latencies)
         return processing_latency
 
     
