@@ -140,6 +140,22 @@ class Ilp(SchedulingAlgorithm):
         # print(f'constraints added: {constraints_added}')
         # time.sleep(1)
         return model
+    
+    def disallow_infeasible_variants(self, gurobiModel, x, accelerators, model_variants,
+                                     largest_batch_sizes):
+        ''' Go through all combinations of model variants and accelerators
+        and disallow pairs for which SLO cannot be met (i.e., largest batch size)
+        is set to 0
+        '''
+        for model_variant in model_variants:
+            for accelerator in accelerators:
+                acc_type = accelerator.split('-')[0]
+                
+                if largest_batch_sizes[(acc_type, model_variant)] == 0:
+                    gurobiModel.addConstr(x[(accelerator, model_variant)] == 0,
+                                          f'c_zero_{accelerator}_{model_variant}')
+                    
+        return gurobiModel
 
     def run(self, observation, num_acc_types, num_max_acc):
         # print('observation shape:', observation.shape)
@@ -147,7 +163,6 @@ class Ilp(SchedulingAlgorithm):
 
         num_isi = observation.shape[0] - 1
         # For simple use cases, the number of models = number of ISIs
-        num_models = num_isi
         self.num_isi = num_isi
         
         current_alloc = observation[0:num_isi, 0:num_acc_types]
@@ -335,7 +350,10 @@ class Ilp(SchedulingAlgorithm):
         # m.addConstrs((sum(x[i, j] for j in models) <=
         #              1 for i in accelerators), 'c2')
         for i in accelerators:
-            m.addConstr(sum(x[i, j] for j in models) <= 1, 'c2_' + str(i))
+            if self.simulator.model_assignment == 'ilp':
+                m.addConstr(sum(x[i, j] for j in models) == 1, 'c2_' + str(i))
+            else:
+                m.addConstr(sum(x[i, j] for j in models) <= 1, 'c2_' + str(i))
 
         # * If infeasible, try setting this to =l= 1
         # ct3(k) .. sum(j, b(j,k) * z(j,k)) =e= 1;
@@ -362,6 +380,12 @@ class Ilp(SchedulingAlgorithm):
         if self.static is 'spec_acc':
             required_predictors, canary_dict = self.get_solution_from_file(self.starting_allocation)
             m = self.add_spec_acc_constraints(m, x, accelerators, required_predictors)
+
+        # We only do this for AccScale/Proteus
+        # if self.simulator.model_assignment == 'ilp' or self.simulator.batching_algo == 'accscale':
+        if self.simulator.model_assignment == 'ilp':
+            m = self.disallow_infeasible_variants(m, x, accelerators, sum(self.simulator.model_variants.values(), []),
+                                                  self.simulator.largest_batch_sizes)
 
         # # ct4(j) .. y(j) =l= sum(i, x(i,j) * p(i,j));
         # m.addConstrs((y[j] <= sum(p[i, j]*x[i, j]
@@ -411,10 +435,10 @@ class Ilp(SchedulingAlgorithm):
             self.cached_solution['accelerators'] = accelerators
             self.cached_solution['models'] = models
 
+            self.print_cached_solution()
             actions = self.generate_actions(current_alloc=current_alloc, ilp_solution=x,
                                             canary_solution=z, accelerators=accelerators,
                                             models=models)
-            self.print_cached_solution()
             # time.sleep(10)
         else:
             actions = np.zeros(current_alloc.shape)
