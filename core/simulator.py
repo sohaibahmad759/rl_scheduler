@@ -495,8 +495,15 @@ class Simulator:
                     for batch_size in self.allowed_batch_sizes:
                         if (isi_name, model_variant, batch_size) not in acc_latencies:
                             acc_latencies[(isi_name, model_variant, batch_size)] = np.inf
-                        latency = acc_latencies.get((isi_name, model_variant, batch_size), np.inf)
+                        latency = acc_latencies[(isi_name, model_variant, batch_size)]
 
+                        # self.log.error(f'slo_dict: {self.slo_dict}')
+                        # if 'gpt' in model_variant:
+                        #     self.log.error(f'variant: {model_variant}, batch_size: {batch_size}, '
+                        #                    f'latency: {latency}, slo/2: {(self.slo_dict[isi_name]/2)}, '
+                        #                    f'latency < slo/2: {latency < self.slo_dict[isi_name]/2}, '
+                        #                    f'acc_type: {acc_type}')
+                        #     time.sleep(1)
                         if batch_size > max_batch_size and latency < self.slo_dict[isi_name] / 2:
                             max_batch_size = batch_size
 
@@ -753,9 +760,9 @@ class Simulator:
 
         ilp_to_acc_type = {}
         ilp_to_acc_type['CPU'] = 1
-        ilp_to_acc_type['GPU_PASCAL'] = 2
+        ilp_to_acc_type['GPU_AMPERE'] = 2
         ilp_to_acc_type['VPU'] = 3
-        ilp_to_acc_type['GPU_AMPERE'] = 4
+        ilp_to_acc_type['GPU_PASCAL'] = 4
 
         variant_to_executor = {}
 

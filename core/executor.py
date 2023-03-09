@@ -851,19 +851,19 @@ class Executor:
         appropriate predictor. The predictor will dequeue the request and process it
         with a batch of requests.
         '''
-        logging.debug(f'enqueuing request for isi: {event.desc}, arrived at: {self.isi}, id: {self.id}')
+        self.log.debug(f'enqueuing request for isi: {event.desc}, arrived at: {self.isi}, id: {self.id}')
 
         if len(self.predictors) == 0:
             self.add_predictor()
 
         if self.task_assignment == TaskAssignment.CANARY:
-            logging.debug(f'Canary routing table, keys: {list(self.canary_routing_table.keys())}, '
+            self.log.debug(f'Canary routing table, keys: {list(self.canary_routing_table.keys())}, '
                          f'weights: {list(self.canary_routing_table.values())}, isi: {self.isi}')
 
             selected_variant = random.choices(list(self.canary_routing_table.keys()),
                                     weights=list(self.canary_routing_table.values()),
                                     k=1)[0]
-            logging.debug(f'Selected variant: {selected_variant}')
+            self.log.debug(f'Selected variant: {selected_variant}')
             
             # Canary routing only tells us the model variant to use, but does not
             # tell us which instance of that model variant. We therefore randomly
@@ -876,22 +876,26 @@ class Executor:
             # So instead of evenly spreading out the requests, it would make more
             # sense to spread requests proportionally
 
-            logging.debug(f'self.predictors names: {list(map(lambda x: x[1].variant_name, self.predictors.items()))}')
+            self.log.debug(f'self.predictors names: {list(map(lambda x: x[1].variant_name, self.predictors.items()))}')
             variants_dict = dict(filter(lambda x: x[1].variant_name == selected_variant,
                                         self.predictors.items()))
             variants = list(variants_dict.keys())
 
             if len(variants) == 0:
+                # TODO: Instead of forcefully adding a predictor here, we should
+                #       fail this request instead
+                self.simulator.bump_failed_request_stats(event)
+                return
                 self.add_predictor(variant_name=selected_variant)
                 variants_dict = dict(filter(lambda x: x[1].variant_name == selected_variant,
                                             self.predictors.items()))
                 variants = list(variants_dict.keys())
 
-            logging.debug(f'Variants: {variants}')
+            self.log.debug(f'Variants: {variants}')
             selected_predictor_id = random.choice(variants)
-            logging.debug(f'Selected predictor id: {selected_predictor_id}')
+            self.log.debug(f'Selected predictor id: {selected_predictor_id}')
             selected_predictor = self.predictors[selected_predictor_id]
-            logging.debug(f'Selected predictor: {selected_predictor}')
+            self.log.debug(f'Selected predictor: {selected_predictor}')
 
             selected_predictor.enqueue_request(event, clock)
             self.assigned_requests[event.id] = selected_predictor

@@ -14,7 +14,7 @@ class Ilp(SchedulingAlgorithm):
 
         self.log = logging.getLogger(__name__)
         self.log.addHandler(logging.FileHandler('logs/ilp/output.log', mode='w'))
-        self.log.setLevel(logging.ERROR)
+        self.log.setLevel(logging.WARN)
 
         self.allocation_window = allocation_window
 
@@ -414,8 +414,7 @@ class Ilp(SchedulingAlgorithm):
             actions = self.generate_actions(current_alloc=current_alloc, ilp_solution=x,
                                             canary_solution=z, accelerators=accelerators,
                                             models=models)
-            # print(f'cached_solution[x]: {self.cached_solution["x"]}')
-            # self.print_cached_solution()
+            self.print_cached_solution()
             # time.sleep(10)
         else:
             actions = np.zeros(current_alloc.shape)
@@ -483,7 +482,7 @@ class Ilp(SchedulingAlgorithm):
 
     def print_cached_solution(self):
         if self.cached_solution is None:
-            self.log.debug('ilp: No solution has been cached yet')
+            self.log.info('ilp: No solution has been cached yet')
             return
         
         self.log.info('ilp: Printing cached solution..')

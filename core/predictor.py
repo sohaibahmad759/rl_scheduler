@@ -71,12 +71,12 @@ class Predictor:
         # If the maximum batch size is 0, that means that predictor cannot even
         # serve a batch size of 1 without violating latency SLO
         if self.max_batch_size == 0:
-            if self.simulator.model_assignment != 'clipper':
-                self.busy = True
-                self.log.error(f'Predictor cannot be used as it will exceed latency SLO, '
-                    f'model variant: {self.variant_name}, accelerator type: '
-                    f'{self.acc_type}')
-                time.sleep(10)
+            # if self.simulator.model_assignment != 'clipper':
+            self.busy = True
+            raise PredictorException(f'Predictor {self.id} cannot be used as it will exceed latency SLO, '
+                f'model variant: {self.variant_name}, accelerator type: '
+                f'{self.acc_type}')
+            time.sleep(10)
         return
 
     
