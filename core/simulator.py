@@ -893,17 +893,17 @@ class Simulator:
             time.sleep(5)
             return
         
-        self.log.debug(f'Canary dict: {canary_dict}')
+        self.log.error(f'Canary dict: {canary_dict}')
         for idx in self.idx_to_executor:
             isi = self.idx_to_executor[idx]
             executor = self.executors[isi]
 
             executor_routing_table = dict(filter(lambda x: x[0][1] == idx, canary_dict.items()))
-            # we want to modify this table from {(model_variant, isi number) -> canary_pct}
-            # to {model_variant -> canary_pct}
+            # we want to modify this table from {(accelerator, isi number) -> canary_pct}
+            # to {accelerator -> canary_pct}
             executor_routing_table = dict(map(lambda x: (x[0][0], x[1]), executor_routing_table.items()))
-            self.log.debug(f'Executor: {isi}, routing table: {executor_routing_table}')
-            self.log.debug(f'predictors by variant name: {executor.predictors_by_variant_name()}')
+            self.log.error(f'Executor: {isi}, routing table: {executor_routing_table}')
+            self.log.error(f'predictors by variant name: {executor.predictors_by_variant_name()}')
 
             executor.apply_routing_table(executor_routing_table)
         return

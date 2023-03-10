@@ -229,6 +229,7 @@ class Executor:
             selected_variant = random.choices(list(self.canary_routing_table.keys()),
                                     weights=list(self.canary_routing_table.values()),
                                     k=1)[0]
+            self.log.error(f'selected_variant: {selected_variant}')
             # Canary routing only tells us the model variant to use, but does not
             # tell us which instance of that model variant. We therefore randomly
             # choose different instances of the model variant, with the expectation
@@ -241,6 +242,8 @@ class Executor:
             # sense to spread requests proportionally
             variants = list(filter(lambda x: self.predictors[x].variant_name == self.predictors[selected_variant].variant_name,
                                     self.predictors))
+            self.log.error(f'variants: {selected_variant}')
+            raise ExecutorException('just debugging')
             selected_predictor_id = random.choice(variants)
             selected_predictor = self.predictors[selected_predictor_id]
             predictor = selected_predictor
@@ -857,14 +860,15 @@ class Executor:
             self.add_predictor()
 
         if self.task_assignment == TaskAssignment.CANARY:
-            self.log.debug(f'Canary routing table, keys: {list(self.canary_routing_table.keys())}, '
+            self.log.error(f'Canary routing table, keys: {list(self.canary_routing_table.keys())}, '
                          f'weights: {list(self.canary_routing_table.values())}, isi: {self.isi}')
 
             selected_variant = random.choices(list(self.canary_routing_table.keys()),
                                     weights=list(self.canary_routing_table.values()),
                                     k=1)[0]
-            self.log.debug(f'Selected variant: {selected_variant}')
-            
+            self.log.error(f'Selected variant: {selected_variant}')
+            raise ExecutorException('just debugging')
+        
             # Canary routing only tells us the model variant to use, but does not
             # tell us which instance of that model variant. We therefore randomly
             # choose different instances of the model variant, with the expectation

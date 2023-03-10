@@ -215,6 +215,9 @@ class Ilp(SchedulingAlgorithm):
         # Whether request type k can be served by model variant j
         # TODO: Initialize this
         b = {}
+
+        # This is just for giving shape to z variable
+        ik_dict = {}
         
         largest_batch_sizes = self.simulator.get_largest_batch_sizes()
 
@@ -264,6 +267,8 @@ class Ilp(SchedulingAlgorithm):
                         # throughput = 1000 / latency
                     p[accelerator, model_variant] = throughput
 
+                    ik_dict[accelerator, isi] = 1
+
                 for isi in range(num_isi):
                     # if model == isi:
                     #     b[model, isi] = 1
@@ -277,6 +282,7 @@ class Ilp(SchedulingAlgorithm):
         # Helper variables for setting up the ILP
         ij_pairs, _ = gp.multidict(p)
         jk_pairs, _ = gp.multidict(b)
+        ik_pairs, _ = gp.multidict(ik_dict)
 
         # Set up the optimization model
         m = gp.Model('Accuracy Throughput MILP')
@@ -292,9 +298,10 @@ class Ilp(SchedulingAlgorithm):
         # TODO: Both these variables need to be positive
         # y = m.addVars(models, name='y', vtype=GRB.POSITIVE)
         # z = m.addVars(jk_pairs, name='z', vtype=GRB.POSITIVE)
-        y = m.addVars(models, name='y')
-        ind = m.addVars(models, name='ind', vtype=GRB.BINARY)
-        z = m.addVars(jk_pairs, name='z')
+        y = m.addVars(accelerators, name='y')
+        ind = m.addVars(accelerators, name='ind', vtype=GRB.BINARY)
+        z = m.addVars(ik_pairs, name='z')
+        zp = m.addVars(accelerators, name='z')
         # aux = m.addVar(name='aux')
 
         # If there are no incoming requests, terminate ILP
@@ -325,7 +332,7 @@ class Ilp(SchedulingAlgorithm):
             # m.addConstr(w[k] <= sum(y[j]*z[j,k]*A[j] for j in models), 'c1_5_' + str(k))
             # TODO: Probably this constraint is forcing z[j,k] to be either 1 or 0
             #       When alpha = 0, z[j,k] varies from 0 to 1 quite often
-            m.addConstr(w[k] <= sum(s[k]*z[j,k]*A[j] for j in models), 'c1_5_' + str(k))
+            m.addConstr(w[k] <= sum(sum(s[k]*z[i,k]*x[i,j]*A[j] for j in models) for i in accelerators), 'c1_5_' + str(k))
             # m.addConstr(sum(b[j, k] * z[j, k] for j in models) <= 1, 'c3_' + str(k))
             # m.addConstr(sum(z[j, k] for j in models) <= 1, 'c3_2_' + str(k))
 
@@ -333,12 +340,12 @@ class Ilp(SchedulingAlgorithm):
             #               works but gives weird result
             # TODO: edit: it seems like this issue has been resolved with constraint c3_3_
             # m.addConstr(sum(b[j, k] * z[j, k] for j in models) == sum(b[j, k] for j in models), 'c3_' + str(k))
-            m.addConstr(sum(b[j, k] * z[j, k] for j in models) == sum(z[j,k] for j in models), 'c3_3_' + str(k))
-            m.addConstr(sum(z[j, k] for j in models) <= 1, 'c3_2_' + str(k))
+            m.addConstr(sum(sum(b[j, k] * z[i, k] * x[i, j] for j in models) for i in accelerators) == sum(z[i, k] for i in accelerators), 'c3_3k_' + str(k))
+            m.addConstr(sum(z[i, k] for i in accelerators) <= 1, 'c3_2_' + str(k))
             # m.addConstr(sum(z[j, k] * ind[j] for j in models) == 1, 'c_ind_3_' + str(k))
 
-            m.addConstr(sum(sum(x[i, j] for i in accelerators)*b[j, k]
-                        for j in models) >= 1, 'c_no_zeros_' + str(k))
+            # raise IlpException('just debugging')
+            m.addConstr(sum(sum(x[i, j] for i in accelerators)* b[j, k] for j in models) >= 1, 'c_no_zeros_' + str(k))
 
         # if sum(x[i, j] for all i in accelerators) >= 1, then sum(z[j,k] for k in rtypes) > 0
 
@@ -355,20 +362,23 @@ class Ilp(SchedulingAlgorithm):
             else:
                 m.addConstr(sum(x[i, j] for j in models) <= 1, 'c2_' + str(i))
 
+            m.addConstr(zp[i] == sum(z[i, k] for k in rtypes), 'c_zp_' + str(i))
+            m.addConstr(sum(sum(b[j, k] * z[i, k] * x[i, j] for j in models) for k in rtypes) == zp[i], 'c3_3i_' + str(i))
+
+
+            m.addConstr(y[i] <= sum(p[i, j]*x[i, j] for j in models), 'c4_' + str(i))
+            # TODO: z[j,k] summed over j is <= 1.
+            # this constraint here is summing z[j,k] over k
+            # This could still be correct, just need to make sure
+            m.addConstr(y[i] <= sum(z[i, k]*s[k] for k in rtypes), 'c5_' + str(i))
+
+            m.addConstr(100000 * ind[i] >= sum(x[i, j] for j in models), 'c_ind_1_' + str(i))
+            m.addConstr(ind[i] <= sum(x[i, j] for j in models), 'c_ind_2_' + str(i))
+
         # * If infeasible, try setting this to =l= 1
         # ct3(k) .. sum(j, b(j,k) * z(j,k)) =e= 1;
         # m.addConstrs((sum(b[j, k] * z[j, k]
         #              for j in models) <= 1 for k in rtypes), 'c3')
-
-        for j in models:
-            m.addConstr(y[j] <= sum(p[i, j]*x[i, j] for i in accelerators), 'c4_' + str(j))
-            # TODO: z[j,k] summed over j is <= 1.
-            # this constraint here is summing z[j,k] over k
-            # This could still be correct, just need to make sure
-            m.addConstr(y[j] <= sum(z[j, k]*s[k] for k in rtypes), 'c5_' + str(j))
-
-            m.addConstr(100000 * ind[j] >= sum(x[i, j] for i in accelerators), 'c_ind_1_' + str(j))
-            m.addConstr(ind[j] <= sum(x[i, j] for i in accelerators), 'c_ind_2_' + str(j))
 
             # m.addConstr(y[j] == sum(y_prime[j,k] for k in rtypes))
             # y_prime[j,k] = 
@@ -435,6 +445,10 @@ class Ilp(SchedulingAlgorithm):
             self.cached_solution['accelerators'] = accelerators
             self.cached_solution['models'] = models
 
+            self.log.error(f'w (effective accuracy): {(gp.quicksum(w).getValue()/sum(s.values()))}')
+            self.log.error(f'waiting 5 seconds before moving on..')
+            time.sleep(5)
+            self.log.error(f'now moving on..')
             self.print_cached_solution()
             actions = self.generate_actions(current_alloc=current_alloc, ilp_solution=x,
                                             canary_solution=z, accelerators=accelerators,
@@ -477,13 +491,13 @@ class Ilp(SchedulingAlgorithm):
         
         canary_dict = {}
         for isi in range(self.num_isi):
-            for model_variant in models:
-                canary_pct = canary_solution[model_variant, isi].X
+            for accelerator in accelerators:
+                canary_pct = canary_solution[accelerator, isi].X
                 if canary_pct > 0:
-                    canary_dict[(model_variant, isi)] = canary_pct
+                    canary_dict[(accelerator, isi)] = canary_pct
                 
                 if canary_pct > 0.0 and canary_pct <= 1.0:
-                    self.log.debug(f'variant: {model_variant}, isi: {isi}, canary pct: {canary_pct}')
+                    self.log.error(f'accelerator: {accelerator}, isi: {isi}, canary pct: {canary_pct}')
 
         # logging.info('required_predictors: {}'.format(required_predictors))
         # logging.info('canary dict: {}'.format(canary_dict))
