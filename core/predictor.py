@@ -29,6 +29,8 @@ class Predictor:
                  executor=None, simulator=None):
         # attributes related to predictor hardware
         self.log = logging.getLogger(__name__)
+        self.log.setLevel(logging_level)
+        self.logging_level = logging_level
 
         self.id = uuid.uuid4().hex
         self.acc_type = acc_type

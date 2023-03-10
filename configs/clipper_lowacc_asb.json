@@ -1,0 +1,11 @@
+{
+    "profiling_data": "profiling/aggregate_profiled.csv",
+    "trace_path": "traces/azure/250",
+    "allowed_variants": "traces/model_variants_clipper_lowacc",
+    "model_allocation": "clipper",
+    "static_allocation": "algorithms/clipper_solutions/clipper_lowacc_equal.txt",
+    "job_scheduling": "canary_routing",
+    "batching": "accscale",
+    "fixed_seed": true,
+    "seed": 10
+}
