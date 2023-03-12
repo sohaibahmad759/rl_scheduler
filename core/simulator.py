@@ -906,22 +906,11 @@ class Simulator:
             isi = self.idx_to_executor[idx]
             executor = self.executors[isi]
 
-            # executor_old_table = dict(filter(lambda x: x[0][1] == idx, canary_dict.items()))
-            # # we want to modify this table from {(accelerator, isi number) -> canary_pct}
-            # # to {accelerator -> canary_pct}
-            # executor_old_table = dict(map(lambda x: (x[0][0], x[1]), executor_old_table.items()))
-            # print()
-            # self.log.error(f'Executor: {isi}, routing table: {executor_old_table}')
-            # self.log.error(f'predictors by variant name: {executor.predictors_by_variant_name()}')
-            # self.log.error(f'executor_old_table: {executor_old_table}')
-
             executor_routing_table = dict(filter(lambda x: x[0][2] == idx, routing_table_ijk.items()))
-            # self.log.error(f'executor_routing_table: {executor_routing_table}')
             # just cleaning up from format {('CPU-0', 'roberta-large', 0): canary_pct}
             # to {('CPU', 'roberta-large'): canary_pct}
             executor_routing_table = dict(map(lambda x: ((x[0][0].split('-')[0], x[0][1]), x[1]),
                                               executor_routing_table.items()))
-            # self.log.error(f'executor_routing_table: {executor_routing_table}')
             executor.apply_routing_table(executor_routing_table)
         return
 

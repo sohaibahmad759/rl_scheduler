@@ -105,27 +105,6 @@ class Executor:
     def set_model_variants(self, model_variants={}):
         self.model_variants = model_variants
         self.variants_for_this_executor = model_variants[self.isi]
-        self.initialize_routing_table()
-
-    
-    def initialize_routing_table(self):
-        ''' Initializes the routing table to set equal probabilities for all
-        model variants
-        '''
-        # if len(self.model_variants) == 0:
-        #     raise ExecutorException(f'initialize_routing_table: no model variants set for executor {self}')
-        #     time.sleep(10)
-        #     return
-
-        # routing_table = {}
-        # model_variants = self.model_variants[self.isi]
-        # total_variants = len(model_variants)
-
-        # for model_variant in model_variants:
-        #     routing_table[model_variant] = 1.0 / total_variants
-
-        # self.canary_routing_table = routing_table
-        return
 
 
     def set_variant_accuracies(self, accuracies=None):
