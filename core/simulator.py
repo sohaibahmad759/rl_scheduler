@@ -736,13 +736,13 @@ class Simulator:
                 'Executor {} has assignment: {}'.format(isi, assignment))
         return
 
-    def apply_ilp_solution(self, required_predictors, canary_dict):
+    def apply_ilp_solution(self, required_predictors, canary_dict, ilp_x):
         ''' Takes in two dictionaries, (i) required_predictors to indicate
         model assignment, and (ii) canary_dict to define the canary routing
         table for the given model assignment
         '''
         self.apply_predictor_dict(required_predictors)
-        self.apply_canary_dict(canary_dict)
+        self.apply_canary_dict(canary_dict, ilp_x)
         return
 
     def apply_predictor_dict(self, required_predictors={}):
@@ -882,7 +882,7 @@ class Simulator:
                 all_tuples.append(tuple)
         return all_tuples
 
-    def apply_canary_dict(self, canary_dict):
+    def apply_canary_dict(self, canary_dict, ilp_x):
         ''' Takes in d dictionary 'canary_dict' with
         key: (model_variant, isi number)
         value: canary routing percentage
@@ -893,18 +893,35 @@ class Simulator:
             time.sleep(5)
             return
         
-        self.log.error(f'Canary dict: {canary_dict}')
+        routing_table_ijk = {}
+        for key1 in canary_dict:
+            for key2 in ilp_x:
+                (accelerator_1, rtype_1) = key1
+                (variant, accelerator_2) = key2
+                canary_value = canary_dict[key1]
+                if accelerator_1 == accelerator_2:
+                    routing_table_ijk[(accelerator_1, variant, rtype_1)] = canary_value
+
         for idx in self.idx_to_executor:
             isi = self.idx_to_executor[idx]
             executor = self.executors[isi]
 
-            executor_routing_table = dict(filter(lambda x: x[0][1] == idx, canary_dict.items()))
-            # we want to modify this table from {(accelerator, isi number) -> canary_pct}
-            # to {accelerator -> canary_pct}
-            executor_routing_table = dict(map(lambda x: (x[0][0], x[1]), executor_routing_table.items()))
-            self.log.error(f'Executor: {isi}, routing table: {executor_routing_table}')
-            self.log.error(f'predictors by variant name: {executor.predictors_by_variant_name()}')
+            # executor_old_table = dict(filter(lambda x: x[0][1] == idx, canary_dict.items()))
+            # # we want to modify this table from {(accelerator, isi number) -> canary_pct}
+            # # to {accelerator -> canary_pct}
+            # executor_old_table = dict(map(lambda x: (x[0][0], x[1]), executor_old_table.items()))
+            # print()
+            # self.log.error(f'Executor: {isi}, routing table: {executor_old_table}')
+            # self.log.error(f'predictors by variant name: {executor.predictors_by_variant_name()}')
+            # self.log.error(f'executor_old_table: {executor_old_table}')
 
+            executor_routing_table = dict(filter(lambda x: x[0][2] == idx, routing_table_ijk.items()))
+            # self.log.error(f'executor_routing_table: {executor_routing_table}')
+            # just cleaning up from format {('CPU-0', 'roberta-large', 0): canary_pct}
+            # to {('CPU', 'roberta-large'): canary_pct}
+            executor_routing_table = dict(map(lambda x: ((x[0][0].split('-')[0], x[0][1]), x[1]),
+                                              executor_routing_table.items()))
+            # self.log.error(f'executor_routing_table: {executor_routing_table}')
             executor.apply_routing_table(executor_routing_table)
         return
 

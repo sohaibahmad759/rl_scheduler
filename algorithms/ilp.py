@@ -43,24 +43,20 @@ class Ilp(SchedulingAlgorithm):
     def set_simulator(self, simulator):
         self.simulator = simulator
 
-    def get_latency_slo(self):
-        slo_dict = {}
-
-        for isi in range(self.num_isi):
-            isi_name = self.simulator.idx_to_executor[isi]
-            
-            # Currently, we set a latency SLO of 200ms for all ISIs (model families)
-            slo_dict[isi_name] = 5000
-
-        return slo_dict
+        if self.starting_allocation is not None:
+            predictor_dict, canary_dict, ilp_x = self.get_solution_from_file(self.starting_allocation)
+            self.simulator.apply_ilp_solution(predictor_dict, canary_dict, ilp_x)
 
     def get_solution_from_file(self, file):
         with open(file, mode='r') as rf:
             lines = rf.readlines()
             required_predictors = eval(lines[1].rstrip('\n'))
             canary_dict = eval(lines[3].rstrip('\n'))
+            ilp_x = None
+            if len(lines) > 4:
+                ilp_x = eval(lines[5].rstrip('\n'))
 
-            return required_predictors, canary_dict
+            return required_predictors, canary_dict, ilp_x
 
     def set_largest_batch_sizes(self, slo_dict, all_model_variants, accelerators):
         ''' Accesses the profiled data from the simulator to establish the maximum
@@ -291,6 +287,7 @@ class Ilp(SchedulingAlgorithm):
         m.setParam('NonConvex', 2)
         m.setParam('TimeLimit', 200)
         m.setParam('MIPGap', 0.5)
+        m.setParam('Threads', 24)
 
         # Add optimization variables
         w = m.addVars(rtypes, name='x')
@@ -367,9 +364,6 @@ class Ilp(SchedulingAlgorithm):
 
 
             m.addConstr(y[i] <= sum(p[i, j]*x[i, j] for j in models), 'c4_' + str(i))
-            # TODO: z[j,k] summed over j is <= 1.
-            # this constraint here is summing z[j,k] over k
-            # This could still be correct, just need to make sure
             m.addConstr(y[i] <= sum(z[i, k]*s[k] for k in rtypes), 'c5_' + str(i))
 
             m.addConstr(100000 * ind[i] >= sum(x[i, j] for j in models), 'c_ind_1_' + str(i))
@@ -388,7 +382,7 @@ class Ilp(SchedulingAlgorithm):
         # Though we could constrain canary_dict to split load equally if it does not do so
         # TODO: Check solution to see if load is being split equally as per Sommelier's description
         if self.static is 'spec_acc':
-            required_predictors, canary_dict = self.get_solution_from_file(self.starting_allocation)
+            required_predictors, canary_dict, _ = self.get_solution_from_file(self.starting_allocation)
             m = self.add_spec_acc_constraints(m, x, accelerators, required_predictors)
 
         # We only do this for AccScale/Proteus
@@ -410,7 +404,7 @@ class Ilp(SchedulingAlgorithm):
         m.optimize()
         end_time = time.time()
         ilp_overhead = end_time - start_time
-        self.log.debug(f'Time to solve ILP: {ilp_overhead} seconds')
+        self.log.warn(f'Time to solve ILP: {ilp_overhead} seconds')
 
         # Measuring routing table overhead for reporting in paper
         # measure_routing_table_overhead()
@@ -445,10 +439,10 @@ class Ilp(SchedulingAlgorithm):
             self.cached_solution['accelerators'] = accelerators
             self.cached_solution['models'] = models
 
-            self.log.error(f'w (effective accuracy): {(gp.quicksum(w).getValue()/sum(s.values()))}')
-            self.log.error(f'waiting 5 seconds before moving on..')
-            time.sleep(5)
-            self.log.error(f'now moving on..')
+            self.log.warn(f'w (effective accuracy): {(gp.quicksum(w).getValue()/sum(s.values()))}')
+            # self.log.error(f'waiting 5 seconds before moving on..')
+            # time.sleep(5)
+            # self.log.error(f'now moving on..')
             self.print_cached_solution()
             actions = self.generate_actions(current_alloc=current_alloc, ilp_solution=x,
                                             canary_solution=z, accelerators=accelerators,
@@ -460,7 +454,6 @@ class Ilp(SchedulingAlgorithm):
             # TODO: perhaps we should use cached solution in this case
             #       what if cached solution is also empty?
             raise IlpException('No solution')
-            time.sleep(10)
         
         return actions
 
@@ -474,6 +467,7 @@ class Ilp(SchedulingAlgorithm):
         new_alloc = np.zeros(current_alloc.shape)
 
         required_predictors = {}
+        ilp_x = {}
 
         for accelerator in accelerators:
             for model_variant in models:
@@ -488,6 +482,11 @@ class Ilp(SchedulingAlgorithm):
                         required_predictors[(model_variant, accelerator_type)] += 1
                     else:
                         required_predictors[(model_variant, accelerator_type)] = 1
+                    
+                    if (model_variant, accelerator) in ilp_x:
+                        ilp_x[(model_variant, accelerator)] += 1
+                    else:
+                        ilp_x[(model_variant, accelerator)] = 1
         
         canary_dict = {}
         for isi in range(self.num_isi):
@@ -496,24 +495,16 @@ class Ilp(SchedulingAlgorithm):
                 if canary_pct > 0:
                     canary_dict[(accelerator, isi)] = canary_pct
                 
-                if canary_pct > 0.0 and canary_pct <= 1.0:
-                    self.log.error(f'accelerator: {accelerator}, isi: {isi}, canary pct: {canary_pct}')
+                # if canary_pct > 0.0 and canary_pct <= 1.0:
+                #     self.log.error(f'accelerator: {accelerator}, isi: {isi}, canary pct: {canary_pct}')
 
         # logging.info('required_predictors: {}'.format(required_predictors))
         # logging.info('canary dict: {}'.format(canary_dict))
         # time.sleep(1)
-        self.simulator.apply_ilp_solution(required_predictors, canary_dict)
+        self.simulator.apply_ilp_solution(required_predictors, canary_dict, ilp_x)
         self.log.debug(f'required_predictors:\n{required_predictors}\ncanary_dict:\n{canary_dict}')
 
         return None
-
-        # print('new allocation:', new_alloc)
-        self.log.debug('current_allocation:' + str(current_alloc))
-
-        # Take a difference with current_alloc
-
-        # Return suggested actions from the difference matrix
-        return new_alloc
 
     def get_cached_solution(self):
         return self.cached_solution

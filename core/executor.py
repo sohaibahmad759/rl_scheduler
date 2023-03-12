@@ -12,6 +12,9 @@ from core.predictor import AccType, Predictor
 from core.exceptions import ExecutorException
 
 
+ACC_CONVERSION = {'CPU': 'CPU', 'GPU_AMPERE': 'GPU', 'VPU': 'VPU', 'GPU_PASCAL': 'FPGA'}
+
+
 class Executor:
     def __init__(self, isi, task_assignment, logging_level, n_qos_levels=1,
                  behavior=Behavior.BESTEFFORT, runtimes=None, variant_runtimes=None,
@@ -109,19 +112,19 @@ class Executor:
         ''' Initializes the routing table to set equal probabilities for all
         model variants
         '''
-        if len(self.model_variants) == 0:
-            raise ExecutorException(f'initialize_routing_table: no model variants set for executor {self}')
-            time.sleep(10)
-            return
+        # if len(self.model_variants) == 0:
+        #     raise ExecutorException(f'initialize_routing_table: no model variants set for executor {self}')
+        #     time.sleep(10)
+        #     return
 
-        routing_table = {}
-        model_variants = self.model_variants[self.isi]
-        total_variants = len(model_variants)
+        # routing_table = {}
+        # model_variants = self.model_variants[self.isi]
+        # total_variants = len(model_variants)
 
-        for model_variant in model_variants:
-            routing_table[model_variant] = 1.0 / total_variants
+        # for model_variant in model_variants:
+        #     routing_table[model_variant] = 1.0 / total_variants
 
-        self.canary_routing_table = routing_table
+        # self.canary_routing_table = routing_table
         return
 
 
@@ -226,34 +229,30 @@ class Executor:
         elif self.task_assignment == TaskAssignment.CANARY:
             predictor = None
 
-            selected_variant = random.choices(list(self.canary_routing_table.keys()),
+            selected = random.choices(list(self.canary_routing_table.keys()),
                                     weights=list(self.canary_routing_table.values()),
                                     k=1)[0]
-            self.log.error(f'selected_variant: {selected_variant}')
-            # Canary routing only tells us the model variant to use, but does not
-            # tell us which instance of that model variant. We therefore randomly
-            # choose different instances of the model variant, with the expectation
-            # that with a large enough number of requests, we will have spread out
-            # the requests evenly to all instances (law of large numbers)
+            (acc_type_unconvered, variant_name) = selected
+            acc_type_converted = ACC_CONVERSION[acc_type_unconvered]
+            selected = (acc_type_converted, variant_name)
 
-            # TODO: The peak profiled throughput on different instances of the same
-            # model variant hosted on different accelerators will be different.
-            # So instead of evenly spreading out the requests, it would make more
-            # sense to spread requests proportionally
-            variants = list(filter(lambda x: self.predictors[x].variant_name == self.predictors[selected_variant].variant_name,
-                                    self.predictors))
-            self.log.error(f'variants: {selected_variant}')
-            raise ExecutorException('just debugging')
+            # self.log.error(f'self.log.predictors: {list(map(lambda x: (AccType(x[1].acc_type).name, x[1].variant_name), self.predictors.items()))}')
+            variants_dict = dict(filter(lambda x: (AccType(x[1].acc_type).name, x[1].variant_name) == selected,
+                                        self.predictors.items()))
+            variants = list(variants_dict.keys())
+
+            if len(variants) == 0:
+                # Instead of forcefully adding a predictor here, we should fail
+                # this request instead
+                self.simulator.bump_failed_request_stats(event)
+                return
+
+            self.log.debug(f'Variants: {variants}')
             selected_predictor_id = random.choice(variants)
+            self.log.debug(f'Selected predictor id: {selected_predictor_id}')
             selected_predictor = self.predictors[selected_predictor_id]
+            self.log.debug(f'Selected predictor: {selected_predictor}')
             predictor = selected_predictor
-
-            # selected_predictor.enqueue_request(event, clock)
-            # self.assigned_requests[event.id] = selected_predictor
-
-            # First choose model variant
-
-            # Then within that model variant, perform earliest finish time
 
 
         elif self.task_assignment == TaskAssignment.INFAAS:
@@ -860,40 +859,34 @@ class Executor:
             self.add_predictor()
 
         if self.task_assignment == TaskAssignment.CANARY:
-            self.log.error(f'Canary routing table, keys: {list(self.canary_routing_table.keys())}, '
-                         f'weights: {list(self.canary_routing_table.values())}, isi: {self.isi}')
+            if len(self.canary_routing_table) == 0:
+                self.simulator.bump_failed_request_stats(event)
+                self.log.error('failed request')
+                return
 
-            selected_variant = random.choices(list(self.canary_routing_table.keys()),
+            selected = random.choices(list(self.canary_routing_table.keys()),
                                     weights=list(self.canary_routing_table.values()),
                                     k=1)[0]
-            self.log.error(f'Selected variant: {selected_variant}')
-            raise ExecutorException('just debugging')
-        
-            # Canary routing only tells us the model variant to use, but does not
-            # tell us which instance of that model variant. We therefore randomly
-            # choose different instances of the model variant, with the expectation
-            # that with a large enough number of requests, we will have spread out
-            # the requests evenly to all instances (law of large numbers)
+            (acc_type_unconvered, variant_name) = selected
+            acc_type_converted = ACC_CONVERSION[acc_type_unconvered]
+            selected = (acc_type_converted, variant_name)
 
-            # TODO: The peak profiled throughput on different instances of the same
-            # model variant hosted on different accelerators will be different.
-            # So instead of evenly spreading out the requests, it would make more
-            # sense to spread requests proportionally
-
-            self.log.debug(f'self.predictors names: {list(map(lambda x: x[1].variant_name, self.predictors.items()))}')
-            variants_dict = dict(filter(lambda x: x[1].variant_name == selected_variant,
+            # self.log.error(f'self.log.predictors: {list(map(lambda x: (AccType(x[1].acc_type).name, x[1].variant_name), self.predictors.items()))}')
+            variants_dict = dict(filter(lambda x: (AccType(x[1].acc_type).name, x[1].variant_name) == selected,
                                         self.predictors.items()))
             variants = list(variants_dict.keys())
 
+            # print('variants start')
+            # for variant_id in variants:
+            #     variant = self.predictors[variant_id]
+                # self.log.error(f'variant type: {variant.variant_name}, acc_type: {variant.acc_type}')
+            # print('variants end')
+
             if len(variants) == 0:
-                # TODO: Instead of forcefully adding a predictor here, we should
-                #       fail this request instead
+                # Instead of forcefully adding a predictor here, we should fail this
+                # request instead
                 self.simulator.bump_failed_request_stats(event)
                 return
-                self.add_predictor(variant_name=selected_variant)
-                variants_dict = dict(filter(lambda x: x[1].variant_name == selected_variant,
-                                            self.predictors.items()))
-                variants = list(variants_dict.keys())
 
             self.log.debug(f'Variants: {variants}')
             selected_predictor_id = random.choice(variants)

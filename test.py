@@ -80,10 +80,20 @@ def validate_config(config: dict, filename: str):
                               f'config file: {filename}\nbeta value is needed if '
                               f'model allocation is one of the following: ilp, ilp_alpha, '
                               f'sommelier')
+    
+    if model_allocation in ['ilp', 'ilp_alpha', 'sommelier'] and 'solve_interval' not in config:
+        raise ConfigException(f'solve_interval for model allocation not specified in '
+                              f'config file: {filename}\nbeta value is needed if '
+                              f'model allocation is one of the following: ilp, ilp_alpha, '
+                              f'sommelier')
+    
+    if not(model_allocation in ['ilp', 'ilp_alpha', 'sommelier']) and 'solve_interval' in config:
+        raise ConfigException(f'unexpected parameter solve_interval specificed in config: {filename}'
+                              f'\solve_interval is only needed for ILP, ILP-Alpha or Sommelier')
 
     if not(model_allocation in ['ilp', 'ilp_alpha', 'sommelier']) and 'beta' in config:
         raise ConfigException(f'unexpected parameter beta specificed in config: {filename}'
-                              f'\nbeta is only needed for ILP or ILP-Alpha')
+                              f'\nbeta is only needed for ILP, ILP-Alpha or Sommelier')
 
     if (model_allocation == 'clipper' or model_allocation == 'sommelier') and 'static_allocation' not in config:
         raise ConfigException(f'expected static_allocation file path for model allocation '
@@ -139,6 +149,7 @@ def main(args):
 
     validate_config(config=config, filename=args.config_file)
 
+    solve_interval = config['solve_interval']
     model_assignment = config['model_allocation']
     job_scheduling = config['job_scheduling']
     batching_algo = config['batching']
@@ -182,7 +193,13 @@ def main(args):
     elif model_assignment == 'load_proportional':
         print('Testing with load proportional algorithm')
     elif model_assignment == 'ilp':
-        ilp = Ilp(allocation_window=allocation_window, beta=beta, logging_level=logging_level)
+        if 'static_allocation' in config:
+            ilp = Ilp(allocation_window=allocation_window, beta=beta,
+                    starting_allocation=config['static_allocation'],
+                    logging_level=logging_level)
+        else:
+            ilp = Ilp(allocation_window=allocation_window, beta=beta,
+                    logging_level=logging_level)
         ilp_applied = True
         print(f'Testing with solution given by ILP (no alpha, beta={beta})')
     elif model_assignment == 'ilp_alpha':
@@ -360,7 +377,7 @@ def main(args):
                 ilp.set_simulator(env.simulator)
 
             if ilp_applied == True:
-                period_tuning = 1
+                period_tuning = solve_interval
                 # TODO: Tune how frequently the ILP is run by tuning 'period_tuning'
                 #       The bigger it is, the less frequently the ILP is invoked
                 #       Also, what are its implications on allocation window sizes and
@@ -475,7 +492,7 @@ def main(args):
     logfile.close()
 
     completed_requests = env.simulator.completed_requests
-    sim_time_elapsed = env.simulator.clock / 1000
+    sim_time_elapsed = env.simulator.clock / testing_steps
     overall_throughput = completed_requests / sim_time_elapsed
 
     print()
