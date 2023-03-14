@@ -25,7 +25,10 @@ logfile_list = sorted(glob.glob(os.path.join('..', 'logs', 'throughput', 'select
 #                 '../logs/throughput/selected/infaas_unit.csv',
 #                 '../logs/throughput/selected/infaas_accuracy.csv',
 #                 '../logs/throughput/selected/accscale.csv']
-logfile_list = ['../logs/throughput/selected_asplos/proteus_300ms.csv']
+logfile_list = [
+                '../logs/throughput/selected_asplos/infaas_accuracy_300ms.csv',
+                '../logs/throughput/selected_asplos/proteus_300ms.csv'
+                ]
 # logfile_list = sorted(glob.glob(os.path.join('..', 'logs', 'throughput', 'selected', 'bursty', 'infaas_accuracy.csv')))
 # logfile_list = sorted(glob.glob(os.path.join('..', 'logs', 'paper_jun13_onwards', 'infaas', '3', '*.csv')))
 # print(logfile_list)
@@ -38,9 +41,10 @@ markers = ['o', 'v', '^', '*', 's']
 #             'INFaaS-Accuracy', 'INFaaS-Instance']
 # algorithms = ['Clipper++ (High Throughput)', 'Clipper++ (High Accuracy)',
 #             'INFaaS-Instance', 'INFaaS-Accuracy', 'AccScale']
-algorithms = ['Proteus']
+algorithms = ['INFaaS-Accuracy', 'Proteus']
 colors = ['#729ECE', '#FF9E4A', '#ED665D', '#AD8BC9', '#67BF5C']
 
+color_idx = 0
 for idx in range(len(logfile_list)):
     logfile = logfile_list[idx]
     
@@ -48,9 +52,16 @@ for idx in range(len(logfile_list)):
 
     df = pd.read_csv(logfile)
 
+    aggregated = df.groupby(df.index // 10).sum()
+    aggregated = df.groupby(df.index // 40).mean()
+    print(f'df: {df}')
+    print(f'aggregated: {aggregated}')
+    df = aggregated
+
     start_cutoff = 0
 
-    time = df['wallclock_time'].values[start_cutoff:]
+    # time = df['wallclock_time'].values[start_cutoff:]
+    time = df['simulation_time'].values[start_cutoff:]
     demand = df['demand'].values[start_cutoff:]
     throughput = df['throughput'].values[start_cutoff:]
     capacity = df['capacity'].values[start_cutoff:]
@@ -62,11 +73,15 @@ for idx in range(len(logfile_list)):
     print(time[0])
     print(time[-1])
 
-
-    # plt.plot(time, demand, label='Demand')
+    if idx == 0:
+        plt.plot(time, demand, label='Demand', color=colors[color_idx],
+                 marker=markers[color_idx])
+        color_idx += 1
     # plt.plot(time, throughput, label=algorithm, marker=markers[idx])
     # plt.plot(time, throughput, label=algorithm)
-    plt.plot(time, throughput, label=algorithms[idx], color=colors[idx])
+    plt.plot(time, throughput, label=algorithms[idx], color=colors[color_idx],
+             marker=markers[color_idx])
+    color_idx += 1
 # plt.plot(time, capacity, label='capacity')
 plt.grid()
 
@@ -86,6 +101,8 @@ plt.ylabel('Requests per second', fontsize=25)
 plt.xticks(np.arange(0, 25, 4), fontsize=15)
 plt.yticks(np.arange(0, y_cutoff, 100), fontsize=15)
 plt.savefig(os.path.join('..', 'figures', 'throughput.pdf'), dpi=500, bbox_inches='tight')
+
+print(f'Warning! We should not be using mean to aggregate, instead we should be using sum')
 
 # accuracy_logfile = os.path.join('..', 'logs', 'log_ilp_accuracy.txt')
 # accuracy_rf = open(accuracy_logfile, mode='r')

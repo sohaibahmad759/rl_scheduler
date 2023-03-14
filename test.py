@@ -76,14 +76,14 @@ def validate_config(config: dict, filename: str):
                               f'\nPossible choices: {model_allocation_algos}')
 
     if model_allocation in ['ilp', 'ilp_alpha', 'sommelier'] and 'beta' not in config:
-        raise ConfigException(f'beta value for model allocation not specified in '
+        raise ConfigException(f'beta value not specified for model allocation  in '
                               f'config file: {filename}\nbeta value is needed if '
                               f'model allocation is one of the following: ilp, ilp_alpha, '
                               f'sommelier')
     
     if model_allocation in ['ilp', 'ilp_alpha', 'sommelier'] and 'solve_interval' not in config:
-        raise ConfigException(f'solve_interval for model allocation not specified in '
-                              f'config file: {filename}\nbeta value is needed if '
+        raise ConfigException(f'solve_interval not specified for model allocation in '
+                              f'config file: {filename}\nsolve_interval value is needed if '
                               f'model allocation is one of the following: ilp, ilp_alpha, '
                               f'sommelier')
     
@@ -238,14 +238,14 @@ def main(args):
     rate_logger = logging.getLogger('Rate logger')
     rate_loggerfile = os.path.join('logs', 'throughput', str(time.time()) + '_' +  model_assignment + '.csv')
     rate_logger.addHandler(logging.FileHandler(rate_loggerfile, mode='w'))
-    rate_logger.setLevel(logging.WARN)
+    rate_logger.setLevel(logging.INFO)
     rate_logger.info('wallclock_time,simulation_time,demand,throughput,capacity')
 
     rate_logger_per_model = logging.getLogger('Rate logger per model')
     rate_logger_per_model_file = os.path.join('logs', 'throughput_per_model', str(time.time()) + '_' + model_assignment + '.csv')
     rate_logger_per_model.addHandler(
         logging.FileHandler(rate_logger_per_model_file, mode='w'))
-    rate_logger_per_model.setLevel(logging.WARN)
+    rate_logger_per_model.setLevel(logging.INFO)
     rate_logger_per_model.info(
         'wallclock_time,simulation_time,demand_nth_model,throughput_nth_model,normalized_throughput_nth_model,accuracy_nth_model,,,,,,,,,,,,,,,,')
 

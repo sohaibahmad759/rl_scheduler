@@ -7,8 +7,7 @@ import numpy as np
 # TODO: comma-separated list of QoS values [3,4,5,7,7,7,2]. select from this list
 def get_args():
     ap = argparse.ArgumentParser()
-    ap.add_argument('--output_dir', '-o', required=False,
-                    default=os.path.join(os.getcwd(), 'traces/synthetic/newly_generated'),
+    ap.add_argument('--output_dir', '-o', required=True,
                     dest='output_dir', help='Directory to write the trace files to. ' +
                     'Default is current directory')
     ap.add_argument('--num_files', '-n', required=True,

@@ -920,7 +920,11 @@ class Simulator:
                 canary_value = canary_dict[key1]
                 if accelerator_1 == accelerator_2:
                     routing_table_ijk[(accelerator_1, variant, rtype_1)] = canary_value
-        self.log.debug(f'routing_table_ijk: {routing_table_ijk}')
+        self.log.error(f'len: {len(canary_dict)}, canary_dict: {canary_dict}')
+        self.log.error('')
+        self.log.error(f'len: {len(routing_table_ijk)}, routing_table_ijk: {routing_table_ijk}')
+        self.log.error('')
+        self.log.error(f'len: {len(ilp_x)}, ilp_x: {ilp_x}')
 
         for idx in self.idx_to_executor:
             isi = self.idx_to_executor[idx]

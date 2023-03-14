@@ -342,7 +342,10 @@ class Ilp(SchedulingAlgorithm):
             # TODO: edit: it seems like this issue has been resolved with constraint c3_3_
             # m.addConstr(sum(b[j, k] * z[j, k] for j in models) == sum(b[j, k] for j in models), 'c3_' + str(k))
             m.addConstr(sum(sum(b[j, k] * z[i, k] * x[i, j] for j in models) for i in accelerators) == sum(z[i, k] for i in accelerators), 'c3_3k_' + str(k))
-            m.addConstr(sum(z[i, k] for i in accelerators) <= 1, 'c3_2_' + str(k))
+            if self.simulator.model_assignment == 'ilp':
+                m.addConstr(sum(z[i, k] for i in accelerators) == 1, 'c3_2_' + str(k))
+            else:
+                m.addConstr(sum(z[i, k] for i in accelerators) <= 1, 'c3_2_' + str(k))
             # m.addConstr(sum(z[j, k] * ind[j] for j in models) == 1, 'c_ind_3_' + str(k))
 
             # raise IlpException('just debugging')
