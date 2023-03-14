@@ -45,6 +45,10 @@ class Ilp(SchedulingAlgorithm):
 
         if self.starting_allocation is not None:
             predictor_dict, canary_dict, ilp_x = self.get_solution_from_file(self.starting_allocation)
+            self.log.error(f'ilp_x: {ilp_x}')
+            self.log.error(f'canary_dict: {canary_dict}')
+            self.log.error(f'predictor_dict: {predictor_dict}')
+            # time.sleep(10)
             self.simulator.apply_ilp_solution(predictor_dict, canary_dict, ilp_x)
 
     def get_solution_from_file(self, file):
@@ -287,7 +291,7 @@ class Ilp(SchedulingAlgorithm):
         m.setParam('NonConvex', 2)
         m.setParam('TimeLimit', 200)
         m.setParam('MIPGap', 0.5)
-        m.setParam('Threads', 24)
+        m.setParam('Threads', 8)
 
         # Add optimization variables
         w = m.addVars(rtypes, name='x')

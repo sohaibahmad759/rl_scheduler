@@ -1,6 +1,6 @@
 {
     "profiling_data": "profiling/aggregate_profiled.csv",
-    "trace_path": "traces/azure/250",
+    "trace_path": "traces/azure/300",
     "allowed_variants": "traces/model_variants",
     "model_allocation": "sommelier",
     "static_allocation": "algorithms/sommelier_solutions/starting_uniform.txt",
@@ -8,5 +8,6 @@
     "batching": "accscale",
     "beta": 0.8,
     "fixed_seed": true,
-    "seed": 10
+    "seed": 10,
+    "solve_interval": 100
 }

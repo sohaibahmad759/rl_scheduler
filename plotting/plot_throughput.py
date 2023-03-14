@@ -20,11 +20,12 @@ logfile_list = sorted(glob.glob(os.path.join('..', 'logs', 'throughput', 'select
 #                 '../logs/throughput/selected/bursty/infaas_unit.csv',
 #                 '../logs/throughput/selected/bursty/infaas_accuracy.csv',
 #                 '../logs/throughput/selected/bursty/accscale.csv']
-logfile_list = ['../logs/throughput/selected/clipper_high_throughput.csv',
-                '../logs/throughput/selected/clipper_high_accuracy.csv',
-                '../logs/throughput/selected/infaas_unit.csv',
-                '../logs/throughput/selected/infaas_accuracy.csv',
-                '../logs/throughput/selected/accscale.csv']
+# logfile_list = ['../logs/throughput/selected/clipper_high_throughput.csv',
+#                 '../logs/throughput/selected/clipper_high_accuracy.csv',
+#                 '../logs/throughput/selected/infaas_unit.csv',
+#                 '../logs/throughput/selected/infaas_accuracy.csv',
+#                 '../logs/throughput/selected/accscale.csv']
+logfile_list = ['../logs/throughput/selected_asplos/proteus_300ms.csv']
 # logfile_list = sorted(glob.glob(os.path.join('..', 'logs', 'throughput', 'selected', 'bursty', 'infaas_accuracy.csv')))
 # logfile_list = sorted(glob.glob(os.path.join('..', 'logs', 'paper_jun13_onwards', 'infaas', '3', '*.csv')))
 # print(logfile_list)
@@ -35,8 +36,9 @@ print(logfile)
 markers = ['o', 'v', '^', '*', 's']
 # algorithms = ['AccScale', 'Clipper++ (High Accuracy)', 'Clipper++ (High Throughput)',
 #             'INFaaS-Accuracy', 'INFaaS-Instance']
-algorithms = ['Clipper++ (High Throughput)', 'Clipper++ (High Accuracy)',
-            'INFaaS-Instance', 'INFaaS-Accuracy', 'AccScale']
+# algorithms = ['Clipper++ (High Throughput)', 'Clipper++ (High Accuracy)',
+#             'INFaaS-Instance', 'INFaaS-Accuracy', 'AccScale']
+algorithms = ['Proteus']
 colors = ['#729ECE', '#FF9E4A', '#ED665D', '#AD8BC9', '#67BF5C']
 
 for idx in range(len(logfile_list)):
@@ -76,13 +78,13 @@ plt.grid()
 # plt.rc('legend', fontsize=30)    # legend
 
 y_cutoff = max(demand) + 50
-y_cutoff = 200
+# y_cutoff = 200
 
 plt.legend(loc='upper center', bbox_to_anchor=(0.5, 1.45), ncol=2, fontsize=15)
 plt.xlabel('Time (min)', fontsize=25)
 plt.ylabel('Requests per second', fontsize=25)
 plt.xticks(np.arange(0, 25, 4), fontsize=15)
-plt.yticks(np.arange(0, y_cutoff, 20), fontsize=15)
+plt.yticks(np.arange(0, y_cutoff, 100), fontsize=15)
 plt.savefig(os.path.join('..', 'figures', 'throughput.pdf'), dpi=500, bbox_inches='tight')
 
 # accuracy_logfile = os.path.join('..', 'logs', 'log_ilp_accuracy.txt')

@@ -16,6 +16,10 @@ from core.exceptions import SimulatorException
 
 MAX_CLOCK_VALUE = 1439934
 MAX_CLOCK_VALUE = 0
+# If the simulator clock is within this threshold of the starting time of
+# the last request in queue for a given executor, it will refill the event
+# queue
+QUEUE_REFILL_THRESHOLD = 2000
 
 
 class Simulator:
@@ -91,6 +95,7 @@ class Simulator:
 
         self.trace_files = {}
         self.trace_file_finished = set()
+        self.last_request_starting = {}
 
         self.accuracy_logfile = open('logs/log_ilp_accuracy.txt', mode='w')
         self.latency_logfilename = os.path.join('logs', 'latency',
@@ -330,6 +335,10 @@ class Simulator:
             if start_time >= read_until:
                 break
             # print(self.requests_added)
+            # We want to keep track of where we stopped adding requests for
+            # each file, so that when the clock gets closer to that time,
+            # we can refill the event queue
+            self.last_request_starting[isi_name] = start_time
         return False
 
     def set_model_variants(self, isi_name, model_variant_list):
@@ -632,30 +641,39 @@ class Simulator:
             self.clock = current_event.start_time
             self.process(current_event, self.clock)
 
-            # in case we are loading file pointers instead of entire file
-            if self.store_file_pointers:
-                finished = self.refill_event_queue()
-                # if finished:
-                #     break
+            for isi in self.last_request_starting:
+                last_request_starting = self.last_request_starting[isi]
+                if self.clock + QUEUE_REFILL_THRESHOLD >= last_request_starting:
+                    # in case we are loading file pointers instead of entire file
+                    if self.store_file_pointers:
+                        finished = self.refill_event_queue(isi)
+                        # if finished:
+                        #     break
         # print(f'ending simulate_until. until: {until}, queue length: {len(self.event_queue)}, '
         #       f'first event start time: {self.event_queue[0].start_time}')
         # time.sleep(5)
         return
 
-    def refill_event_queue(self):
+    def refill_event_queue(self, isi=None):
         # self.log.debug(f'simulator clock: {self.clock}')
         if len(self.trace_files) == 0:
             # we are in a deepcopied simulator instance
             return False
         # if len(self.event_queue) < 10000:
         finished = True
-        for isi_name in self.trace_files:
+
+        if isi is None:
+            trace_files = self.trace_files
+        else:
+            trace_files = {isi: self.trace_files[isi]}
+
+        for isi_name in trace_files:
             if isi_name in self.trace_file_finished:
                 continue
             readfile = self.trace_files[isi_name]
             # print('Adding requests from {}'.format(readfile))
             file_finished = self.add_requests_from_trace_pointer(isi_name, readfile,
-                                                                    read_until=self.clock+10000)
+                                                                read_until=self.clock+10000)
             if file_finished:
                 self.trace_file_finished.add(isi_name)
                 self.log.info('Trace file {} finished'.format(isi_name))
@@ -888,6 +906,7 @@ class Simulator:
         value: canary routing percentage
         And applies it to the canary routing table for each ISI (executor)
         '''
+        self.log.debug(f'len: {len(canary_dict)}, canary_dict: {canary_dict}')
         if len(canary_dict) == 0:
             self.log.error('apply_canary_dict: No canary dictionary passed')
             time.sleep(5)
@@ -901,6 +920,7 @@ class Simulator:
                 canary_value = canary_dict[key1]
                 if accelerator_1 == accelerator_2:
                     routing_table_ijk[(accelerator_1, variant, rtype_1)] = canary_value
+        self.log.debug(f'routing_table_ijk: {routing_table_ijk}')
 
         for idx in self.idx_to_executor:
             isi = self.idx_to_executor[idx]

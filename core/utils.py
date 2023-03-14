@@ -21,7 +21,7 @@ def log_throughput(logger, observation, simulation_time, allocation_window):
     # logger.debug('allocation matrix:' + str(allocation_matrix))
     # logger.debug('capacity matrix:' + str(capacity_matrix))
     
-    logger.debug(f'{time.time()},{simulation_time},{demand},{throughput},{capacity}')
+    logger.info(f'{time.time()},{simulation_time},{demand},{throughput},{capacity}')
 
 def log_thput_accuracy_per_model(logger, simulation_time, requests, failed, accuracy):
     ''' Writes throughput and accuracy logs per model in the following CSV format:
@@ -41,4 +41,4 @@ def log_thput_accuracy_per_model(logger, simulation_time, requests, failed, accu
 
         line += f'{normalized_throughput},{accuracy[model]}'
 
-    logger.debug(line)
+    logger.info(line)
