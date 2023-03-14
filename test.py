@@ -22,7 +22,7 @@ def getargs():
                         help='Initializes random runtimes if used. Otherwise, uses static runtimes.')
     # parser.add_argument('--test_steps', '-t', required=False, default=100000,
     #                     dest='test_steps', help='Number of steps to test for. Default value is 1000')
-    parser.add_argument('--action_size', '-a', required=False, default=10,
+    parser.add_argument('--action_size', '-a', required=False, default=1,
                         dest='action_size', help='Number of scheduling changes to make in each iteration. ' +
                         'Default value is 15')
     parser.add_argument('--reward_window_length', '-l', required=False, default=10,
@@ -239,7 +239,7 @@ def main(args):
     rate_loggerfile = os.path.join('logs', 'throughput', str(time.time()) + '_' +  model_assignment + '.csv')
     rate_logger.addHandler(logging.FileHandler(rate_loggerfile, mode='w'))
     rate_logger.setLevel(logging.INFO)
-    rate_logger.info('wallclock_time,simulation_time,demand,throughput,capacity')
+    rate_logger.info('wallclock_time,simulation_time,demand,throughput,capacity,effective_accuracy,total_accuracy,successful')
 
     rate_logger_per_model = logging.getLogger('Rate logger per model')
     rate_logger_per_model_file = os.path.join('logs', 'throughput_per_model', str(time.time()) + '_' + model_assignment + '.csv')
@@ -254,6 +254,8 @@ def main(args):
     failed_requests = 0
     total_requests = 0
     successful_requests = 0
+    total_successful = 0
+    total_accuracy = 0
     ilp_rounds = 0
     start = time.time()
     step_time = time.time()
@@ -468,14 +470,19 @@ def main(args):
                           str(failed_requests) + '\n')
             requests_per_model, failed_per_model, accuracy_per_model, successful_per_model = env.simulator.get_thput_accuracy_per_model()
             utils.log_thput_accuracy_per_model(rate_logger_per_model, i, requests_per_model,
-                                            failed_per_model, accuracy_per_model)
+                                               failed_per_model, accuracy_per_model)
         if done:
             break
         rl_reward += reward
         env.render()
 
-
-        utils.log_throughput(rate_logger, observation, i, allocation_window)
+        new_total_accuracy = env.simulator.total_accuracy
+        new_total_successful = env.simulator.total_successful
+        utils.log_throughput(rate_logger, observation, i, allocation_window,
+                             new_total_accuracy-total_accuracy,
+                             new_total_successful-total_successful)
+        total_accuracy = new_total_accuracy
+        total_successful = new_total_successful
         # print('observation:', observation)
 
     end = time.time()
@@ -506,7 +513,7 @@ def main(args):
     print(f'Overall throughput (requests/sec): {overall_throughput}')
 
     total_accuracy = env.simulator.total_accuracy
-    effective_accuracy = total_accuracy / completed_requests
+    effective_accuracy = total_accuracy / env.simulator.total_successful
     print(f'Effective accuracy (over served requests): {effective_accuracy}')
     print()
 

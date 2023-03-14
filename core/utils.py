@@ -2,7 +2,8 @@ import time
 import numpy as np
 
 
-def log_throughput(logger, observation, simulation_time, allocation_window):
+def log_throughput(logger, observation, simulation_time, allocation_window,
+                   total_accuracy, total_successful):
     ''' Writes aggregate throughput and accuracy logs in the following CSV format:
     wallclock_time,simulation_time,demand,throughput,capacity
     '''
@@ -17,11 +18,17 @@ def log_throughput(logger, observation, simulation_time, allocation_window):
     capacity_matrix = np.multiply(allocation_matrix, throughput_matrix)
     capacity = np.sum(capacity_matrix) * allocation_window / 1000
 
+    if total_successful == 0:
+        effective_accuracy = 0
+    else:
+        effective_accuracy = total_accuracy / total_successful
+
     # logger.debug('latency matrix:' + str(latency_matrix))
     # logger.debug('allocation matrix:' + str(allocation_matrix))
     # logger.debug('capacity matrix:' + str(capacity_matrix))
     
-    logger.info(f'{time.time()},{simulation_time},{demand},{throughput},{capacity}')
+    logger.info(f'{time.time()},{simulation_time},{demand},{throughput},{capacity},'
+                f'{effective_accuracy},{total_accuracy},{total_successful}')
 
 def log_thput_accuracy_per_model(logger, simulation_time, requests, failed, accuracy):
     ''' Writes throughput and accuracy logs per model in the following CSV format:

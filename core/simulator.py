@@ -920,11 +920,11 @@ class Simulator:
                 canary_value = canary_dict[key1]
                 if accelerator_1 == accelerator_2:
                     routing_table_ijk[(accelerator_1, variant, rtype_1)] = canary_value
-        self.log.error(f'len: {len(canary_dict)}, canary_dict: {canary_dict}')
-        self.log.error('')
-        self.log.error(f'len: {len(routing_table_ijk)}, routing_table_ijk: {routing_table_ijk}')
-        self.log.error('')
-        self.log.error(f'len: {len(ilp_x)}, ilp_x: {ilp_x}')
+        self.log.debug(f'len: {len(canary_dict)}, canary_dict: {canary_dict}')
+        self.log.debug('')
+        self.log.debug(f'len: {len(routing_table_ijk)}, routing_table_ijk: {routing_table_ijk}')
+        self.log.debug('')
+        self.log.debug(f'len: {len(ilp_x)}, ilp_x: {ilp_x}')
 
         for idx in self.idx_to_executor:
             isi = self.idx_to_executor[idx]
@@ -1199,11 +1199,11 @@ class Simulator:
         ''' Generate an END_REQUEST event and insert it into the simulator's
         event queue.
         '''
-        self.total_accuracy += accuracy_seen
+        # self.total_accuracy += accuracy_seen
         isi = event.desc
         self.insert_event(end_time, EventType.END_REQUEST,
                         event.desc, id=event.id, qos_level=event.qos_level,
-                        event_counter=event.start_time)
+                        event_counter=event.start_time, accuracy_seen=accuracy_seen)
         self.accuracy_logfile.write(str(accuracy_seen) + '\n')
         self.accuracy_per_model[isi].append(accuracy_seen)
         
@@ -1318,6 +1318,7 @@ class Simulator:
         self.successful_per_model[isi] += 1
         self.slo_timeouts['succeeded'] += 1
         self.total_successful += 1
+        self.total_accuracy += event.accuracy_seen
         return
 
     def bump_overall_request_stats(self, event):
@@ -1341,24 +1342,25 @@ class Simulator:
 
     def insert_event(self, start_time, type, desc, runtime=None, id='', deadline=1000,
                     qos_level=0, accuracy=None, predictor=None, executor=None,
-                    event_counter=0):
+                    event_counter=0, accuracy_seen=None):
         if type == EventType.END_REQUEST:
             event = Event(start_time, type, desc, runtime, id=id, deadline=deadline,
-                            qos_level=qos_level, event_counter=event_counter)
+                          qos_level=qos_level, event_counter=event_counter,
+                          accuracy_seen=accuracy_seen)
         elif type == EventType.FINISH_BATCH:
             event = Event(start_time, type, desc, runtime, id=id, deadline=deadline,
-                            qos_level=qos_level, accuracy=accuracy, predictor=predictor,
-                            executor=executor)
+                          qos_level=qos_level, accuracy=accuracy, predictor=predictor,
+                          executor=executor)
         elif type == EventType.SLO_EXPIRING:
             event = Event(start_time, type, desc, runtime, id=id, deadline=deadline,
-                            qos_level=qos_level, accuracy=accuracy, predictor=predictor,
-                            executor=executor, event_counter=event_counter)
+                          qos_level=qos_level, accuracy=accuracy, predictor=predictor,
+                          executor=executor, event_counter=event_counter)
         elif type == EventType.START_REQUEST:
             event = Event(start_time, type, desc, runtime, deadline=deadline,
-                            qos_level=qos_level, accuracy=accuracy)
+                          qos_level=qos_level, accuracy=accuracy)
         else:
             event = Event(start_time, type, desc, runtime, deadline=deadline,
-                            qos_level=qos_level, accuracy=accuracy)
+                          qos_level=qos_level, accuracy=accuracy)
 
         # using binary search to reduce search time complexity
         idx = self.binary_find_index(self.event_queue, start_time)

@@ -26,8 +26,8 @@ logfile_list = sorted(glob.glob(os.path.join('..', 'logs', 'throughput', 'select
 #                 '../logs/throughput/selected/infaas_accuracy.csv',
 #                 '../logs/throughput/selected/accscale.csv']
 logfile_list = [
-                '../logs/throughput/selected_asplos/infaas_accuracy_300ms.csv',
-                '../logs/throughput/selected_asplos/proteus_300ms.csv'
+                '../logs/throughput/selected_asplos/proteus_300ms.csv',
+                '../logs/throughput/selected_asplos/infaas_accuracy_300ms.csv'
                 ]
 # logfile_list = sorted(glob.glob(os.path.join('..', 'logs', 'throughput', 'selected', 'bursty', 'infaas_accuracy.csv')))
 # logfile_list = sorted(glob.glob(os.path.join('..', 'logs', 'paper_jun13_onwards', 'infaas', '3', '*.csv')))
@@ -41,9 +41,10 @@ markers = ['o', 'v', '^', '*', 's']
 #             'INFaaS-Accuracy', 'INFaaS-Instance']
 # algorithms = ['Clipper++ (High Throughput)', 'Clipper++ (High Accuracy)',
 #             'INFaaS-Instance', 'INFaaS-Accuracy', 'AccScale']
-algorithms = ['INFaaS-Accuracy', 'Proteus']
+algorithms = ['Proteus', 'INFaaS-Accuracy']
 colors = ['#729ECE', '#FF9E4A', '#ED665D', '#AD8BC9', '#67BF5C']
 
+fig, (ax1, ax2) = plt.subplots(2)
 color_idx = 0
 for idx in range(len(logfile_list)):
     logfile = logfile_list[idx]
@@ -53,7 +54,7 @@ for idx in range(len(logfile_list)):
     df = pd.read_csv(logfile)
 
     aggregated = df.groupby(df.index // 10).sum()
-    aggregated = df.groupby(df.index // 40).mean()
+    aggregated = df.groupby(df.index // 5).mean()
     print(f'df: {df}')
     print(f'aggregated: {aggregated}')
     df = aggregated
@@ -66,6 +67,11 @@ for idx in range(len(logfile_list)):
     throughput = df['throughput'].values[start_cutoff:]
     capacity = df['capacity'].values[start_cutoff:]
 
+    effective_accuracy = df['effective_accuracy'].values[start_cutoff:]
+    print(f'effective accuracy: {effective_accuracy}')
+
+    successful = df['successful'].values[start_cutoff:]
+
     time = time
     time = [x - time[0] for x in time]
     print(time[-1])
@@ -74,16 +80,19 @@ for idx in range(len(logfile_list)):
     print(time[-1])
 
     if idx == 0:
-        plt.plot(time, demand, label='Demand', color=colors[color_idx],
+        ax1.plot(time, demand, label='Demand', color=colors[color_idx],
                  marker=markers[color_idx])
         color_idx += 1
     # plt.plot(time, throughput, label=algorithm, marker=markers[idx])
     # plt.plot(time, throughput, label=algorithm)
-    plt.plot(time, throughput, label=algorithms[idx], color=colors[color_idx],
+    ax1.plot(time, successful, label=algorithms[idx], color=colors[color_idx],
+             marker=markers[color_idx])
+    ax2.plot(time, effective_accuracy, label=algorithms[idx], color=colors[color_idx],
              marker=markers[color_idx])
     color_idx += 1
 # plt.plot(time, capacity, label='capacity')
-plt.grid()
+ax1.grid()
+ax2.grid()
 
 # plt.rcParams.update({'font.size': 30})
 # plt.rc('axes', titlesize=30)     # fontsize of the axes title
@@ -95,14 +104,21 @@ plt.grid()
 y_cutoff = max(demand) + 50
 # y_cutoff = 200
 
-plt.legend(loc='upper center', bbox_to_anchor=(0.5, 1.45), ncol=2, fontsize=15)
-plt.xlabel('Time (min)', fontsize=25)
-plt.ylabel('Requests per second', fontsize=25)
-plt.xticks(np.arange(0, 25, 4), fontsize=15)
-plt.yticks(np.arange(0, y_cutoff, 100), fontsize=15)
-plt.savefig(os.path.join('..', 'figures', 'throughput.pdf'), dpi=500, bbox_inches='tight')
+ax1.legend(loc='upper center', bbox_to_anchor=(0.5, 1.50), ncol=3, fontsize=15)
+ax1.set_ylabel('Requests per sec', fontsize=15)
+ax1.set_xticks(np.arange(0, 25, 4), fontsize=15)
+ax1.set_yticks(np.arange(0, y_cutoff, 100), fontsize=15)
+
+ax2.set_yticks(np.arange(80, 104, 5))
+ax2.set_ylabel('Effective Accuracy', fontsize=15)
+
+ax2.set_xlabel('Time (min)', fontsize=15)
+
+plt.savefig(os.path.join('..', 'figures', 'timeseries_thput_accuracy.pdf'), dpi=500, bbox_inches='tight')
 
 print(f'Warning! We should not be using mean to aggregate, instead we should be using sum')
+print(f'Warning! There are some points where requests served are greater than incoming '
+      f'demand. Fix this or find the cause')
 
 # accuracy_logfile = os.path.join('..', 'logs', 'log_ilp_accuracy.txt')
 # accuracy_rf = open(accuracy_logfile, mode='r')
