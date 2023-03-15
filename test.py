@@ -20,8 +20,6 @@ def getargs():
     parser.add_argument('--random_runtimes', '-r', required=False,
                         dest='random_runtimes', action='store_true',
                         help='Initializes random runtimes if used. Otherwise, uses static runtimes.')
-    # parser.add_argument('--test_steps', '-t', required=False, default=100000,
-    #                     dest='test_steps', help='Number of steps to test for. Default value is 1000')
     parser.add_argument('--action_size', '-a', required=False, default=1,
                         dest='action_size', help='Number of scheduling changes to make in each iteration. ' +
                         'Default value is 15')
@@ -138,7 +136,6 @@ def validate_config(config: dict, filename: str):
 
 def main(args):
     model_training_steps = 8000
-    # testing_steps = int(args.test_steps)
     action_group_size = int(args.action_size)
     reward_window_length = args.reward_window_length
     allocation_window = int(args.allocation_window)
@@ -149,11 +146,12 @@ def main(args):
 
     validate_config(config=config, filename=args.config_file)
 
-    testing_steps = 1000 if 'short_run' in config and config['short_run'] == True else 100000
+    testing_steps = 1000 if 'short_run' in config and config['short_run'] == True else 10000
     solve_interval = config['solve_interval'] if 'solve_interval' in config else 0
     model_assignment = config['model_allocation']
     job_scheduling = config['job_scheduling']
     batching_algo = config['batching']
+    file_log_level = logging.INFO if 'log_to_file' in config and config['log_to_file'] is True else logging.WARN
 
     trace_path = config['trace_path']
     fixed_seed = int(config['seed']) if 'seed' in config else 0
@@ -238,14 +236,14 @@ def main(args):
     rate_logger = logging.getLogger('Rate logger')
     rate_loggerfile = os.path.join('logs', 'throughput', str(time.time()) + '_' +  model_assignment + '.csv')
     rate_logger.addHandler(logging.FileHandler(rate_loggerfile, mode='w'))
-    rate_logger.setLevel(logging.INFO)
+    rate_logger.setLevel(file_log_level)
     rate_logger.info('wallclock_time,simulation_time,demand,throughput,capacity,effective_accuracy,total_accuracy,successful')
 
     rate_logger_per_model = logging.getLogger('Rate logger per model')
     rate_logger_per_model_file = os.path.join('logs', 'throughput_per_model', str(time.time()) + '_' + model_assignment + '.csv')
     rate_logger_per_model.addHandler(
         logging.FileHandler(rate_logger_per_model_file, mode='w'))
-    rate_logger_per_model.setLevel(logging.INFO)
+    rate_logger_per_model.setLevel(file_log_level)
     rate_logger_per_model.info(
         'wallclock_time,simulation_time,demand_nth_model,throughput_nth_model,normalized_throughput_nth_model,accuracy_nth_model,,,,,,,,,,,,,,,,')
 
@@ -453,7 +451,7 @@ def main(args):
             clipper.apply_solution()
             action = env.simulator.null_action(env.action_space.sample(), 1)
 
-        if i % 100 == 0:
+        if i % 10 == 0:
             print(f'Testing step: {i} of {testing_steps}')
             print(f'Simulator event queue length: {len(env.simulator.event_queue)}')
             print(f'Time since last print: {(time.time() - step_time):.3f} seconds')

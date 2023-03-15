@@ -107,7 +107,7 @@ y_cutoff = max(demand) + 50
 ax1.legend(loc='upper center', bbox_to_anchor=(0.5, 1.50), ncol=3, fontsize=15)
 ax1.set_ylabel('Requests per sec', fontsize=15)
 ax1.set_xticks(np.arange(0, 25, 4), fontsize=15)
-ax1.set_yticks(np.arange(0, y_cutoff, 100), fontsize=15)
+ax1.set_yticks(np.arange(0, y_cutoff, 200), fontsize=15)
 
 ax2.set_yticks(np.arange(80, 104, 5))
 ax2.set_ylabel('Effective Accuracy', fontsize=15)

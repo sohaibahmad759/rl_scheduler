@@ -6,5 +6,6 @@
     "job_scheduling": "infaas",
     "batching": "infaas",
     "fixed_seed": true,
-    "seed": 10
+    "seed": 10,
+    "log_to_file": true
 }
