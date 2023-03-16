@@ -342,10 +342,8 @@ class Ilp(SchedulingAlgorithm):
             # TODO: edit: it seems like this issue has been resolved with constraint c3_3_
             # m.addConstr(sum(b[j, k] * z[j, k] for j in models) == sum(b[j, k] for j in models), 'c3_' + str(k))
             m.addConstr(sum(sum(b[j, k] * z[i, k] * x[i, j] for j in models) for i in accelerators) == sum(z[i, k] for i in accelerators), 'c3_3k_' + str(k))
-            if self.simulator.model_assignment == 'ilp':
-                m.addConstr(sum(z[i, k] for i in accelerators) == 1, 'c3_2_' + str(k))
-            else:
-                m.addConstr(sum(z[i, k] for i in accelerators) <= 1, 'c3_2_' + str(k))
+            
+            m.addConstr(sum(z[i, k] for i in accelerators) == 1, 'c3_2_' + str(k))
             # m.addConstr(sum(z[j, k] * ind[j] for j in models) == 1, 'c_ind_3_' + str(k))
 
             # raise IlpException('just debugging')
@@ -361,10 +359,7 @@ class Ilp(SchedulingAlgorithm):
         # m.addConstrs((sum(x[i, j] for j in models) <=
         #              1 for i in accelerators), 'c2')
         for i in accelerators:
-            if self.simulator.model_assignment == 'ilp':
-                m.addConstr(sum(x[i, j] for j in models) == 1, 'c2_' + str(i))
-            else:
-                m.addConstr(sum(x[i, j] for j in models) <= 1, 'c2_' + str(i))
+            m.addConstr(sum(x[i, j] for j in models) == 1, 'c2_' + str(i))
 
             m.addConstr(zp[i] == sum(z[i, k] for k in rtypes), 'c_zp_' + str(i))
             m.addConstr(sum(sum(b[j, k] * z[i, k] * x[i, j] for j in models) for k in rtypes) == zp[i], 'c3_3i_' + str(i))
@@ -373,8 +368,8 @@ class Ilp(SchedulingAlgorithm):
             m.addConstr(y[i] <= sum(p[i, j]*x[i, j] for j in models), 'c4_' + str(i))
             m.addConstr(y[i] <= sum(z[i, k]*s[k] for k in rtypes), 'c5_' + str(i))
 
-            m.addConstr(100000 * ind[i] >= sum(x[i, j] for j in models), 'c_ind_1_' + str(i))
-            m.addConstr(ind[i] <= sum(x[i, j] for j in models), 'c_ind_2_' + str(i))
+            # m.addConstr(10000000 * ind[i] >= sum(x[i, j] for j in models), 'c_ind_1_' + str(i))
+            # m.addConstr(ind[i] <= sum(x[i, j] for j in models), 'c_ind_2_' + str(i))
 
         # * If infeasible, try setting this to =l= 1
         # ct3(k) .. sum(j, b(j,k) * z(j,k)) =e= 1;
@@ -394,9 +389,9 @@ class Ilp(SchedulingAlgorithm):
 
         # We only do this for AccScale/Proteus
         # if self.simulator.model_assignment == 'ilp' or self.simulator.batching_algo == 'accscale':
-        if self.simulator.model_assignment == 'ilp':
-            m = self.disallow_infeasible_variants(m, x, accelerators, sum(self.simulator.model_variants.values(), []),
-                                                  self.simulator.largest_batch_sizes)
+        # if self.simulator.model_assignment == 'ilp':
+        m = self.disallow_infeasible_variants(m, x, accelerators, sum(self.simulator.model_variants.values(), []),
+                                                self.simulator.largest_batch_sizes)
 
         # # ct4(j) .. y(j) =l= sum(i, x(i,j) * p(i,j));
         # m.addConstrs((y[j] <= sum(p[i, j]*x[i, j]

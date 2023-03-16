@@ -3,9 +3,10 @@
     "trace_path": "traces/azure/asplos/300",
     "allowed_variants": "traces/model_variants_clipper_lowacc",
     "model_allocation": "clipper",
-    "static_allocation": "algorithms/clipper_solutions/clipper_lowacc_equal.txt",
+    "static_allocation": "algorithms/clipper_solutions/clipper_lowacc_optimized.txt",
     "job_scheduling": "canary_routing",
     "batching": "aimd",
     "fixed_seed": true,
-    "seed": 10
+    "seed": 10,
+    "log_to_file": true
 }

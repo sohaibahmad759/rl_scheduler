@@ -1,10 +1,12 @@
-import json
+import logging
 from algorithms.base import SchedulingAlgorithm
 
 
 class Clipper(SchedulingAlgorithm):
-    def __init__(self, simulator, solution_file):
+    def __init__(self, simulator, solution_file, logging_level=logging.INFO):
         SchedulingAlgorithm.__init__(self, 'Clipper')
+        self.log = logging.getLogger(__name__)
+        self.log.setLevel(logging_level)
 
         self.simulator = simulator
         self.solution_file = solution_file
@@ -22,10 +24,12 @@ class Clipper(SchedulingAlgorithm):
             lines = rf.readlines()
             required_predictors = eval(lines[1].rstrip('\n'))
             canary_dict = eval(lines[3].rstrip('\n'))
+            ilp_x = eval(lines[5].rstrip('\n'))
 
-            print(f'required_predictors: {required_predictors}')
-            print(f'canary_dict: {canary_dict}')
-            self.simulator.apply_ilp_solution(required_predictors, canary_dict)
+            self.log.info(f'required_predictors: {required_predictors}')
+            self.log.info(f'canary_dict: {canary_dict}')
+            self.log.info(f'ilp_x: {ilp_x}')
+            self.simulator.apply_ilp_solution(required_predictors, canary_dict, ilp_x)
             self.solution_applied = True
 
         return

@@ -759,6 +759,11 @@ class Simulator:
         model assignment, and (ii) canary_dict to define the canary routing
         table for the given model assignment
         '''
+        self.log.debug(f'len: {len(required_predictors)}, required_predictors: {required_predictors}')
+        self.log.debug('')
+        self.log.debug(f'len: {len(canary_dict)}, canary_dict: {canary_dict}')
+        self.log.debug('')
+        self.log.debug(f'len: {len(ilp_x)}, ilp_x: {ilp_x}')
         self.apply_predictor_dict(required_predictors)
         self.apply_canary_dict(canary_dict, ilp_x)
         return
@@ -912,6 +917,10 @@ class Simulator:
             time.sleep(5)
             return
         
+        if len(ilp_x) < sum(self.predictors_max):
+            ilp_x = self.previous_ilp_x
+            canary_dict = self.previous_canary_dict
+            self.log.warn(f'Used previous allocation')
         routing_table_ijk = {}
         for key1 in canary_dict:
             for key2 in ilp_x:
@@ -920,6 +929,8 @@ class Simulator:
                 canary_value = canary_dict[key1]
                 if accelerator_1 == accelerator_2:
                     routing_table_ijk[(accelerator_1, variant, rtype_1)] = canary_value
+        self.previous_ilp_x = ilp_x
+        self.previous_canary_dict = canary_dict
         self.log.debug(f'len: {len(canary_dict)}, canary_dict: {canary_dict}')
         self.log.debug('')
         self.log.debug(f'len: {len(routing_table_ijk)}, routing_table_ijk: {routing_table_ijk}')
