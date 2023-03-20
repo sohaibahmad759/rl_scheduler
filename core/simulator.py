@@ -1254,6 +1254,16 @@ class Simulator:
                         predictor=predictor, executor=executor,
                         event_counter=event_counter)
         return
+    
+    def generate_nexus_expiring_event(self, time, request, predictor, executor, event_counter):
+        ''' Generate an SLO_EXPIRING event and insert it into the simulator's
+        event queue
+        '''
+        self.insert_event(time, EventType.NEXUS_EXPIRING, desc=request.desc,
+                        id=request.id, deadline=request.deadline,
+                        predictor=predictor, executor=executor,
+                        event_counter=event_counter)
+        return
 
     def process_slo_expiring_event(self, event, clock):
         ''' When an SLO_EXPIRING event is encountered, trigger the appropriate
@@ -1266,6 +1276,14 @@ class Simulator:
         #       how to handle this case?
 
         predictor.slo_expiring_callback(event, clock)
+        return
+    
+    def process_nexus_expiring_event(self, event, clock):
+        ''' When a NEXUS_EXPIRING event is encountered, trigger the appropriate
+        callbacks
+        '''
+        predictor = event.predictor
+        predictor.nexus_expiring_callback(event, clock)
         return
 
     def process_end_event(self, event, clock):

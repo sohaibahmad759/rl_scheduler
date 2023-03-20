@@ -17,9 +17,9 @@ import matplotlib.pyplot as plt
 
 logfile_list = [
                 '../logs/throughput/selected_asplos/infaas_accuracy_300ms.csv',
-                # '../logs/throughput/selected_asplos/clipper_ht_300ms.csv',
-                '../logs/throughput/selected_asplos/clipper_optstart_300ms.csv',
-                '../logs/throughput/selected_asplos/sommelier_aimd_300ms.csv',
+                # # '../logs/throughput/selected_asplos/clipper_ht_300ms.csv',
+                # '../logs/throughput/selected_asplos/clipper_optstart_300ms.csv',
+                # '../logs/throughput/selected_asplos/sommelier_aimd_300ms.csv',
                 '../logs/throughput/selected_asplos/sommelier_asb_300ms.csv',
                 '../logs/throughput/selected_asplos/proteus_300ms.csv',
                 # '../logs/throughput/selected_asplos/sommelier_uniform_asb_300ms.csv'
@@ -38,9 +38,9 @@ markers = ['o', 'v', '^', '*', 's', 'x']
 #             'INFaaS-Instance', 'INFaaS-Accuracy', 'AccScale']
 algorithms = [
               'INFaaS-Accuracy',
-              'Clipper-HT',
-            #   'Clipper-HT Optimized Start',
-              'Sommelier-AIMD',
+            #   'Clipper-HT',
+            # #   'Clipper-HT Optimized Start',
+            #   'Sommelier-AIMD',
               'Sommelier-ASB',
               'Proteus',
             #   'Sommelier-ASB (Uniform Start)'

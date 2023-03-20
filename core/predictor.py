@@ -68,6 +68,8 @@ class Predictor:
         self.set_infaas_cost()
         self.aimd_batch_size = 1
 
+        self.nexus_expiring_set = False
+
         self.task_assignment = self.executor.task_assignment
         
         # If the maximum batch size is 0, that means that predictor cannot even
@@ -206,6 +208,11 @@ class Predictor:
         # If predictor is busy, we have to wait until we get a FINISH_BATCH event
         # before we further process this request
         if self.busy:
+            # if self.batching_algo == 'nexus':
+            #     if self.nexus_expiring_set == False:
+            #         nexus_expiring_time = clock + event.deadline - self.batch_processing_latency(self.max_batch_size, event)
+            #         self.generate_nexus_expiring(event, nexus_expiring_time)
+            # else:
             self.generate_head_slo_expiring()
             return
 
@@ -235,7 +242,8 @@ class Predictor:
         elif self.task_assignment == TaskAssignment.INFAAS:
             batch_size = self.infaas_batch_size
         else:
-            raise PredictorException(f'Unexpected situation')
+            raise PredictorException(f'Unexpected combination, task assignment: {self.task_assignment}, '
+                                     f'batching algorithm: {self.batching_algo}')
 
         if self.batching_algo == 'aimd':
             self.log.debug(f'AIMD calling pop_while_first_expires')
@@ -366,8 +374,7 @@ class Predictor:
                         self.simulator.bump_failed_request_stats(request)
                         continue
                     else:
-                        raise PredictorException('process_batch: unexpected situation')
-                        time.sleep(10)
+                        raise PredictorException(f'unexpected batching algorithm: {self.batching_algo}')
                 elif self.task_assignment == TaskAssignment.INFAAS:
                     self.simulator.bump_failed_request_stats(request)
                     continue
@@ -502,21 +509,34 @@ class Predictor:
         self.log.debug(f'Generating SLO_EXPIRING event for request {event.id} '
                       f'to expire at {time}')
         self.simulator.generate_slo_expiring_event(time, event,
-                                                predictor=self,
-                                                executor=self.executor,
-                                                event_counter=event.id)
+                                                   predictor=self,
+                                                   executor=self.executor,
+                                                   event_counter=event.id)
         self.slo_expiring_dict[event.id] = time
         # TODO: remove this line if SLO_EXPIRING works correctly
         self.event_counter += 1
+        return
+    
+
+    def generate_nexus_expiring(self, event, time):
+        ''' Call the simulator's handler for generating a NEXUS_EXPIRING
+        event
+        '''
+        self.simulator.generate_nexus_expiring_event(time, event,
+                                                     predictor=self,
+                                                     executor=self.executor,
+                                                     event_counter=event.id)
+        self.nexus_expiring_set = True
         return
 
     
     def slo_expiring_callback(self, event, clock):
         ''' Callback to handle an SLO_EXPIRING event
         '''
-        # if self.task_assignment == TaskAssignment.INFAAS:
-        #     logging.info('SLO expiring event encountered, ignoring for INFaaS')
-        #     return
+        if self.task_assignment == TaskAssignment.INFAAS or self.batching_algo == 'nexus':
+            self.log.debug(f'SLO expiring event encountered, ignoring for task assignment: '
+                          f'{self.task_assignment}, batching algo: {self.batching_algo}')
+            return
 
         self.log.debug(f'SLO expiring callback, Current clock: {clock}, event counter: '
             f'{event.event_counter}, slo_expiring_dict entry: {self.slo_expiring_dict[event.event_counter]}')
@@ -568,6 +588,20 @@ class Predictor:
         self.log.debug(f'Calling process_batch from slo_expiring_callback')
         self.process_batch(clock, batch_size)
         return
+    
+    
+    def nexus_expiring_callback(self, event, clock):
+        ''' Callback to handle an NEXUS_EXPIRING event
+        '''
+        self.pop_while_first_expires()
+
+        if len(self.request_queue) == 0:
+            self.log.error(f'no requests in queue, returning from nexus expiring callback')
+            return
+        
+        batch_size = min(len(self.request_queue, self.max_batch_size))
+        self.process_batch(clock, batch_size)
+        return
 
     
     def generate_head_slo_expiring(self):
@@ -583,7 +617,6 @@ class Predictor:
 
         if self.batch_processing_latency(batch_size=1, request=first_request) > first_request.deadline:
             raise PredictorException(f'Request cannot be processed even with batch size of 1')
-            time.sleep(10)
         
         # TODO: what if we are already past the t_w for this batch size?
         batch_size = self.find_batch_size(requests=len(self.request_queue))
@@ -607,6 +640,8 @@ class Predictor:
         self.log.debug(f'Request desc: {request.desc}, qos_level: {request.qos_level}, '
                       f'profiled latency: {self.profiled_latencies[(request.desc, self.variant_name, batch_size)]}')
         processing_latency = self.profiled_latencies[(request.desc, self.variant_name, batch_size)] * batch_size
+        # self.log.error(f'tuple: {(request.desc, self.variant_name, batch_size)}, profiled latency: {self.profiled_latencies[(request.desc, self.variant_name, batch_size)]}')
+        # self.log.error(f'processing_latency: {processing_latency}')
         # if self.acc_type == 4:
         #     print(f'predictor type: {self.acc_type}, self.profiled_latencies:')
         #     pprint.pprint(self.profiled_latencies)
