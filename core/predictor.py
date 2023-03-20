@@ -208,12 +208,12 @@ class Predictor:
         # If predictor is busy, we have to wait until we get a FINISH_BATCH event
         # before we further process this request
         if self.busy:
-            # if self.batching_algo == 'nexus':
-            #     if self.nexus_expiring_set == False:
-            #         nexus_expiring_time = clock + event.deadline - self.batch_processing_latency(self.max_batch_size, event)
-            #         self.generate_nexus_expiring(event, nexus_expiring_time)
-            # else:
-            self.generate_head_slo_expiring()
+            if self.batching_algo == 'nexus':
+                if self.nexus_expiring_set == False:
+                    nexus_expiring_time = clock + event.deadline - self.batch_processing_latency(self.max_batch_size, event)
+                    self.generate_nexus_expiring(event, nexus_expiring_time)
+            else:
+                self.generate_head_slo_expiring()
             return
 
         # if self.task_assignment == TaskAssignment.INFAAS:
@@ -239,6 +239,10 @@ class Predictor:
                 self.increase_aimd_batch_size()
             else:
                 return
+        elif self.task_assignment == TaskAssignment.CANARY and self.batching_algo == 'nexus':
+            if len(self.request_queue) >= self.max_batch_size:
+                self.process_batch(clock, self.max_batch_size)
+            return
         elif self.task_assignment == TaskAssignment.INFAAS:
             batch_size = self.infaas_batch_size
         else:
@@ -370,7 +374,7 @@ class Predictor:
                         raise PredictorException('process_batch: Something is wrong, first request in queue '
                             'will expire before batch finishes processing')
                         time.sleep(10)
-                    elif self.batching_algo == 'aimd':
+                    elif self.batching_algo == 'aimd' or self.batching_algo == 'nexus':
                         self.simulator.bump_failed_request_stats(request)
                         continue
                     else:
@@ -424,6 +428,22 @@ class Predictor:
                     self.process_batch(clock, self.aimd_batch_size)
                     self.increase_aimd_batch_size()
                     return
+            elif self.batching_algo == 'nexus':
+                self.nexus_expiring_set = False
+                if len(self.request_queue) >= self.max_batch_size:
+                    self.process_batch(clock, self.max_batch_size)
+                    return
+                elif len(self.request_queue) > 0 and len(self.request_queue) < self.max_batch_size:
+                    first_request = self.request_queue[0]
+                    first_request_deadline = first_request.deadline
+                    nexus_expiring_time = clock + first_request_deadline - self.batch_processing_latency(self.max_batch_size, first_request)
+                    self.generate_nexus_expiring(first_request, nexus_expiring_time)
+                    return
+                elif len(self.request_queue) == 0:
+                    # Request queue is empty, nothing to do
+                    return
+                else:
+                    raise PredictorException('nexus batching encountered unexpected situation')
             else:
                 self.log.error(f'finish_batch_callback: Unexpected batching algo: {self.batching_algo}')
         elif self.task_assignment == TaskAssignment.INFAAS:
@@ -533,7 +553,7 @@ class Predictor:
     def slo_expiring_callback(self, event, clock):
         ''' Callback to handle an SLO_EXPIRING event
         '''
-        if self.task_assignment == TaskAssignment.INFAAS or self.batching_algo == 'nexus':
+        if self.batching_algo == 'nexus':
             self.log.debug(f'SLO expiring event encountered, ignoring for task assignment: '
                           f'{self.task_assignment}, batching algo: {self.batching_algo}')
             return
@@ -640,6 +660,8 @@ class Predictor:
         self.log.debug(f'Request desc: {request.desc}, qos_level: {request.qos_level}, '
                       f'profiled latency: {self.profiled_latencies[(request.desc, self.variant_name, batch_size)]}')
         processing_latency = self.profiled_latencies[(request.desc, self.variant_name, batch_size)] * batch_size
+        if self.batching_algo == 'nexus':
+            processing_latency = processing_latency / batch_size
         # self.log.error(f'tuple: {(request.desc, self.variant_name, batch_size)}, profiled latency: {self.profiled_latencies[(request.desc, self.variant_name, batch_size)]}')
         # self.log.error(f'processing_latency: {processing_latency}')
         # if self.acc_type == 4:

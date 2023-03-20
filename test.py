@@ -42,7 +42,7 @@ def validate_config(config: dict, filename: str):
                               'clipper', 'ilp', 'infaas_v2', 'sommelier']
     job_sched_algos = ['random', 'round_robin', 'eft_fifo', 'lft_fifo', 'infaas',
                        'canary_routing']
-    batching_algorithms = ['disabled', 'accscale', 'aimd', 'infaas']
+    batching_algorithms = ['disabled', 'accscale', 'aimd', 'infaas', 'nexus']
 
     if 'profiling_data' not in config:
         raise ConfigException(f'profiling_data not specified in config file: {filename}')
@@ -121,7 +121,7 @@ def validate_config(config: dict, filename: str):
     batching = config['batching']
     if batching not in batching_algorithms:
         raise ConfigException(f'invalid batching algorithm specified: {batching}. '
-                              f'\nPossible choices: {model_allocation_algos}')
+                              f'\nPossible choices: {batching_algorithms}')
     
     if 'fixed_seed' in config:
         if 'seed' not in config:

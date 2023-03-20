@@ -8,6 +8,7 @@ class EventType(Enum):
     END_REQUEST = 3
     FINISH_BATCH = 4
     SLO_EXPIRING = 5
+    NEXUS_EXPIRING = 6
 
 
 class Event:
