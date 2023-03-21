@@ -10,10 +10,10 @@ logfile_list = [
                 '../logs/throughput/selected_asplos/clipper_ht_aimd_300ms.csv',
                 '../logs/throughput/selected_asplos/clipper_ht_asb_300ms.csv',
                 # '../logs/throughput/selected_asplos/clipper_optstart_300ms.csv',
-                '../logs/throughput/selected_asplos/sommelier_aimd_300ms.csv',
+                # '../logs/throughput/selected_asplos/sommelier_aimd_300ms.csv',
                 # '../logs/throughput/selected_asplos/sommelier_asb_300ms.csv',
                 # '../logs/throughput/selected_asplos/sommelier_nexus_300ms.csv',
-                '../logs/throughput/selected_asplos/proteus_300ms.csv',
+                # '../logs/throughput/selected_asplos/proteus_300ms.csv',
                 # '../logs/throughput/selected_asplos/clipper_ht_asb_300ms.csv',
                 # '../logs/throughput/selected_asplos/sommelier_uniform_asb_300ms.csv'
                 ]
@@ -32,19 +32,19 @@ markers = ['+', 'o', 'v', '^', '*', 's', 'x']
 algorithms = [
               'INFaaS-Accuracy',
               'Clipper-HT-AIMD',
-              'Clipper-HT-ASB',
+              'Clipped-HT-ASB'
             #   'Clipper-HT Optimized Start',
-              'Sommelier-AIMD',
+            #   'Sommelier-AIMD',
             #   'Sommelier-ASB',
             #   'Sommelier-Nexus'
-              'Proteus'
+            #   'Proteus'
             #   'Clipper-HT-ASB',
             #   'Sommelier-ASB (Uniform Start)'
               ]
 colors = ['#729ECE', '#FF9E4A', '#ED665D', '#AD8BC9', '#67BF5C', '#8C564B',
           '#E377C2']
 
-fig, (ax1, ax2) = plt.subplots(2)
+fig, (ax1, ax2, ax3) = plt.subplots(3)
 color_idx = 0
 clipper_accuracy = []
 for idx in range(len(logfile_list)):
@@ -67,6 +67,7 @@ for idx in range(len(logfile_list)):
     demand = df['demand'].values[start_cutoff:]
     throughput = df['throughput'].values[start_cutoff:]
     capacity = df['capacity'].values[start_cutoff:]
+    dropped = df['dropped'].values[start_cutoff:]
 
     effective_accuracy = df['effective_accuracy'].values[start_cutoff:]
     # print(f'effective accuracy: {effective_accuracy}')
@@ -80,6 +81,10 @@ for idx in range(len(logfile_list)):
                 effective_accuracy[i] = clipper_accuracy[i]
 
     successful = df['successful'].values[start_cutoff:]
+
+    difference = demand - successful - dropped
+    print(f'difference: {difference}')
+    print(f'sum of difference: {sum(difference)}')
 
     time = time
     time = [x - time[0] for x in time]
@@ -100,15 +105,19 @@ for idx in range(len(logfile_list)):
                 marker=markers[color_idx])
         ax2.plot(time, effective_accuracy, label=algorithms[idx], color=colors[color_idx],
                 marker=markers[color_idx])
+        ax3.plot(time, dropped, label=algorithms[idx], color=colors[color_idx],
+                marker=markers[color_idx])
     else:
         ax1.plot(time, successful, label=algorithms[idx], color=colors[color_idx])
         ax2.plot(time, effective_accuracy, label=algorithms[idx], color=colors[color_idx])
+        ax3.plot(time, dropped, label=algorithms[idx], color=colors[color_idx])
         # ax1.plot(time, successful, label=algorithms[idx])
         # ax2.plot(time, effective_accuracy, label=algorithms[idx])
     color_idx += 1
 # plt.plot(time, capacity, label='capacity')
 ax1.grid()
 ax2.grid()
+ax3.grid()
 
 # plt.rcParams.update({'font.size': 30})
 # plt.rc('axes', titlesize=30)     # fontsize of the axes title
@@ -129,9 +138,13 @@ ax2.set_xticks(np.arange(0, 25, 4), fontsize=15)
 ax2.set_yticks(np.arange(80, 104, 5))
 ax2.set_ylabel('Effective Accuracy', fontsize=15)
 
-ax2.set_xlabel('Time (min)', fontsize=15)
+ax3.set_xticks(np.arange(0, 25, 4), fontsize=15)
+# ax2.set_yticks(np.arange(80, 104, 5))
+ax3.set_ylabel('SLO Timeouts', fontsize=15)
 
-plt.savefig(os.path.join('..', 'figures', 'timeseries_thput_accuracy.pdf'), dpi=500, bbox_inches='tight')
+ax3.set_xlabel('Time (min)', fontsize=15)
+
+plt.savefig(os.path.join('..', 'figures', 'timeseries_thput_accuracy_slo.pdf'), dpi=500, bbox_inches='tight')
 
 print(f'Warning! We should not be using mean to aggregate, instead we should be using sum')
 print(f'Warning! There are some points where requests served are greater than incoming '

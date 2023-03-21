@@ -56,8 +56,6 @@ class Simulator:
         self.job_sched_algo = job_sched_algo
         self.n_qos_levels = n_qos_levels
 
-        self.test_stat = 0
-
         self.store_file_pointers = True
         self.requests_added = 0
 
@@ -89,7 +87,7 @@ class Simulator:
         self.failed_per_model = {}
         self.successful_per_model = {}
 
-        self.slo_timeouts = {'total': 0, 'succeeded': 0, 'timeouts': 0}
+        self.slo_timeouts = {'total': 0, 'succeeded': 0, 'timeouts': 0, 'late': 0}
 
         self.accuracy_per_model = {}
 
@@ -1295,9 +1293,9 @@ class Simulator:
         executor = self.executors[isi]
         request_finished = executor.finish_request(event, clock)
         if request_finished:
-            self.bump_successful_request_stats(event)
-            finish_time = clock - event.event_counter
-            self.latency_logfile.write(f'{isi},{event.event_counter},{clock},{finish_time}\n')
+            processing_time = clock - event.event_counter
+            self.bump_successful_request_stats(event, processing_time=processing_time)
+            self.latency_logfile.write(f'{isi},{event.event_counter},{clock},{processing_time}\n')
         else:
             self.bump_failed_request_stats(event)
         return
@@ -1337,7 +1335,7 @@ class Simulator:
         self.qos_stats[self.isi_to_idx[isi], event.qos_level * 2 + 1] += 1
         return
     
-    def bump_successful_request_stats(self, event):
+    def bump_successful_request_stats(self, event, processing_time):
         ''' Bump stats for a successful request
         '''
         isi = event.desc
@@ -1348,6 +1346,10 @@ class Simulator:
         self.slo_timeouts['succeeded'] += 1
         self.total_successful += 1
         self.total_accuracy += event.accuracy_seen
+
+        # print(f'start_time: {event.event_counter}, processing time: {processing_time}, clock: {self.clock}')
+        if processing_time > event.deadline:
+            self.slo_timeouts['late'] += 1
         return
 
     def bump_overall_request_stats(self, event):
@@ -1358,7 +1360,6 @@ class Simulator:
         self.total_requests_arr[self.isi_to_idx[isi]] += 1
         self.requests_per_model[isi] += 1
         self.qos_stats[self.isi_to_idx[isi], event.qos_level * 2] += 1
-        # self.test_stat += 1
         return
 
     def add_executor(self, isi, job_sched_algo, runtimes=None, model_variant_runtimes=None, 

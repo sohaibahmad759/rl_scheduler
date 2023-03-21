@@ -189,7 +189,6 @@ class Predictor:
             return False
         
         # self.request_dict.remove(event.id)
-        # self.simulator.bump_successful_request_stats(event)
         del self.request_dict[event.id]
         if len(self.request_dict) == 0:
             self.busy = False

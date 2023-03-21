@@ -237,7 +237,7 @@ def main(args):
     rate_loggerfile = os.path.join('logs', 'throughput', str(time.time()) + '_' +  model_assignment + '.csv')
     rate_logger.addHandler(logging.FileHandler(rate_loggerfile, mode='w'))
     rate_logger.setLevel(file_log_level)
-    rate_logger.info('wallclock_time,simulation_time,demand,throughput,capacity,effective_accuracy,total_accuracy,successful')
+    rate_logger.info('wallclock_time,simulation_time,demand,throughput,capacity,effective_accuracy,total_accuracy,successful,dropped,late')
 
     rate_logger_per_model = logging.getLogger('Rate logger per model')
     rate_logger_per_model_file = os.path.join('logs', 'throughput_per_model', str(time.time()) + '_' + model_assignment + '.csv')
@@ -254,6 +254,8 @@ def main(args):
     successful_requests = 0
     total_successful = 0
     total_accuracy = 0
+    total_dropped = 0
+    total_late = 0
     ilp_rounds = 0
     start = time.time()
     step_time = time.time()
@@ -476,11 +478,17 @@ def main(args):
 
         new_total_accuracy = env.simulator.total_accuracy
         new_total_successful = env.simulator.total_successful
+        new_dropped = env.simulator.slo_timeouts['timeouts']
+        new_late = env.simulator.slo_timeouts['late']
         utils.log_throughput(rate_logger, observation, i, allocation_window,
                              new_total_accuracy-total_accuracy,
-                             new_total_successful-total_successful)
+                             new_total_successful-total_successful,
+                             new_dropped-total_dropped,
+                             new_late-total_late)
         total_accuracy = new_total_accuracy
         total_successful = new_total_successful
+        total_dropped = new_dropped
+        total_late = new_late
         # print('observation:', observation)
 
     end = time.time()
@@ -526,13 +534,13 @@ def main(args):
     bumped_failed = env.simulator.slo_timeouts['timeouts']
     bumped_total = bumped_failed + bumped_succeeded
     bumped_violation_ratio = bumped_failed / bumped_total
+    bumped_late = env.simulator.slo_timeouts['late']
     print(f'SLO violation ratio based on bumped stats: {bumped_violation_ratio}')
     # total_slo = env.simulator.slo_timeouts['total']
     print(f'Total SLO: {bumped_total}, SLO timed out: {bumped_failed}, successful '
           f'SLO: {bumped_succeeded}, timeout ratio: {bumped_violation_ratio}')
+    print(f'Late requests: {bumped_late}')
     print()
-
-    print(f'test stat: {env.simulator.test_stat}')
 
     # bumped_failed = env.simulator.failed_requests
     # bumped_succeeded = env.simulator.successful_requests
