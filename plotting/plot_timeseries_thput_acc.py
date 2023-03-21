@@ -23,6 +23,7 @@ logfile_list = [
                 # '../logs/throughput/selected_asplos/sommelier_asb_300ms.csv',
                 # '../logs/throughput/selected_asplos/sommelier_nexus_300ms.csv',
                 '../logs/throughput/selected_asplos/proteus_300ms.csv',
+                # '../logs/throughput/selected_asplos/clipper_ht_asb_300ms.csv',
                 # '../logs/throughput/selected_asplos/sommelier_uniform_asb_300ms.csv'
                 ]
 
@@ -32,19 +33,20 @@ MARKERS_ON = False
 logfile = logfile_list[-1]
 print(logfile)
 
-markers = ['o', 'v', '^', '*', 's', 'x']
+markers = ['+', 'o', 'v', '^', '*', 's', 'x']
 # algorithms = ['AccScale', 'Clipper++ (High Accuracy)', 'Clipper++ (High Throughput)',
 #             'INFaaS-Accuracy', 'INFaaS-Instance']
 # algorithms = ['Clipper++ (High Throughput)', 'Clipper++ (High Accuracy)',
 #             'INFaaS-Instance', 'INFaaS-Accuracy', 'AccScale']
 algorithms = [
               'INFaaS-Accuracy',
-              'Clipper-HT',
+              'Clipper-HT-AIMD',
             #   'Clipper-HT Optimized Start',
               'Sommelier-AIMD',
             #   'Sommelier-ASB',
             #   'Sommelier-Nexus'
-              'Proteus',
+              'Proteus'
+            #   'Clipper-HT-ASB',
             #   'Sommelier-ASB (Uniform Start)'
               ]
 colors = ['#729ECE', '#FF9E4A', '#ED665D', '#AD8BC9', '#67BF5C', '#8C564B',

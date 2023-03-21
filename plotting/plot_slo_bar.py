@@ -16,7 +16,7 @@ logfile_list = [
                 ]
 
 algorithms = [
-              'AIMD',
+              'Clipper',
               'Nexus',
               'Proteus',
               ]

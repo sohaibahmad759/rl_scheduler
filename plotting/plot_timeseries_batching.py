@@ -39,7 +39,7 @@ markers = ['o', 'v', '^', '*', 's', 'x']
 # algorithms = ['Clipper++ (High Throughput)', 'Clipper++ (High Accuracy)',
 #             'INFaaS-Instance', 'INFaaS-Accuracy', 'AccScale']
 algorithms = [
-              'AIMD',
+              'Clipper',
               'Nexus',
               'Proteus',
               ]
