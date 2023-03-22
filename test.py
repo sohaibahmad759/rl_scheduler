@@ -146,7 +146,7 @@ def main(args):
 
     validate_config(config=config, filename=args.config_file)
 
-    testing_steps = 1000 if 'short_run' in config and config['short_run'] == True else 10000
+    testing_steps = 300 if 'short_run' in config and config['short_run'] == True else 10000
     solve_interval = config['solve_interval'] if 'solve_interval' in config else 0
     model_assignment = config['model_allocation']
     job_scheduling = config['job_scheduling']
@@ -535,12 +535,22 @@ def main(args):
     bumped_total = bumped_failed + bumped_succeeded
     bumped_violation_ratio = bumped_failed / bumped_total
     bumped_late = env.simulator.slo_timeouts['late']
+    bumped_late_ratio = bumped_late / bumped_total
+    total_slo_violations = bumped_failed + bumped_late
+    slo_violation_ratio = total_slo_violations / bumped_total
     print(f'SLO violation ratio based on bumped stats: {bumped_violation_ratio}')
     # total_slo = env.simulator.slo_timeouts['total']
-    print(f'Total SLO: {bumped_total}, SLO timed out: {bumped_failed}, successful '
-          f'SLO: {bumped_succeeded}, timeout ratio: {bumped_violation_ratio}')
-    print(f'Late requests: {bumped_late}')
-    print()
+    print(f'Total requests: {bumped_total}, dropped: {bumped_failed}, successful from '
+          f'SLO counter: {bumped_succeeded}, dropped ratio: {bumped_violation_ratio}')
+    print(f'Late requests: {bumped_late}, late ratio: {bumped_late_ratio}')
+    print(f'SLO violations (dropped + late): {total_slo_violations}, violation ratio: '
+          f'{slo_violation_ratio}')
+    
+    if env.simulator.batching_algo == 'aimd':
+        print(f'AIMD increased batch size {env.simulator.aimd_stats["increased"]} times '
+              f'and decreased batch size {env.simulator.aimd_stats["decreased"]} times')
+        
+    print(f'Batch sizes used throughout: {env.simulator.batch_size_counters}')
 
     # bumped_failed = env.simulator.failed_requests
     # bumped_succeeded = env.simulator.successful_requests

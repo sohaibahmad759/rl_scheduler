@@ -88,6 +88,8 @@ class Simulator:
         self.successful_per_model = {}
 
         self.slo_timeouts = {'total': 0, 'succeeded': 0, 'timeouts': 0, 'late': 0}
+        self.aimd_stats = {'increased': 0, 'decreased': 0}
+        self.batch_size_counters = {1: 0, 2: 0, 4: 0, 8: 0, 16: 0}
 
         self.accuracy_per_model = {}
 
@@ -425,7 +427,7 @@ class Simulator:
                 isi_list.append(isi_name)
             acc_type = acc_types[idx]
             batch_size = batch_sizes[idx]
-            latency = latencies[idx]
+            latency = round(latencies[idx])
 
             if batch_size not in self.allowed_batch_sizes:
                 continue
@@ -1146,6 +1148,8 @@ class Simulator:
             self.process_finish_batch_event(event, clock)
         elif event.type == EventType.SLO_EXPIRING:
             self.process_slo_expiring_event(event, clock)
+        elif event.type == EventType.BATCH_EXPIRING:
+            self.process_batch_expiring_event(event, clock)
 
         return None
 
@@ -1248,19 +1252,19 @@ class Simulator:
         event queue
         '''
         self.insert_event(time, EventType.SLO_EXPIRING, desc=request.desc,
-                        id=request.id, deadline=request.deadline,
-                        predictor=predictor, executor=executor,
-                        event_counter=event_counter)
+                          id=request.id, deadline=request.deadline,
+                          predictor=predictor, executor=executor,
+                          event_counter=event_counter)
         return
     
-    def generate_nexus_expiring_event(self, time, request, predictor, executor, event_counter):
-        ''' Generate an SLO_EXPIRING event and insert it into the simulator's
+    def generate_batch_expiring_event(self, time, request, predictor, executor, event_counter):
+        ''' Generate a BATCH_EXPIRING event and insert it into the simulator's
         event queue
         '''
-        self.insert_event(time, EventType.NEXUS_EXPIRING, desc=request.desc,
-                        id=request.id, deadline=request.deadline,
-                        predictor=predictor, executor=executor,
-                        event_counter=event_counter)
+        self.insert_event(time, EventType.BATCH_EXPIRING, desc=request.desc,
+                          id=request.id, deadline=request.deadline,
+                          predictor=predictor, executor=executor,
+                          event_counter=event_counter)
         return
 
     def process_slo_expiring_event(self, event, clock):
@@ -1276,12 +1280,12 @@ class Simulator:
         predictor.slo_expiring_callback(event, clock)
         return
     
-    def process_nexus_expiring_event(self, event, clock):
-        ''' When a NEXUS_EXPIRING event is encountered, trigger the appropriate
+    def process_batch_expiring_event(self, event, clock):
+        ''' When a BATCH_EXPIRING event is encountered, trigger the appropriate
         callbacks
         '''
         predictor = event.predictor
-        predictor.nexus_expiring_callback(event, clock)
+        predictor.batch_expiring_callback(event, clock)
         return
 
     def process_end_event(self, event, clock):
@@ -1351,6 +1355,9 @@ class Simulator:
         if processing_time > event.deadline:
             self.slo_timeouts['late'] += 1
         return
+    
+    # def bump_late_successful_request_stats(self, event):
+
 
     def bump_overall_request_stats(self, event):
         ''' Bump overall request stats, i.e., total requests per ISI, requests
@@ -1382,6 +1389,10 @@ class Simulator:
                           qos_level=qos_level, accuracy=accuracy, predictor=predictor,
                           executor=executor)
         elif type == EventType.SLO_EXPIRING:
+            event = Event(start_time, type, desc, runtime, id=id, deadline=deadline,
+                          qos_level=qos_level, accuracy=accuracy, predictor=predictor,
+                          executor=executor, event_counter=event_counter)
+        elif type == EventType.BATCH_EXPIRING:
             event = Event(start_time, type, desc, runtime, id=id, deadline=deadline,
                           qos_level=qos_level, accuracy=accuracy, predictor=predictor,
                           executor=executor, event_counter=event_counter)

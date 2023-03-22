@@ -43,7 +43,7 @@ algorithms = [
             #   'Sommelier-Nexus'
               'Proteus-Clipper',
               'Proteus-Nexus',
-              'Proteus'
+              'Proteus-Proteus'
             #   'Clipper-HT-ASB',
             #   'Sommelier-ASB (Uniform Start)'
               ]
@@ -53,6 +53,7 @@ colors = ['#729ECE', '#FF9E4A', '#ED665D', '#AD8BC9', '#67BF5C', '#8C564B',
 fig, (ax1, ax2, ax3) = plt.subplots(3)
 color_idx = 0
 clipper_accuracy = []
+y_cutoff = 0
 for idx in range(len(logfile_list)):
     logfile = logfile_list[idx]
     
@@ -76,7 +77,9 @@ for idx in range(len(logfile_list)):
 
     dropped = df['dropped'].values[start_cutoff:]
     late = df['late'].values[start_cutoff:]
-    total_slo_violations = dropped + late
+    slo_violations = dropped + late
+
+    y_cutoff = max(y_cutoff, max(slo_violations))
 
     effective_accuracy = df['effective_accuracy'].values[start_cutoff:]
     # print(f'effective accuracy: {effective_accuracy}')
@@ -103,23 +106,23 @@ for idx in range(len(logfile_list)):
     print(time[-1])
 
     if idx == 0:
-        ax1.plot(time, demand, label='Demand', color=colors[color_idx],
-                 marker=markers[color_idx])
+        # ax1.plot(time, demand, label='Demand', color=colors[color_idx],
+        #          marker=markers[color_idx])
         # ax1.plot(time, demand, label='Demand', marker=markers[color_idx])
         color_idx += 1
     # plt.plot(time, throughput, label=algorithm, marker=markers[idx])
     # plt.plot(time, throughput, label=algorithm)
     if MARKERS_ON == True:
-        ax1.plot(time, successful, label=algorithms[idx], color=colors[color_idx],
+        ax1.plot(time, dropped, label=algorithms[idx], color=colors[color_idx],
                 marker=markers[color_idx])
-        ax2.plot(time, effective_accuracy, label=algorithms[idx], color=colors[color_idx],
+        ax2.plot(time, late, label=algorithms[idx], color=colors[color_idx],
                 marker=markers[color_idx])
-        ax3.plot(time, total_slo_violations, label=algorithms[idx], color=colors[color_idx],
+        ax3.plot(time, slo_violations, label=algorithms[idx], color=colors[color_idx],
                 marker=markers[color_idx])
     else:
-        ax1.plot(time, successful, label=algorithms[idx], color=colors[color_idx])
-        ax2.plot(time, effective_accuracy, label=algorithms[idx], color=colors[color_idx])
-        ax3.plot(time, total_slo_violations, label=algorithms[idx], color=colors[color_idx])
+        ax1.plot(time, dropped, label=algorithms[idx], color=colors[color_idx])
+        ax2.plot(time, late, label=algorithms[idx], color=colors[color_idx])
+        ax3.plot(time, slo_violations, label=algorithms[idx], color=colors[color_idx])
         # ax1.plot(time, successful, label=algorithms[idx])
         # ax2.plot(time, effective_accuracy, label=algorithms[idx])
     color_idx += 1
@@ -135,25 +138,26 @@ ax3.grid()
 # plt.rc('ytick', labelsize=30)    # fontsize of the tick labels
 # plt.rc('legend', fontsize=30)    # legend
 
-y_cutoff = max(demand) + 50
+y_cutoff += 100
+print(f'y_cutoff: {y_cutoff}')
 # y_cutoff = 200
 
 ax1.legend(loc='upper center', bbox_to_anchor=(0.5, 1.55), ncol=3, fontsize=12)
-ax1.set_ylabel('Requests per sec', fontsize=15)
 ax1.set_xticks(np.arange(0, 25, 4), fontsize=15)
 ax1.set_yticks(np.arange(0, y_cutoff, 200), fontsize=15)
+ax1.set_ylabel('Dropped', fontsize=12)
 
 ax2.set_xticks(np.arange(0, 25, 4), fontsize=15)
-ax2.set_yticks(np.arange(80, 104, 5))
-ax2.set_ylabel('Effective Accuracy', fontsize=15)
+ax2.set_yticks(np.arange(0, y_cutoff, 200), fontsize=15)
+ax2.set_ylabel('Late', fontsize=12)
 
 ax3.set_xticks(np.arange(0, 25, 4), fontsize=15)
-# ax2.set_yticks(np.arange(80, 104, 5))
-ax3.set_ylabel('SLO Timeouts', fontsize=15)
+ax3.set_yticks(np.arange(0, y_cutoff, 200), fontsize=15)
+ax3.set_ylabel('Total SLO Violations', fontsize=12)
 
-ax3.set_xlabel('Time (min)', fontsize=15)
+ax3.set_xlabel('Time (min)', fontsize=12)
 
-plt.savefig(os.path.join('..', 'figures', 'timeseries_thput_accuracy_slo.pdf'), dpi=500, bbox_inches='tight')
+plt.savefig(os.path.join('..', 'figures', 'timeseries_slo.pdf'), dpi=500, bbox_inches='tight')
 
 print(f'Warning! We should not be using mean to aggregate, instead we should be using sum')
 print(f'Warning! There are some points where requests served are greater than incoming '

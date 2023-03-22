@@ -10,6 +10,6 @@
     "fixed_seed": true,
     "seed": 10,
     "solve_interval": 10,
-    "short_run": false,
+    "short_run": true,
     "log_to_file": true
 }
