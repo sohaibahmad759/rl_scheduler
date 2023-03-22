@@ -1,5 +1,6 @@
 import logging
 import time
+import traceback
 import uuid
 import pprint
 import numpy as np
@@ -71,16 +72,19 @@ class Predictor:
         self.batch_expiring_set = False
 
         self.task_assignment = self.executor.task_assignment
+
+        # traceback.print_stack()
+        # time.sleep(1)
         
         # If the maximum batch size is 0, that means that predictor cannot even
         # serve a batch size of 1 without violating latency SLO
         if self.max_batch_size == 0:
             # if self.simulator.model_assignment != 'clipper':
             self.busy = True
-            raise PredictorException(f'Predictor {self.id} cannot be used as it will exceed latency SLO, '
-                f'model variant: {self.variant_name}, accelerator type: '
-                f'{self.acc_type}')
-            time.sleep(10)
+            # if not('infaas' in self.simulator.model_assignment):
+            #     raise PredictorException(f'Predictor {self.id} cannot be used as it will exceed latency SLO, '
+            #         f'model variant: {self.variant_name}, accelerator type: '
+            #         f'{self.acc_type}')
         return
 
     
@@ -279,9 +283,12 @@ class Predictor:
                 raise PredictorException('Expired request has not been removed from the queue')
 
             if self.batch_processing_latency(1, first_request) > first_request.deadline:
-                raise PredictorException(f'Request cannot be processed even with batch size '
-                                         f'of 1. deadline: {first_request.deadline}, processing '
-                                         f'latency: {self.batch_processing_latency(1, first_request)}')
+                if 'infaas' in self.simulator.model_assignment:
+                    self.simulator.bump_failed_request_stats(first_request)
+                else:
+                    raise PredictorException(f'Request cannot be processed even with batch size '
+                                            f'of 1. deadline: {first_request.deadline}, processing '
+                                            f'latency: {self.batch_processing_latency(1, first_request)}')
 
             max_waiting_time = first_request_expiration - self.batch_processing_latency(batch_size, first_request)
 
@@ -330,12 +337,13 @@ class Predictor:
         #     batch_size = 1
 
         if batch_size > self.max_batch_size:
-            if self.batching_algo != 'aimd' and self.task_assignment != TaskAssignment.INFAAS: 
-                self.log.error(f'process_batch received batch size of {batch_size}, max '
-                            f'batch size: {self.max_batch_size}')   
-                time.sleep(10)
-            else:
-                batch_size = self.max_batch_size
+            # if self.batching_algo != 'aimd' and self.task_assignment != TaskAssignment.INFAAS: 
+            #     self.log.error(f'process_batch received batch size of {batch_size}, max '
+            #                 f'batch size: {self.max_batch_size}')   
+            #     time.sleep(10)
+            # else:
+            #     batch_size = self.max_batch_size
+            batch_size = self.max_batch_size
 
         temp_queue = []
         dequeued_requests = 0
@@ -506,8 +514,8 @@ class Predictor:
                 failed_request = self.request_queue.pop(0)
                 self.simulator.bump_failed_request_stats(failed_request)
                 queued_requests = len(self.request_queue)
-                self.simulator.slo_timeouts['timeouts'] += 1
-                self.simulator.slo_timeouts['total'] += 1
+                # self.simulator.slo_timeouts['timeouts'] += 1
+                # self.simulator.slo_timeouts['total'] += 1
                 popped = True
                 # time.sleep(10)
             else:
@@ -594,6 +602,8 @@ class Predictor:
             batch_size = self.aimd_batch_size
         elif self.task_assignment == TaskAssignment.INFAAS:
             batch_size = self.infaas_batch_size
+            if batch_size == 0:
+                batch_size = 1
         
         if batch_size == -1:
             # requests in queue exceed maximum batch size, this should not happen
@@ -659,8 +669,16 @@ class Predictor:
         first_request = self.request_queue[0]
         first_request_expiration = first_request.start_time + first_request.deadline
 
-        if self.batch_processing_latency(batch_size=1, request=first_request) > first_request.deadline:
-            raise PredictorException(f'Request cannot be processed even with batch size of 1')
+        while self.batch_processing_latency(batch_size=1, request=first_request) > first_request.deadline:
+            if 'infaas' in self.simulator.model_assignment or 'accscale' in self.simulator.model_assignment:
+                self.simulator.bump_failed_request_stats(first_request)
+                self.request_queue.pop(0)
+                if len(self.request_queue) == 0:
+                    return
+                first_request = self.request_queue[0]
+                first_request_expiration = first_request.start_time + first_request.deadline
+            else:
+                raise PredictorException(f'Request cannot be processed even with batch size of 1')
         
         # TODO: what if we are already past the t_w for this batch size?
         batch_size = self.find_batch_size(requests=len(self.request_queue))

@@ -146,7 +146,7 @@ def main(args):
 
     validate_config(config=config, filename=args.config_file)
 
-    testing_steps = 300 if 'short_run' in config and config['short_run'] == True else 10000
+    testing_steps = 291 if 'short_run' in config and config['short_run'] == True else 10000
     solve_interval = config['solve_interval'] if 'solve_interval' in config else 0
     model_assignment = config['model_allocation']
     job_scheduling = config['job_scheduling']
@@ -382,6 +382,8 @@ def main(args):
 
             if ilp_applied == True:
                 period_tuning = solve_interval
+                # if i >= 50 and i <= 100:
+                #     period_tuning = 2
                 # TODO: Tune how frequently the ILP is run by tuning 'period_tuning'
                 #       The bigger it is, the less frequently the ILP is invoked
                 #       Also, what are its implications on allocation window sizes and
@@ -446,6 +448,7 @@ def main(args):
                 action = env.action_space.sample()
                 action[0] = 0
                 action[1:5] = observation[0, 0:4]
+            action = env.simulator.null_action(env.action_space.sample(), 1)
             # print('observation:' + str(observation))
             # print('null action:' + str(action))
             # time.sleep(2)
@@ -461,6 +464,12 @@ def main(args):
             print(f'Action taken: {action}')
             # print('State: {}'.format(env.state))
         observation, reward, done, info = env.step(action)
+        print(f'available predictors: {env.simulator.available_predictors}')
+        available_predictors = env.simulator.available_predictors
+        if max(available_predictors) > 10 or min(available_predictors) < 0:
+            print(f'Invalid available predictors state: {available_predictors}')
+            time.sleep(10)
+        env.simulator.print_allocation()
         # read failed and total requests once every 5 actions
         if (i-1) % action_group_size == 0 or done:
             failed_requests += np.sum(observation[:,-1])

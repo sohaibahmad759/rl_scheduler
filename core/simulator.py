@@ -5,6 +5,7 @@ import requests
 import string
 import os
 import time
+import traceback
 import pprint
 import numpy as np
 import pandas as pd
@@ -105,6 +106,8 @@ class Simulator:
         self.predictors_max = predictors_max
         # self.available_predictors = np.tile(copy.deepcopy(predictors_max), self.n_qos_levels)
         self.available_predictors = copy.deepcopy(predictors_max)
+        self.added_predictors = copy.deepcopy(predictors_max)
+        self.log.info(f'available predictors at the start: {self.available_predictors}')
 
         self.batching_enabled = batching
         self.batching_algo = batching_algo
@@ -1329,6 +1332,7 @@ class Simulator:
         self.failed_requests_arr[self.isi_to_idx[isi]] += 1
         self.failed_per_model[isi] += 1
         self.slo_timeouts['timeouts'] += 1
+        self.slo_timeouts['total'] += 1
         self.bump_qos_unmet_stats(event)
         return
 
@@ -1471,6 +1475,22 @@ class Simulator:
             event = self.event_queue[i]
             self.log.debug('Time: {}, event {} of type {}'.format(
                 event.start_time, event.desc, event.type))
+            
+    
+    def print_allocation(self):
+        total_predictors = 0
+        self.log.info('')
+        self.log.info('------')
+        self.log.info('Printing simulator\'s current allocation..')
+        for key in self.executors:
+            predictors = self.executors[key].predictors
+            total_predictors += len(predictors)
+            predictors = list(map(lambda x: (x.variant_name, x.acc_type), predictors.values()))
+            self.log.info(f'isi: {key}, predictors: {predictors}')
+        self.log.info(f'Total predictors: {total_predictors}')
+        self.log.info('------')
+        self.log.info('')
+        # time.sleep(5)
 
 
 if __name__ == '__main__':

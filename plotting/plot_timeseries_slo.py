@@ -6,16 +6,16 @@ import matplotlib.pyplot as plt
 
 
 logfile_list = [
-                # '../logs/throughput/selected_asplos/infaas_accuracy_300ms.csv',
+                '../logs/throughput/selected_asplos/infaas_accuracy_300ms.csv',
                 # '../logs/throughput/selected_asplos/clipper_ht_aimd_300ms.csv',
                 # '../logs/throughput/selected_asplos/clipper_ht_nexus_300ms.csv',
                 # '../logs/throughput/selected_asplos/clipper_ht_asb_300ms.csv',
                 # '../logs/throughput/selected_asplos/clipper_optstart_300ms.csv',
-                # '../logs/throughput/selected_asplos/sommelier_aimd_300ms.csv',
-                # '../logs/throughput/selected_asplos/sommelier_asb_300ms.csv',
+                '../logs/throughput/selected_asplos/sommelier_aimd_300ms.csv',
+                '../logs/throughput/selected_asplos/sommelier_asb_300ms.csv',
                 # '../logs/throughput/selected_asplos/sommelier_nexus_300ms.csv',
-                '../logs/throughput/selected_asplos/proteus_aimd_300ms.csv',
-                '../logs/throughput/selected_asplos/proteus_nexus_300ms.csv',
+                # '../logs/throughput/selected_asplos/proteus_aimd_300ms.csv',
+                # '../logs/throughput/selected_asplos/proteus_nexus_300ms.csv',
                 '../logs/throughput/selected_asplos/proteus_300ms.csv',
                 # '../logs/throughput/selected_asplos/clipper_ht_asb_300ms.csv',
                 # '../logs/throughput/selected_asplos/sommelier_uniform_asb_300ms.csv'
@@ -33,16 +33,16 @@ markers = ['+', 'o', 'v', '^', '*', 's', 'x']
 # algorithms = ['Clipper++ (High Throughput)', 'Clipper++ (High Accuracy)',
 #             'INFaaS-Instance', 'INFaaS-Accuracy', 'AccScale']
 algorithms = [
-            #   'INFaaS-Accuracy',
+              'INFaaS-Accuracy',
             #   'Clipper-HT-AIMD',
             #   'Clipper-HT-Nexus',
             #   'Clipped-HT-ASB'
             #   'Clipper-HT Optimized Start',
-            #   'Sommelier-AIMD',
-            #   'Sommelier-ASB',
+              'Sommelier-AIMD',
+              'Sommelier-ASB',
             #   'Sommelier-Nexus'
-              'Proteus-Clipper',
-              'Proteus-Nexus',
+            #   'Proteus-Clipper',
+            #   'Proteus-Nexus',
               'Proteus-Proteus'
             #   'Clipper-HT-ASB',
             #   'Sommelier-ASB (Uniform Start)'

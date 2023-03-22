@@ -523,8 +523,12 @@ class Executor:
         for key in self.predictors:
             predictor = self.predictors[key]
             batch_size = predictor.get_infaas_batch_size()
-            runtime = self.variant_runtimes[predictor.acc_type][(self.isi, predictor.variant_name, batch_size)]
-            peak_throughput = batch_size * 1000 / runtime
+            if batch_size == 0:
+                runtime = math.inf
+                peak_throughput = 0
+            else:
+                runtime = self.variant_runtimes[predictor.acc_type][(self.isi, predictor.variant_name, batch_size)]
+                peak_throughput = batch_size * 1000 / runtime
             queued_requests = len(predictor.request_dict)
 
             infaas_slack = 0.95
@@ -559,7 +563,10 @@ class Executor:
                 # Option 1: Replication
                 incoming_load = self.simulator.total_requests_arr[self.simulator.isi_to_idx[self.isi]]
                 self.log.debug(f'incoming load: {incoming_load}')
-                replicas_needed = math.ceil(incoming_load / (peak_throughput * infaas_slack))
+                if peak_throughput == 0:
+                    replicas_needed = math.inf
+                else:
+                    replicas_needed = math.ceil(incoming_load / (peak_throughput * infaas_slack))
 
                 # Replicating this given predictor will have as much cost as the
                 # cost of this predictor, i.e., the accuracy drop of this predictor
@@ -596,8 +603,6 @@ class Executor:
                 for model_variant in model_variants:
                     variant_name = model_variant[1]
                     batch_size = model_variant[2]
-                    if batch_size > predictor.get_largest_batch_size():
-                        continue
 
                     cpu_peak_throughput = self.variant_runtimes[AccType.CPU.value][(self.isi, variant_name, batch_size)]
                     gpu_peak_throughput = self.variant_runtimes[AccType.GPU.value][(self.isi, variant_name, batch_size)]
@@ -614,13 +619,13 @@ class Executor:
                     vpu_available = self.simulator.available_predictors[2]
                     fpga_available = self.simulator.available_predictors[3]
 
-                    if cpu_available == 0 or self.get_largest_batch_size(variant_name, 1) == 0:
+                    if cpu_available == 0:
                         cpu_needed = math.inf
-                    if gpu_available == 0 or self.get_largest_batch_size(variant_name, 2) == 0:
+                    if gpu_available == 0:
                         gpu_needed = math.inf
-                    if vpu_available == 0 or self.get_largest_batch_size(variant_name, 3) == 0:
+                    if vpu_available == 0:
                         vpu_needed = math.inf
-                    if fpga_available == 0 or self.get_largest_batch_size(variant_name, 4) == 0:
+                    if fpga_available == 0:
                         fpga_needed = math.inf
 
                     upgrade_needed_variant = min([cpu_needed, gpu_needed, vpu_needed, fpga_needed])
@@ -635,6 +640,8 @@ class Executor:
                         upgrade_needed = upgrade_needed_variant
                         type_needed = type_needed_variant
                         selected_variant = variant_name
+                if type_needed is None:
+                    continue
                 self.log.debug(f'selected variant for upgrade: {selected_variant}, cost '
                               f'of upgrade: {cost_upgrade}')
 
@@ -646,9 +653,11 @@ class Executor:
                     self.log.debug(f'available predictors left: {self.simulator.available_predictors[type_needed]}')
                     # add 'upgrade_needed' predictors of type 'type_needed' or as many as possible
                     while self.simulator.available_predictors[type_needed] > 0 and upgrade_needed > 0:
+                        # time.sleep(5)
                         self.add_predictor(acc_type=AccType(type_needed+1), variant_name=selected_variant)
                         upgrade_needed -= 1
                         self.simulator.available_predictors[type_needed] -= 1
+                        print(f'infaas upgraded predictor of type: {type_needed}, available predictors: {self.simulator.available_predictors}')
                     self.log.debug(f'upgrade needed: {upgrade_needed}')
                     self.log.debug(f'available predictors left: {self.simulator.available_predictors[type_needed]}')
                     return
@@ -660,9 +669,11 @@ class Executor:
                     self.log.debug(f'available predictors left: {self.simulator.available_predictors[type_needed]}')
                     # add 'upgrade_needed' predictors of type 'type_needed' or as many as possible
                     while self.simulator.available_predictors[type_needed] > 0 and replicas_needed > 0:
-                        self.add_predictor(acc_type=type_needed)
+                        # time.sleep(5)
+                        self.add_predictor(acc_type=AccType(type_needed+1))
                         replicas_needed -= 1
                         self.simulator.available_predictors[type_needed] -= 1
+                        print(f'infaas replicated predictor of type: {type_needed}, available predictors: {self.simulator.available_predictors}')
                     self.log.debug(f'replicas needed: {upgrade_needed}')
                     self.log.debug(f'available predictors left: {self.simulator.available_predictors[type_needed]}')
                     return
@@ -678,6 +689,8 @@ class Executor:
     
 
     def trigger_infaas_v2_downscaling(self):
+        self.log.error('infaas downscaling is buggy, skipping for now..')
+        return
         self.log.debug('infaas v2 downscaling triggered')
         infaas_slack = self.simulator.infaas_slack
 
@@ -687,7 +700,10 @@ class Executor:
         for key in self.predictors:
             predictor = self.predictors[key]
             batch_size = predictor.get_infaas_batch_size()
-            runtime = self.variant_runtimes[predictor.acc_type][(self.isi, predictor.variant_name, batch_size)]
+            if batch_size == 0:
+                runtime = math.inf
+            else:
+                runtime = self.variant_runtimes[predictor.acc_type][(self.isi, predictor.variant_name, batch_size)]
             
             predictor_peak_throughput = predictor.get_infaas_batch_size() * 1000 / runtime
             total_peak_throughput += predictor_peak_throughput
@@ -700,7 +716,10 @@ class Executor:
         predictors_to_add = []
         for key in self.predictors:
             predictor = self.predictors[key]
-            runtime = self.variant_runtimes[predictor.acc_type][(self.isi, predictor.variant_name, batch_size)]
+            if batch_size == 0:
+                runtime = math.inf
+            else:
+                runtime = self.variant_runtimes[predictor.acc_type][(self.isi, predictor.variant_name, batch_size)]
             
             predictor_peak_throughput = predictor.get_infaas_batch_size() * 1000 / runtime
 
@@ -776,6 +795,8 @@ class Executor:
         # We can't add/remove predictors inside the above loop since it will
         # change the size of the loop
         for id in predictors_to_remove:
+            # print(f'infaas removed predictor')
+            # time.sleep(1)
             self.remove_predictor_by_id(id)
 
         for tuple in predictors_to_add:
@@ -834,8 +855,8 @@ class Executor:
         '''
         self.log.debug(f'enqueuing request for isi: {event.desc}, arrived at: {self.isi}, id: {self.id}')
 
-        if len(self.predictors) == 0:
-            self.add_predictor()
+        # if len(self.predictors) == 0:
+        #     acc_type = self.add_predictor()
 
         if self.task_assignment == TaskAssignment.CANARY:
             if len(self.canary_routing_table) == 0:
@@ -892,8 +913,12 @@ class Executor:
                     _predictor = self.predictors[key]
                     batch_size = _predictor.get_infaas_batch_size()
                     executor_isi = _predictor.executor.isi
-                    profiled_latency = _predictor.profiled_latencies[(executor_isi, _predictor.variant_name, batch_size)]
-                    peak_throughput = math.floor(batch_size * 1000 / profiled_latency)
+                    if batch_size == 0:
+                        profiled_latency = math.inf
+                        peak_throughput = 0
+                    else:
+                        profiled_latency = _predictor.profiled_latencies[(executor_isi, _predictor.variant_name, batch_size)]
+                        peak_throughput = math.floor(batch_size * 1000 / profiled_latency)
                     queued_requests = len(_predictor.request_dict)
 
                     self.log.debug(f'Throughput: {peak_throughput}')
@@ -959,8 +984,9 @@ class Executor:
                 for candidate in inactive_candidates:
                     model_variant, acc_type = candidate
 
-                    if self.num_predictor_types[acc_type.value-1 + event.qos_level*4] < self.max_acc_per_type:
+                    if self.num_predictor_types[acc_type.value-1 + event.qos_level*4] < self.max_acc_per_type and self.simulator.available_predictors[acc_type.value-1] > 0:
                         predictor_id = self.add_predictor(acc_type=acc_type, variant_name=model_variant)
+                        self.simulator.available_predictors[acc_type.value-1] -= 1
                         predictor = self.predictors[predictor_id]
                         self.log.debug(f'Predictor {predictor} added from inactive variants')
                         break
