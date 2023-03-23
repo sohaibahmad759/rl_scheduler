@@ -550,10 +550,10 @@ class Executor:
                 # Technically it is an upgrade, but we can increase it first and
                 # see if anything still needs to be changed
                 for batch_size in self.simulator.allowed_batch_sizes:
-                    if batch_size > predictor.get_largest_batch_size():
-                        break
-                    else:
-                        predictor.set_infaas_batch_size(batch_size)
+                    # if batch_size > predictor.get_largest_batch_size():
+                    #     break
+                    # else:
+                    predictor.set_infaas_batch_size(batch_size)
                 
                 peak_throughput = predictor.get_infaas_batch_size() * 1000 / runtime
 
@@ -689,8 +689,8 @@ class Executor:
     
 
     def trigger_infaas_v2_downscaling(self):
-        self.log.error('infaas downscaling is buggy, skipping for now..')
-        return
+        # self.log.error('infaas downscaling is buggy, skipping for now..')
+        # return
         self.log.debug('infaas v2 downscaling triggered')
         infaas_slack = self.simulator.infaas_slack
 
@@ -740,8 +740,8 @@ class Executor:
             
             # First consider smaller batch sizes, going in increasing order
             for batch_size in self.simulator.allowed_batch_sizes:
-                if batch_size > predictor.get_largest_batch_size():
-                    break
+                # if batch_size > predictor.get_largest_batch_size():
+                #     break
 
                 batch_peak_throughput = batch_size * 1000 / runtime
                 new_throughput = total_peak_throughput - predictor_peak_throughput + batch_peak_throughput
@@ -767,13 +767,16 @@ class Executor:
                 cpu_available = self.simulator.available_predictors[0]
                 vpu_available = self.simulator.available_predictors[2]
 
-                if self.get_largest_batch_size(predictor.variant_name, 'CPU') == 0:
-                    continue
+                # if self.get_largest_batch_size(predictor.variant_name, 'CPU') == 0:
+                #     continue
 
                 if cpu_available > 0 or vpu_available > 0:
-                    cpu_peak_throughput = self.variant_runtimes[AccType.CPU.value][(self.isi,
-                                                predictor.variant_name,
-                                                predictor.get_infaas_batch_size())]
+                    if predictor.get_infaas_batch_size() == 0:
+                        cpu_peak_throughput = 0
+                    else:
+                        cpu_peak_throughput = self.variant_runtimes[AccType.CPU.value][(self.isi,
+                                                    predictor.variant_name,
+                                                    predictor.get_infaas_batch_size())]
                     new_throughput = total_peak_throughput - predictor_peak_throughput + cpu_peak_throughput
 
                     if new_throughput * infaas_slack > total_queued_requests:
@@ -797,11 +800,15 @@ class Executor:
         for id in predictors_to_remove:
             # print(f'infaas removed predictor')
             # time.sleep(1)
-            self.remove_predictor_by_id(id)
+            predictor_type = self.predictors[id].acc_type
+            removed = self.remove_predictor_by_id(id)
+            if removed:
+                self.simulator.available_predictors[predictor_type-1] += 1
 
         for tuple in predictors_to_add:
             acc_type, variant_name = tuple
             self.add_predictor(acc_type=acc_type, variant_name=variant_name)
+            self.simulator.available_predictors[acc_type.value-1] -= 1
 
         return
 
@@ -964,15 +971,15 @@ class Executor:
                             largest_batch_size = self.get_largest_batch_size(model_variant=model_variant, acc_type=acc_type.value)
                             
                             if largest_batch_size == 0:
-                                continue
+                                largest_batch_size = 1
 
                             runtime = self.variant_runtimes[predictor_type][(isi_name, model_variant, largest_batch_size)]
 
                             self.log.debug(f'infaas, runtime: {runtime}, deadline: {event.deadline}')
 
-                            if math.isinf(runtime) or largest_batch_size == 0:
-                                self.log.debug(f'largest_batch_size: {largest_batch_size}, runtime: {runtime}')
-                                continue
+                            # if math.isinf(runtime) or largest_batch_size == 0:
+                            #     self.log.debug(f'largest_batch_size: {largest_batch_size}, runtime: {runtime}')
+                            #     continue
                             
                             loadtime = self.variant_loadtimes[(isi_name, model_variant)]
                             total_time = runtime + loadtime
@@ -1001,10 +1008,11 @@ class Executor:
                     _predictor = self.predictors[candidate]
                     variant_name = _predictor.variant_name
                     acc_type = _predictor.acc_type
-                    batch_size = self.get_largest_batch_size(model_variant=variant_name, acc_type=acc_type)
+                    # batch_size = self.get_largest_batch_size(model_variant=variant_name, acc_type=acc_type)
+                    batch_size = _predictor.get_infaas_batch_size()
 
                     if batch_size == 0:
-                        continue
+                        batch_size = 1
 
                     runtime = self.variant_runtimes[acc_type][(isi_name, variant_name, batch_size)]
 
@@ -1024,6 +1032,9 @@ class Executor:
             if predictor is None:
                 self.log.debug(f'infaas: predictor not found. not sure what to do here')
                 closest_acc_candidates = sorted(self.predictors, key=lambda x: abs(self.predictors[x].profiled_accuracy - event.accuracy))
+                if len(closest_acc_candidates) == 0:
+                    self.simulator.bump_failed_request_stats(event)
+                    return
                 predictor = self.predictors[random.choice(closest_acc_candidates)]
 
             self.log.debug(f'enqueuing request at predictor {predictor}')

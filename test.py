@@ -79,13 +79,13 @@ def validate_config(config: dict, filename: str):
                               f'model allocation is one of the following: ilp, ilp_alpha, '
                               f'sommelier')
     
-    if model_allocation in ['ilp', 'ilp_alpha', 'sommelier'] and 'solve_interval' not in config:
+    if model_allocation in ['ilp', 'ilp_alpha', 'sommelier', 'infaas_v2'] and 'solve_interval' not in config:
         raise ConfigException(f'solve_interval not specified for model allocation in '
                               f'config file: {filename}\nsolve_interval value is needed if '
                               f'model allocation is one of the following: ilp, ilp_alpha, '
                               f'sommelier')
     
-    if not(model_allocation in ['ilp', 'ilp_alpha', 'sommelier']) and 'solve_interval' in config:
+    if not(model_allocation in ['ilp', 'ilp_alpha', 'sommelier', 'infaas_v2']) and 'solve_interval' in config:
         raise ConfigException(f'unexpected parameter solve_interval specificed in config: {filename}'
                               f'\solve_interval is only needed for ILP, ILP-Alpha or Sommelier')
 
@@ -383,12 +383,12 @@ def main(args):
             if ilp_applied == True:
                 period_tuning = solve_interval
                 # if i >= 50 and i <= 100:
-                #     period_tuning = 2
+                #     period_tuning = 5
                 # TODO: Tune how frequently the ILP is run by tuning 'period_tuning'
                 #       The bigger it is, the less frequently the ILP is invoked
                 #       Also, what are its implications on allocation window sizes and
                 #       action group sizes?
-                if i % period_tuning == 0:
+                if i % period_tuning == 0 or i == 5:
                     actions = ilp.run(observation, env.n_accelerators, env.max_no_of_accelerators)
                     ilp_rounds += 1
                 else:
@@ -432,8 +432,9 @@ def main(args):
                 env.trigger_infaas_upscaling()
                 env.trigger_infaas_downscaling()
             elif model_assignment == 'infaas_v2':
-                env.trigger_infaas_v2_upscaling()
-                env.trigger_infaas_v2_downscaling()
+                if i % solve_interval == 0:
+                    env.trigger_infaas_v2_upscaling()
+                    env.trigger_infaas_v2_downscaling()
             else:
                 print(f'Invalid verison of INFaaS: {model_assignment}')
             
@@ -466,7 +467,7 @@ def main(args):
         observation, reward, done, info = env.step(action)
         print(f'available predictors: {env.simulator.available_predictors}')
         available_predictors = env.simulator.available_predictors
-        if max(available_predictors) > 10 or min(available_predictors) < 0:
+        if max(available_predictors) > env.max_no_of_accelerators or min(available_predictors) < 0:
             print(f'Invalid available predictors state: {available_predictors}')
             time.sleep(10)
         env.simulator.print_allocation()

@@ -34,7 +34,7 @@ class SchedulingEnv(gym.Env):
         self.allocation_window = allocation_window
         
         # if we make this a vector, can have heterogeneous no. of accelerators for each type
-        self.max_no_of_accelerators = 10
+        self.max_no_of_accelerators = 5
         self.max_runtime = 1000
 
         self.model_assignment = model_assignment

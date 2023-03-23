@@ -62,6 +62,13 @@ class Predictor:
         self.batch_sizes_allowed = self.simulator.allowed_batch_sizes
         self.max_batch_size = self.get_largest_batch_size()
 
+        if self.max_batch_size == 0:
+            self.peak_throughput = 0
+        else:
+            self.peak_throughput = self.max_batch_size * 1000 / profiled_latencies[(self.executor.isi,
+                                                                                    variant_name,
+                                                                                    self.max_batch_size)] 
+
         self.batching_algo = self.simulator.batching_algo
         # Only needed if model assignment and job scheduling policies are INFaaS v2
         self.infaas_batch_size = self.max_batch_size

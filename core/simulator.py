@@ -779,8 +779,6 @@ class Simulator:
         """
         if len(required_predictors) == 0:
             raise SimulatorException('No required predictors passed')
-            time.sleep(5)
-            return
 
         self.log.debug(f'apply_predictor_dict: required_predictors: {required_predictors}')
 
@@ -887,7 +885,25 @@ class Simulator:
                 if (self.available_predictors[acc_type-1]) < 0:
                     raise SimulatorException(f'Available predictors {self.available_predictors[acc_type-1]} for type {acc_type}')
                 required -= 1
-        self.log.debug('added predictors:', added)
+        self.log.debug(f'added predictors: {added}')
+
+        total_predictors = 0
+        total_queued = 0
+        total_capacity = 0
+        for key in self.executors:
+            predictors = self.executors[key].predictors
+            total_predictors += len(predictors)
+            # print(f'queued: {list(map(lambda x: len(x.request_queue), predictors.values()))}')
+            total_queued += sum(list(map(lambda x: len(x.request_queue), predictors.values())))
+            total_capacity += sum(list(map(lambda x: x.peak_throughput if 'prajjwal' not in x.variant_name else 0,
+                                           predictors.values())))
+            predictors = list(map(lambda x: (x.variant_name, f'acc_type: {x.acc_type}',
+                                             f'queue length: {len(x.request_queue)}',
+                                             f'peak throughput: {x.peak_throughput}',),
+                                  predictors.values()))
+        self.log.debug(f'Total queued requests: {total_queued}, system serving capacity: '
+                    f'{total_capacity} reqs/sec')
+        self.log.debug(f'Total predictors: {total_predictors}')
         
         return
 
@@ -1479,14 +1495,26 @@ class Simulator:
     
     def print_allocation(self):
         total_predictors = 0
+        total_queued = 0
+        total_capacity = 0
         self.log.info('')
         self.log.info('------')
         self.log.info('Printing simulator\'s current allocation..')
         for key in self.executors:
             predictors = self.executors[key].predictors
             total_predictors += len(predictors)
-            predictors = list(map(lambda x: (x.variant_name, x.acc_type), predictors.values()))
+            # print(f'queued: {list(map(lambda x: len(x.request_queue), predictors.values()))}')
+            total_queued += sum(list(map(lambda x: len(x.request_queue), predictors.values())))
+            # total_capacity += sum(list(map(lambda x: x.peak_throughput if 'prajjwal' not in x.variant_name else 0,
+            #                                predictors.values())))
+            total_capacity += sum(list(map(lambda x: x.peak_throughput, predictors.values())))
+            predictors = list(map(lambda x: (x.variant_name, f'acc_type: {x.acc_type}',
+                                             f'queue length: {len(x.request_queue)}',
+                                             f'peak throughput: {x.peak_throughput}',),
+                                  predictors.values()))
             self.log.info(f'isi: {key}, predictors: {predictors}')
+        self.log.info(f'Total queued requests: {total_queued}, system serving capacity: '
+                      f'{total_capacity} reqs/sec')
         self.log.info(f'Total predictors: {total_predictors}')
         self.log.info('------')
         self.log.info('')

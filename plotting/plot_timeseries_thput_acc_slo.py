@@ -7,11 +7,11 @@ import matplotlib.pyplot as plt
 
 logfile_list = [
                 '../logs/throughput/selected_asplos/infaas_accuracy_300ms.csv',
-                # '../logs/throughput/selected_asplos/clipper_ht_aimd_300ms.csv',
+                '../logs/throughput/selected_asplos/clipper_ht_aimd_300ms.csv',
                 # '../logs/throughput/selected_asplos/clipper_ht_nexus_300ms.csv',
                 # '../logs/throughput/selected_asplos/clipper_ht_asb_300ms.csv',
                 # '../logs/throughput/selected_asplos/clipper_optstart_300ms.csv',
-                '../logs/throughput/selected_asplos/sommelier_aimd_300ms.csv',
+                # '../logs/throughput/selected_asplos/sommelier_aimd_300ms.csv',
                 '../logs/throughput/selected_asplos/sommelier_asb_300ms.csv',
                 # '../logs/throughput/selected_asplos/sommelier_nexus_300ms.csv',
                 # '../logs/throughput/selected_asplos/proteus_aimd_300ms.csv',
@@ -34,11 +34,11 @@ markers = ['+', 'o', 'v', '^', '*', 's', 'x']
 #             'INFaaS-Instance', 'INFaaS-Accuracy', 'AccScale']
 algorithms = [
               'INFaaS-Accuracy',
-            #   'Clipper-HT-AIMD',
+              'Clipper-HT-AIMD',
             #   'Clipper-HT-Nexus',
             #   'Clipped-HT-ASB'
             #   'Clipper-HT Optimized Start',
-              'Sommelier-AIMD',
+            #   'Sommelier-AIMD',
               'Sommelier-ASB',
             #   'Sommelier-Nexus'
             #   'Proteus-Clipper',
@@ -53,6 +53,7 @@ colors = ['#729ECE', '#FF9E4A', '#ED665D', '#AD8BC9', '#67BF5C', '#8C564B',
 fig, (ax1, ax2, ax3) = plt.subplots(3)
 color_idx = 0
 clipper_accuracy = []
+y_cutoff = 0
 for idx in range(len(logfile_list)):
     logfile = logfile_list[idx]
     
@@ -73,6 +74,8 @@ for idx in range(len(logfile_list)):
     demand = df['demand'].values[start_cutoff:]
     throughput = df['throughput'].values[start_cutoff:]
     capacity = df['capacity'].values[start_cutoff:]
+
+    y_cutoff = max(y_cutoff, max(demand))
 
     dropped = df['dropped'].values[start_cutoff:]
     late = df['late'].values[start_cutoff:]
@@ -135,13 +138,13 @@ ax3.grid()
 # plt.rc('ytick', labelsize=30)    # fontsize of the tick labels
 # plt.rc('legend', fontsize=30)    # legend
 
-y_cutoff = max(demand) + 50
+y_cutoff += 50
 # y_cutoff = 200
 
 ax1.legend(loc='upper center', bbox_to_anchor=(0.5, 1.55), ncol=3, fontsize=12)
 ax1.set_ylabel('Requests per sec', fontsize=15)
 ax1.set_xticks(np.arange(0, 25, 4), fontsize=15)
-ax1.set_yticks(np.arange(0, y_cutoff, 200), fontsize=15)
+ax1.set_yticks(np.arange(0, y_cutoff, y_cutoff/8), fontsize=15)
 
 ax2.set_xticks(np.arange(0, 25, 4), fontsize=15)
 ax2.set_yticks(np.arange(80, 104, 5))

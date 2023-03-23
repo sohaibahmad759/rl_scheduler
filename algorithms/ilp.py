@@ -1,10 +1,15 @@
 import time
 import logging
+import pprint
 import numpy as np
 import gurobipy as gp
 from gurobipy import GRB
 from algorithms.base import SchedulingAlgorithm
 from core.exceptions import IlpException
+
+
+MINIMUM_BETA = 0.2
+MINIMUM_ACCURACY = 93.0
 
 
 class Ilp(SchedulingAlgorithm):
@@ -18,6 +23,7 @@ class Ilp(SchedulingAlgorithm):
 
         self.allocation_window = allocation_window
 
+        self.initial_beta = beta
         self.beta = beta
 
         self.simulator = None
@@ -284,178 +290,194 @@ class Ilp(SchedulingAlgorithm):
         jk_pairs, _ = gp.multidict(b)
         ik_pairs, _ = gp.multidict(ik_dict)
 
-        # Set up the optimization model
-        m = gp.Model('Accuracy Throughput MILP')
-        m.setParam("LogToConsole", 0)
+        solution_found = False
+        while solution_found == False and self.beta > MINIMUM_BETA:
+            # Set up the optimization model
+            m = gp.Model('Accuracy Throughput MILP')
+            m.setParam("LogToConsole", 0)
 
-        m.setParam('NonConvex', 2)
-        m.setParam('TimeLimit', 200)
-        m.setParam('MIPGap', 0.5)
-        m.setParam('Threads', 8)
+            m.setParam('NonConvex', 2)
+            m.setParam('TimeLimit', 20)
+            m.setParam('MIPGap', 0.5)
+            m.setParam('Threads', 8)
 
-        # Add optimization variables
-        w = m.addVars(rtypes, name='x')
-        x = m.addVars(ij_pairs, vtype=GRB.BINARY, name='x')
-        # TODO: Both these variables need to be positive
-        # y = m.addVars(models, name='y', vtype=GRB.POSITIVE)
-        # z = m.addVars(jk_pairs, name='z', vtype=GRB.POSITIVE)
-        y = m.addVars(accelerators, name='y')
-        ind = m.addVars(accelerators, name='ind', vtype=GRB.BINARY)
-        z = m.addVars(ik_pairs, name='z')
-        zp = m.addVars(accelerators, name='z')
-        # aux = m.addVar(name='aux')
+            # Add optimization variables
+            w = m.addVars(rtypes, name='x')
+            x = m.addVars(ij_pairs, vtype=GRB.BINARY, name='x')
+            # TODO: Both these variables need to be positive
+            # y = m.addVars(models, name='y', vtype=GRB.POSITIVE)
+            # z = m.addVars(jk_pairs, name='z', vtype=GRB.POSITIVE)
+            y = m.addVars(accelerators, name='y')
+            yp = m.addVars(accelerators, name='yp')
+            ind = m.addVars(accelerators, name='ind', vtype=GRB.BINARY)
+            z = m.addVars(ik_pairs, name='z')
+            zp = m.addVars(accelerators, name='z')
+            # aux = m.addVar(name='aux')
 
-        # If there are no incoming requests, terminate ILP
-        if sum(s.values()) == 0:
-            self.log.error('No requests received, terminating ILP.')
-            return None
-        else:
-            self.log.debug('\nIncoming requests:' + str(sum(s.values())))
-        
-        # TODO: how to set accelerators for each model variant (and specify model variant while doing so)?
-        # Set the objective
-        # m.setObjective(alpha * gp.quicksum(w) * aux + (1-alpha) * gp.quicksum(y) / sum(s.values()), GRB.MAXIMIZE)
-        m.setObjective((gp.quicksum(w) / sum(s.values()) / 100), GRB.MAXIMIZE)
-
-        # Add constraints
-        # m.addConstrs((w[k] == sum(sum(s[k]*b[j, k]*A[j]*z[j, k]*x[i, j] for j in models)
-        #                           for i in accelerators) for k in rtypes), 'c1')
-        m.addConstr(gp.quicksum(y) / sum(s.values()) >= self.beta, 'c_min_thput')
-        for k in rtypes:
-            # m.addConstr(w[k] <= sum(sum(s[k]*z[j, k]*b[j, k]*A[j]*x[i, j] for j in models)
-            #                         for i in accelerators), 'c1_1_' + str(k))
-            # m.addConstr(w[k] == sum(sum(y[j]*b[j, k]*A[j]*x[i, j] for j in models)
-            #                         for i in accelerators), 'c1_2_' + str(k))
-            # m.addConstr(w[k] == sum(s[k]*z[j,k]*b[j,k]*A[j] for j in models), 'c1_3' + str(k))
-            # m.addConstr(w[k] <= sum(sum(y[j]*A[j]*x[i, j] for j in models)
-                                    # for i in accelerators), 'c1_4_' + str(k))
-            # TODO: how of many of the requests in y[j] belong to isi k?
-            # m.addConstr(w[k] <= sum(y[j]*z[j,k]*A[j] for j in models), 'c1_5_' + str(k))
-            # TODO: Probably this constraint is forcing z[j,k] to be either 1 or 0
-            #       When alpha = 0, z[j,k] varies from 0 to 1 quite often
-            m.addConstr(w[k] <= sum(sum(s[k]*z[i,k]*x[i,j]*A[j] for j in models) for i in accelerators), 'c1_5_' + str(k))
-            # m.addConstr(sum(b[j, k] * z[j, k] for j in models) <= 1, 'c3_' + str(k))
-            # m.addConstr(sum(z[j, k] for j in models) <= 1, 'c3_2_' + str(k))
-
-            # TODO: Jun 1: model is infeasible due to this particular constraint, without it the model
-            #               works but gives weird result
-            # TODO: edit: it seems like this issue has been resolved with constraint c3_3_
-            # m.addConstr(sum(b[j, k] * z[j, k] for j in models) == sum(b[j, k] for j in models), 'c3_' + str(k))
-            m.addConstr(sum(sum(b[j, k] * z[i, k] * x[i, j] for j in models) for i in accelerators) == sum(z[i, k] for i in accelerators), 'c3_3k_' + str(k))
+            # If there are no incoming requests, terminate ILP
+            if sum(s.values()) == 0:
+                self.log.error('No requests received, terminating ILP.')
+                return None
+            else:
+                self.log.debug('\nIncoming requests:' + str(sum(s.values())))
             
-            m.addConstr(sum(z[i, k] for i in accelerators) == 1, 'c3_2_' + str(k))
-            # m.addConstr(sum(z[j, k] * ind[j] for j in models) == 1, 'c_ind_3_' + str(k))
+            # TODO: how to set accelerators for each model variant (and specify model variant while doing so)?
+            # Set the objective
+            # m.setObjective(alpha * gp.quicksum(w) * aux + (1-alpha) * gp.quicksum(y) / sum(s.values()), GRB.MAXIMIZE)
+            m.setObjective((gp.quicksum(w) / sum(s.values()) / 100), GRB.MAXIMIZE)
 
-            # raise IlpException('just debugging')
-            m.addConstr(sum(sum(x[i, j] for i in accelerators)* b[j, k] for j in models) >= 1, 'c_no_zeros_' + str(k))
+            m.addConstr((gp.quicksum(w) / sum(s.values())) >= MINIMUM_ACCURACY, 'c_min_acc')
+            # Add constraints
+            # m.addConstrs((w[k] == sum(sum(s[k]*b[j, k]*A[j]*z[j, k]*x[i, j] for j in models)
+            #                           for i in accelerators) for k in rtypes), 'c1')
+            m.addConstr(gp.quicksum(y) / sum(s.values()) >= self.beta, 'c_min_thput')
+            for k in rtypes:
+                # m.addConstr(w[k] <= sum(sum(s[k]*z[j, k]*b[j, k]*A[j]*x[i, j] for j in models)
+                #                         for i in accelerators), 'c1_1_' + str(k))
+                # m.addConstr(w[k] == sum(sum(y[j]*b[j, k]*A[j]*x[i, j] for j in models)
+                #                         for i in accelerators), 'c1_2_' + str(k))
+                # m.addConstr(w[k] == sum(s[k]*z[j,k]*b[j,k]*A[j] for j in models), 'c1_3' + str(k))
+                # m.addConstr(w[k] <= sum(sum(y[j]*A[j]*x[i, j] for j in models)
+                                        # for i in accelerators), 'c1_4_' + str(k))
+                # TODO: how of many of the requests in y[j] belong to isi k?
+                # m.addConstr(w[k] <= sum(y[j]*z[j,k]*A[j] for j in models), 'c1_5_' + str(k))
+                # TODO: Probably this constraint is forcing z[j,k] to be either 1 or 0
+                #       When alpha = 0, z[j,k] varies from 0 to 1 quite often
+                m.addConstr(w[k] <= sum(sum(s[k]*z[i,k]*x[i,j]*A[j] for j in models) for i in accelerators), 'c1_5_' + str(k))
+                # m.addConstr(sum(b[j, k] * z[j, k] for j in models) <= 1, 'c3_' + str(k))
+                # m.addConstr(sum(z[j, k] for j in models) <= 1, 'c3_2_' + str(k))
 
-        # if sum(x[i, j] for all i in accelerators) >= 1, then sum(z[j,k] for k in rtypes) > 0
+                # TODO: Jun 1: model is infeasible due to this particular constraint, without it the model
+                #               works but gives weird result
+                # TODO: edit: it seems like this issue has been resolved with constraint c3_3_
+                # m.addConstr(sum(b[j, k] * z[j, k] for j in models) == sum(b[j, k] for j in models), 'c3_' + str(k))
+                m.addConstr(sum(sum(b[j, k] * z[i, k] * x[i, j] for j in models) for i in accelerators) == sum(z[i, k] for i in accelerators), 'c3_3k_' + str(k))
+                
+                m.addConstr(sum(z[i, k] for i in accelerators) == 1, 'c3_2_' + str(k))
+                # m.addConstr(sum(z[j, k] * ind[j] for j in models) == 1, 'c_ind_3_' + str(k))
 
-        # m.addConstr(aux * gp.quicksum(y) == 1, 'c_aux')
-        # m.addConstr(gp.quicksum(y) >= 1, 'c_bound_1')
+                # raise IlpException('just debugging')
+                # m.addConstr(sum(sum(x[i, j] for i in accelerators)* b[j, k] for j in models) >= 1, 'c_no_zeros_' + str(k))
 
-        # m.addConstr(aux * gp.quicksum(s) == 1, 'c_aux')
+            # if sum(x[i, j] for all i in accelerators) >= 1, then sum(z[j,k] for k in rtypes) > 0
 
-        # m.addConstrs((sum(x[i, j] for j in models) <=
-        #              1 for i in accelerators), 'c2')
-        for i in accelerators:
-            m.addConstr(sum(x[i, j] for j in models) == 1, 'c2_' + str(i))
+            # m.addConstr(aux * gp.quicksum(y) == 1, 'c_aux')
+            # m.addConstr(gp.quicksum(y) >= 1, 'c_bound_1')
 
-            m.addConstr(zp[i] == sum(z[i, k] for k in rtypes), 'c_zp_' + str(i))
-            m.addConstr(sum(sum(b[j, k] * z[i, k] * x[i, j] for j in models) for k in rtypes) == zp[i], 'c3_3i_' + str(i))
+            # m.addConstr(aux * gp.quicksum(s) == 1, 'c_aux')
+
+            # m.addConstrs((sum(x[i, j] for j in models) <=
+            #              1 for i in accelerators), 'c2')
+            for i in accelerators:
+                m.addConstr(sum(x[i, j] for j in models) == 1, 'c2_' + str(i))
+
+                m.addConstr(zp[i] == sum(z[i, k] for k in rtypes), 'c_zp_' + str(i))
+                m.addConstr(sum(sum(b[j, k] * z[i, k] * x[i, j] for j in models) for k in rtypes) == zp[i], 'c3_3i_' + str(i))
 
 
-            m.addConstr(y[i] <= sum(p[i, j]*x[i, j] for j in models), 'c4_' + str(i))
-            m.addConstr(y[i] <= sum(z[i, k]*s[k] for k in rtypes), 'c5_' + str(i))
+                m.addConstr(y[i] <= sum(p[i, j]*x[i, j] for j in models), 'c4_' + str(i))
+                m.addConstr(y[i] <= sum(z[i, k]*s[k] for k in rtypes), 'c5_' + str(i))
 
-            # m.addConstr(10000000 * ind[i] >= sum(x[i, j] for j in models), 'c_ind_1_' + str(i))
-            # m.addConstr(ind[i] <= sum(x[i, j] for j in models), 'c_ind_2_' + str(i))
+                m.addConstr(yp[i] == sum(p[i, j]*x[i, j] for j in models), 'c6_' + str(i))
 
-        # * If infeasible, try setting this to =l= 1
-        # ct3(k) .. sum(j, b(j,k) * z(j,k)) =e= 1;
-        # m.addConstrs((sum(b[j, k] * z[j, k]
-        #              for j in models) <= 1 for k in rtypes), 'c3')
+                # m.addConstr(10000000 * ind[i] >= sum(x[i, j] for j in models), 'c_ind_1_' + str(i))
+                # m.addConstr(ind[i] <= sum(x[i, j] for j in models), 'c_ind_2_' + str(i))
 
-            # m.addConstr(y[j] == sum(y_prime[j,k] for k in rtypes))
-            # y_prime[j,k] = 
+            # * If infeasible, try setting this to =l= 1
+            # ct3(k) .. sum(j, b(j,k) * z(j,k)) =e= 1;
+            # m.addConstrs((sum(b[j, k] * z[j, k]
+            #              for j in models) <= 1 for k in rtypes), 'c3')
 
-        # As of now, canary_dict plays no role in spec_acc
-        # Since model variant can be changed, there is no point of fixing the canary dict at start
-        # Though we could constrain canary_dict to split load equally if it does not do so
-        # TODO: Check solution to see if load is being split equally as per Sommelier's description
-        if self.static is 'spec_acc':
-            required_predictors, canary_dict, _ = self.get_solution_from_file(self.starting_allocation)
-            m = self.add_spec_acc_constraints(m, x, accelerators, required_predictors)
+                # m.addConstr(y[j] == sum(y_prime[j,k] for k in rtypes))
+                # y_prime[j,k] = 
 
-        # We only do this for AccScale/Proteus
-        # if self.simulator.model_assignment == 'ilp' or self.simulator.batching_algo == 'accscale':
-        # if self.simulator.model_assignment == 'ilp':
-        m = self.disallow_infeasible_variants(m, x, accelerators, sum(self.simulator.model_variants.values(), []),
-                                                self.simulator.largest_batch_sizes)
+            # As of now, canary_dict plays no role in spec_acc
+            # Since model variant can be changed, there is no point of fixing the canary dict at start
+            # Though we could constrain canary_dict to split load equally if it does not do so
+            # TODO: Check solution to see if load is being split equally as per Sommelier's description
+            if self.static is 'spec_acc':
+                required_predictors, canary_dict, _ = self.get_solution_from_file(self.starting_allocation)
+                m = self.add_spec_acc_constraints(m, x, accelerators, required_predictors)
 
-        # # ct4(j) .. y(j) =l= sum(i, x(i,j) * p(i,j));
-        # m.addConstrs((y[j] <= sum(p[i, j]*x[i, j]
-        #              for i in accelerators) for j in models), 'c4')
+            # We only do this for AccScale/Proteus
+            # if self.simulator.model_assignment == 'ilp' or self.simulator.batching_algo == 'accscale':
+            # if self.simulator.model_assignment == 'ilp':
+            m = self.disallow_infeasible_variants(m, x, accelerators, sum(self.simulator.model_variants.values(), []),
+                                                    self.simulator.largest_batch_sizes)
 
-        # # ct5(j) .. y(j) =l= sum(k, z(j,k) * s(k));
-        # m.addConstrs((y[j] <= sum(z[j, k]*s[k] for k in rtypes)
-        #              for j in models), 'c5')
+            # # ct4(j) .. y(j) =l= sum(i, x(i,j) * p(i,j));
+            # m.addConstrs((y[j] <= sum(p[i, j]*x[i, j]
+            #              for i in accelerators) for j in models), 'c4')
 
-        # Solve ILP
-        start_time = time.time()
-        m.optimize()
-        end_time = time.time()
-        ilp_overhead = end_time - start_time
-        self.log.warn(f'Time to solve ILP: {ilp_overhead} seconds')
+            # # ct5(j) .. y(j) =l= sum(k, z(j,k) * s(k));
+            # m.addConstrs((y[j] <= sum(z[j, k]*s[k] for k in rtypes)
+            #              for j in models), 'c5')
 
-        # Measuring routing table overhead for reporting in paper
-        # measure_routing_table_overhead()
+            # Solve ILP
+            start_time = time.time()
+            m.optimize()
+            end_time = time.time()
+            ilp_overhead = end_time - start_time
+            self.log.warn(f'Time to solve ILP: {ilp_overhead} seconds')
 
-        if m.status == GRB.OPTIMAL:
-            self.log.info('\nObjective: %g' % m.ObjVal)
+            # Measuring routing table overhead for reporting in paper
+            # measure_routing_table_overhead()
 
-            total_request_rate = sum(s.values())
-            self.log.debug(
-                'Total incoming requests per second:' + str(total_request_rate))
+            if m.status == GRB.OPTIMAL:
+                self.log.info('\nObjective: %g' % m.ObjVal)
 
-            # throughput = m.ObjVal
-            throughput = gp.quicksum(y).getValue()
-            normalized_throughput = gp.quicksum(y).getValue() / sum(s.values())
-            self.log.debug('Theoretical throughput (objective):' + str(throughput))
-            self.log.debug('Percentage of requests met per second (theoretically):' + \
-                            str(throughput/total_request_rate*100))
-            self.log.debug('Normalized throughput from objective: {}'.format(normalized_throughput))
+                total_request_rate = sum(s.values())
+                self.log.debug(
+                    'Total incoming requests per second:' + str(total_request_rate))
 
-            accuracy = gp.quicksum(w).getValue()
-            self.log.debug('Accuracy (objective):' + str(accuracy))
-            if throughput > 0:
-                self.log.debug('Effective accuracy (over served requests):' + str(accuracy/throughput))
-            self.log.debug('Effective accuracy (over all requests):' + str(accuracy/sum(s[k] for k in rtypes)))
-            # print('\nx:')
-            # for i in accelerators:
-            #     for j in models:
-            #         if x[i, j].X > 0.0001:
-            #             print(f'{i}, {j}, x: {x[i, j].X}')
-            self.cached_solution = {}
-            self.cached_solution['x'] = x
-            self.cached_solution['accelerators'] = accelerators
-            self.cached_solution['models'] = models
+                # throughput = m.ObjVal
+                throughput = gp.quicksum(y).getValue()
+                normalized_throughput = gp.quicksum(y).getValue() / sum(s.values())
+                self.log.debug('Theoretical throughput (objective):' + str(throughput))
+                self.log.debug('Percentage of requests met per second (theoretically):' + \
+                                str(throughput/total_request_rate*100))
+                self.log.warn('Normalized throughput from objective: {}'.format(normalized_throughput))
+                self.log.warn(f'Overall throughput from objective: {throughput}')
+                self.log.warn(f'Total incoming demand: {sum(s.values())}')
+                self.log.warn(f'System serving capacity from ILP: {gp.quicksum(yp).getValue()}')
+                # time.sleep(5)
 
-            self.log.warn(f'w (effective accuracy): {(gp.quicksum(w).getValue()/sum(s.values()))}')
-            # self.log.error(f'waiting 5 seconds before moving on..')
-            # time.sleep(5)
-            # self.log.error(f'now moving on..')
-            self.print_cached_solution()
-            actions = self.generate_actions(current_alloc=current_alloc, ilp_solution=x,
-                                            canary_solution=z, accelerators=accelerators,
-                                            models=models)
-            # time.sleep(10)
-        else:
-            actions = np.zeros(current_alloc.shape)
-            # self.log.error('No solution')
-            # TODO: perhaps we should use cached solution in this case
-            #       what if cached solution is also empty?
-            raise IlpException('No solution')
+                accuracy = gp.quicksum(w).getValue()
+                self.log.debug('Accuracy (objective):' + str(accuracy))
+                if throughput > 0:
+                    self.log.debug('Effective accuracy (over served requests):' + str(accuracy/throughput))
+                self.log.debug('Effective accuracy (over all requests):' + str(accuracy/sum(s[k] for k in rtypes)))
+                # print('\nx:')
+                # for i in accelerators:
+                #     for j in models:
+                #         if x[i, j].X > 0.0001:
+                #             print(f'{i}, {j}, x: {x[i, j].X}')
+                self.cached_solution = {}
+                self.cached_solution['x'] = x
+                self.cached_solution['accelerators'] = accelerators
+                self.cached_solution['models'] = models
+
+                self.log.warn(f'w (effective accuracy): {(gp.quicksum(w).getValue()/sum(s.values()))}')
+                # self.log.error(f'waiting 5 seconds before moving on..')
+                # time.sleep(5)
+                # self.log.error(f'now moving on..')
+                self.print_cached_solution()
+                actions = self.generate_actions(current_alloc=current_alloc, ilp_solution=x,
+                                                canary_solution=z, accelerators=accelerators,
+                                                models=models)
+                # time.sleep(10)
+                solution_found = True
+                self.beta = self.initial_beta
+            else:
+                actions = np.zeros(current_alloc.shape)
+                # self.log.error('No solution')
+                # TODO: perhaps we should use cached solution in this case
+                #       what if cached solution is also empty?
+                self.log.warn(f'No ILP solution with beta: {self.beta}, trying with: {(self.beta-0.05)}')
+                self.beta -= 0.05
+                # raise IlpException('No solution')
+        if solution_found == False:
+            raise IlpException(f'No solution found even with beta: {self.beta}')
         
         return actions
 
