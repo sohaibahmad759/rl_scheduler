@@ -17,7 +17,7 @@ def get_args():
                                            'across models')
     ap.add_argument('--slo', '-s', required=False, default=300, dest='slo',
                     help='The SLO value to use for all requests (in milliseconds)')
-    ap.add_argument('--out', '-o', required=False, default='../../twitter/asplos/equal_exponential',
+    ap.add_argument('--out', '-o', required=False, default='../../twitter/asplos/zipf_exponential',
                     dest='out_path', help='Output path to write the traces to')
     return ap.parse_args()
 
