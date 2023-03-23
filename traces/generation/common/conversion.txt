@@ -1,0 +1,9 @@
+1,mobilenet
+2,efficientnet
+3,resnest
+4,bert
+5,yolo
+6,densenet
+7,resnet
+8,t5
+9,gpt2

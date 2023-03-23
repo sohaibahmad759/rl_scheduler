@@ -115,6 +115,11 @@ for idx in range(len(logfile_list)):
         ax1.plot(time, successful, label=algorithms[idx], color=colors[color_idx])
         ax2.plot(time, effective_accuracy, label=algorithms[idx], color=colors[color_idx])
         ax3.plot(time, total_slo_violations, label=algorithms[idx], color=colors[color_idx])
+
+        if 'estimated_throughput' in df:
+            estimated_throughput = df['estimated_throughput'].values[start_cutoff:]
+            ax1.plot(time, estimated_throughput, label=f'Estimated throughput ({algorithms[idx]})',
+                     color='black')
         # ax1.plot(time, successful, label=algorithms[idx])
         # ax2.plot(time, effective_accuracy, label=algorithms[idx])
     color_idx += 1

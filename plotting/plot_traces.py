@@ -7,9 +7,10 @@ import matplotlib.pyplot as plt
 END_TIME = 1441
 END_TIME = 300
 
+path = ('../../datasets/infaas/asplos/zipf_exponential/trace_files/')
 
-# logfile_list = glob.glob('../traces/azure/mlsys/250/*.txt')
-logfile_list = glob.glob('../../datasets/infaas/asplos/trace_files/*.txt')
+
+logfile_list = glob.glob(os.path.join(path, '*.txt'))
 
 # # We want the latest log file
 # logfile = logfile_list[-1]
@@ -75,8 +76,8 @@ plt.xlabel('Time (min)', fontsize=25)
 plt.ylabel('Requests per second', fontsize=25)
 # plt.xticks(np.arange(0, 25, 4), fontsize=15)
 # plt.yticks(np.arange(0, y_cutoff, 200), fontsize=15)
-plt.savefig(os.path.join('../../datasets/infaas/asplos/trace_files/traces_by_model.pdf'), dpi=500, bbox_inches='tight')
+plt.savefig(os.path.join(path, 'traces_by_model.pdf'), dpi=500, bbox_inches='tight')
 
 plt.close()
 plt.plot(total_requests)
-plt.savefig(os.path.join('../../datasets/infaas/asplos/trace_files/traces_total.pdf'), dpi=500, bbox_inches='tight')
+plt.savefig(os.path.join(path, 'traces_total.pdf'), dpi=500, bbox_inches='tight')
