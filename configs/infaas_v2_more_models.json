@@ -1,12 +1,13 @@
 {
     "profiling_data": "profiling/aggregate_profiled.csv",
-    "trace_path": "traces/twitter/asplos/300",
-    "allowed_variants": "traces/model_variants",
+    "trace_path": "traces/twitter/asplos/low_load/300",
+    "allowed_variants": "traces/model_variants_nosmallbert",
     "model_allocation": "infaas_v2",
     "job_scheduling": "infaas",
     "batching": "infaas",
     "fixed_seed": true,
     "seed": 10,
     "solve_interval": 10,
+    "short_run": true,
     "log_to_file": true
 }

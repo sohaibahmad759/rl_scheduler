@@ -33,7 +33,7 @@ MARKERS_ON = False
 logfile = logfile_list[-1]
 print(logfile)
 
-markers = ['o', 'v', '^', '*', 's', 'x']
+markers = ['+', 'v', '^', '*', 's', 'x']
 # algorithms = ['AccScale', 'Clipper++ (High Accuracy)', 'Clipper++ (High Throughput)',
 #             'INFaaS-Accuracy', 'INFaaS-Instance']
 # algorithms = ['Clipper++ (High Throughput)', 'Clipper++ (High Accuracy)',
@@ -47,7 +47,7 @@ algorithms = [
 colors = ['tab:blue', 'tab:orange', 'tab:green', 'tab:red', '#67BF5C', '#8C564B',
           '#E377C2']
 
-fig, (ax1, ax2) = plt.subplots(2)
+fig, (ax1, ax2, ax3) = plt.subplots(3)
 color_idx = 0
 clipper_accuracy = []
 for idx in range(len(logfile_list)):
@@ -70,6 +70,10 @@ for idx in range(len(logfile_list)):
     demand = df['demand'].values[start_cutoff:]
     throughput = df['throughput'].values[start_cutoff:]
     capacity = df['capacity'].values[start_cutoff:]
+
+    dropped = df['dropped'].values[start_cutoff:]
+    late = df['late'].values[start_cutoff:]
+    total_slo_violations = dropped + late
 
     effective_accuracy = df['effective_accuracy'].values[start_cutoff:]
     # print(f'effective accuracy: {effective_accuracy}')
@@ -103,16 +107,20 @@ for idx in range(len(logfile_list)):
                 marker=markers[color_idx])
         ax2.plot(time, effective_accuracy, label=algorithms[idx], color=colors[color_idx],
                 marker=markers[color_idx])
+        ax3.plot(time, total_slo_violations, label=algorithms[idx], color=colors[color_idx],
+                marker=markers[color_idx])
         # ax1.plot(time, successful, label=algorithms[idx], marker=markers[color_idx])
         # ax2.plot(time, effective_accuracy, label=algorithms[idx], marker=markers[color_idx])
     else:
         ax1.plot(time, successful, label=algorithms[idx], color=colors[color_idx])
         ax2.plot(time, effective_accuracy, label=algorithms[idx], color=colors[color_idx])
+        ax3.plot(time, total_slo_violations, label=algorithms[idx], color=colors[color_idx])
         # ax1.plot(time, successful, label=algorithms[idx])
         # ax2.plot(time, effective_accuracy, label=algorithms[idx])
     color_idx += 1
 ax1.grid()
 ax2.grid()
+ax3.grid()
 
 y_cutoff = max(demand) + 50
 # y_cutoff = 200
@@ -126,7 +134,11 @@ ax2.set_xticks(np.arange(0, 25, 4), fontsize=15)
 ax2.set_yticks(np.arange(80, 104, 5))
 ax2.set_ylabel('Effective Accuracy', fontsize=15)
 
-ax2.set_xlabel('Time (min)', fontsize=15)
+ax3.set_xticks(np.arange(0, 25, 4), fontsize=15)
+# ax2.set_yticks(np.arange(80, 104, 5))
+ax3.set_ylabel('SLO Timeouts', fontsize=15)
+
+ax3.set_xlabel('Time (min)', fontsize=15)
 
 plt.savefig(os.path.join('..', 'figures', 'timeseries_batching.pdf'), dpi=500, bbox_inches='tight')
 

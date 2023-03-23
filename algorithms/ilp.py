@@ -176,6 +176,8 @@ class Ilp(SchedulingAlgorithm):
         demand_since_last = observation[0:num_isi, -2]
         # divide demand by time elapsed since last measurement to get demand in units of requests per second
         demand = demand_since_last / (self.allocation_window / 1000)
+        print(f'demand: {sum(demand)}')
+        time.sleep(10)
         missed_requests = observation[0:num_isi, -1]
 
         # latencies = observation[0:num_isi, num_acc_types:2*num_acc_types]

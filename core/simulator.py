@@ -1187,6 +1187,7 @@ class Simulator:
 
         if not self.batching_enabled:
             self.process_start_event_without_batch(event, clock, executor)
+            raise SimulatorException('This code flow should be deprecated')
         else:
             self.process_start_event_with_batch(event, clock, executor)
         
@@ -1497,6 +1498,7 @@ class Simulator:
         total_predictors = 0
         total_queued = 0
         total_capacity = 0
+        total_served = 0
         self.log.info('')
         self.log.info('------')
         self.log.info('Printing simulator\'s current allocation..')
@@ -1508,17 +1510,22 @@ class Simulator:
             # total_capacity += sum(list(map(lambda x: x.peak_throughput if 'prajjwal' not in x.variant_name else 0,
             #                                predictors.values())))
             total_capacity += sum(list(map(lambda x: x.peak_throughput, predictors.values())))
+            total_served += sum(list(map(lambda x: x.served_requests_per_step, predictors.values())))
+            for key in predictors:
+                predictor = predictors[key]
+                predictor.served_requests_per_step = 0
             predictors = list(map(lambda x: (x.variant_name, f'acc_type: {x.acc_type}',
                                              f'queue length: {len(x.request_queue)}',
                                              f'peak throughput: {x.peak_throughput}',),
                                   predictors.values()))
             self.log.info(f'isi: {key}, predictors: {predictors}')
         self.log.info(f'Total queued requests: {total_queued}, system serving capacity: '
-                      f'{total_capacity} reqs/sec')
+                      f'{total_capacity} reqs/sec, total served by predictors since last '
+                      f'checked: {total_served}')
         self.log.info(f'Total predictors: {total_predictors}')
         self.log.info('------')
         self.log.info('')
-        # time.sleep(5)
+        # time.sleep(1)
 
 
 if __name__ == '__main__':

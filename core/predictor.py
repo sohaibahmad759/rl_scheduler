@@ -62,6 +62,7 @@ class Predictor:
         self.batch_sizes_allowed = self.simulator.allowed_batch_sizes
         self.max_batch_size = self.get_largest_batch_size()
 
+        self.served_requests_per_step = 0
         if self.max_batch_size == 0:
             self.peak_throughput = 0
         else:
@@ -202,9 +203,10 @@ class Predictor:
             return False
         
         # self.request_dict.remove(event.id)
+        self.served_requests_per_step += 1
         del self.request_dict[event.id]
         if len(self.request_dict) == 0:
-            self.busy = False
+            # self.busy = False
             self.busy_till = None
 
         return True
@@ -242,6 +244,7 @@ class Predictor:
         # and request cannot possibly be executed within deadline
 
         if self.task_assignment == TaskAssignment.CANARY and self.batching_algo == 'accscale':
+            self.pop_while_first_expires(clock)
             batch_size = self.find_batch_size(requests=len(self.request_queue))
             self.log.debug(f'enqueue_request: Trying to find appropriate batch size. Number '
                            f'of requests in queue: {len(self.request_queue)}, batch size '
@@ -264,6 +267,7 @@ class Predictor:
                 self.process_batch(clock, self.max_batch_size)
             return
         elif self.task_assignment == TaskAssignment.INFAAS:
+            self.pop_while_first_expires(clock)
             batch_size = self.infaas_batch_size
         else:
             raise PredictorException(f'Unexpected combination, task assignment: {self.task_assignment}, '
@@ -329,6 +333,9 @@ class Predictor:
         ''' Dequeue the first `batch_size` requests from the queue and process
         them in a batch.
         '''
+        if self.busy:
+            raise PredictorException('process_batch called when predictor is busy')
+        
         self.simulator.batch_size_counters[batch_size] += 1
 
         self.log.debug(f'process_batch called with batch size of {batch_size}')
@@ -491,7 +498,7 @@ class Predictor:
         batch size allowed, iteratively until we do not have any request in the queue
         that would expire
         '''
-        if self.batching_algo in ['aimd', 'infaas']:
+        if self.batching_algo in ['aimd']:
             raise PredictorException(f'{self.batching_algo} should not be using '
                                      f'pop_while_first_expires() since it drops request using '
                                      f'an assumption of SLO_EXPIRING events which are not '
@@ -571,6 +578,9 @@ class Predictor:
     def slo_expiring_callback(self, event, clock):
         ''' Callback to handle an SLO_EXPIRING event
         '''
+        if self.busy is True:
+            return
+        
         if self.batching_algo == 'nexus' or self.batching_algo == 'aimd':
             self.log.debug(f'SLO expiring event encountered, ignoring for task assignment: '
                           f'{self.task_assignment}, batching algo: {self.batching_algo}')
@@ -642,6 +652,9 @@ class Predictor:
     def nexus_expiring_callback(self, event, clock):
         ''' Callback to handle a Nexus BATCH_EXPIRING event
         '''
+        if self.busy is True:
+            return
+
         self.pop_while_first_expires(clock)
 
         if len(self.request_queue) == 0:
