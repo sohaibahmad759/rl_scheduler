@@ -868,7 +868,7 @@ class Executor:
         if self.task_assignment == TaskAssignment.CANARY:
             if len(self.canary_routing_table) == 0:
                 self.simulator.bump_failed_request_stats(event)
-                self.log.error('failed request')
+                self.log.error('failed request because routing table is empty')
                 return
 
             selected = random.choices(list(self.canary_routing_table.keys()),

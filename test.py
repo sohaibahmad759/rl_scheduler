@@ -237,7 +237,8 @@ def main(args):
     rate_loggerfile = os.path.join('logs', 'throughput', str(time.time()) + '_' +  model_assignment + '.csv')
     rate_logger.addHandler(logging.FileHandler(rate_loggerfile, mode='w'))
     rate_logger.setLevel(file_log_level)
-    rate_logger.info('wallclock_time,simulation_time,demand,throughput,capacity,effective_accuracy,total_accuracy,successful,dropped,late')
+    rate_logger.info('wallclock_time,simulation_time,demand,throughput,capacity,effective_accuracy,' +
+                     'total_accuracy,successful,dropped,late,estimated_throughput,estimated_effective_accuracy')
 
     rate_logger_per_model = logging.getLogger('Rate logger per model')
     rate_logger_per_model_file = os.path.join('logs', 'throughput_per_model', str(time.time()) + '_' + model_assignment + '.csv')
@@ -490,11 +491,15 @@ def main(args):
         new_total_successful = env.simulator.total_successful
         new_dropped = env.simulator.slo_timeouts['timeouts']
         new_late = env.simulator.slo_timeouts['late']
+        estimated_throughput = env.simulator.estimated_throughput
+        estimated_effective_accuracy = env.simulator.estimated_effective_accuracy
         utils.log_throughput(rate_logger, observation, i, allocation_window,
                              new_total_accuracy-total_accuracy,
                              new_total_successful-total_successful,
                              new_dropped-total_dropped,
-                             new_late-total_late)
+                             new_late-total_late,
+                             estimated_throughput,
+                             estimated_effective_accuracy)
         total_accuracy = new_total_accuracy
         total_successful = new_total_successful
         total_dropped = new_dropped

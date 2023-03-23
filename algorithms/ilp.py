@@ -176,8 +176,8 @@ class Ilp(SchedulingAlgorithm):
         demand_since_last = observation[0:num_isi, -2]
         # divide demand by time elapsed since last measurement to get demand in units of requests per second
         demand = demand_since_last / (self.allocation_window / 1000)
-        print(f'demand: {sum(demand)}')
-        time.sleep(10)
+        self.log.info(f'demand: {sum(demand)}')
+        # time.sleep(10)
         missed_requests = observation[0:num_isi, -1]
 
         # latencies = observation[0:num_isi, num_acc_types:2*num_acc_types]
@@ -459,7 +459,10 @@ class Ilp(SchedulingAlgorithm):
                 self.cached_solution['accelerators'] = accelerators
                 self.cached_solution['models'] = models
 
-                self.log.warn(f'w (effective accuracy): {(gp.quicksum(w).getValue()/sum(s.values()))}')
+                effective_accuracy = gp.quicksum(w).getValue()/sum(s.values())
+                self.log.warn(f'w (effective accuracy): {effective_accuracy}')
+                self.simulator.estimated_effective_accuracy = effective_accuracy
+                self.simulator.estimated_throughput = throughput
                 # self.log.error(f'waiting 5 seconds before moving on..')
                 # time.sleep(5)
                 # self.log.error(f'now moving on..')

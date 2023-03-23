@@ -91,6 +91,8 @@ class Simulator:
         self.slo_timeouts = {'total': 0, 'succeeded': 0, 'timeouts': 0, 'late': 0}
         self.aimd_stats = {'increased': 0, 'decreased': 0}
         self.batch_size_counters = {1: 0, 2: 0, 4: 0, 8: 0, 16: 0}
+        self.estimated_throughput = 0
+        self.estimated_effective_accuracy = 0
 
         self.accuracy_per_model = {}
 
@@ -1518,7 +1520,7 @@ class Simulator:
                                              f'queue length: {len(x.request_queue)}',
                                              f'peak throughput: {x.peak_throughput}',),
                                   predictors.values()))
-            self.log.info(f'isi: {key}, predictors: {predictors}')
+            # self.log.info(f'isi: {key}, predictors: {predictors}')
         self.log.info(f'Total queued requests: {total_queued}, system serving capacity: '
                       f'{total_capacity} reqs/sec, total served by predictors since last '
                       f'checked: {total_served}')
