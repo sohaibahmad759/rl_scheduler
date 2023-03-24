@@ -1,6 +1,6 @@
 {
     "profiling_data": "profiling/aggregate_profiled.csv",
-    "trace_path": "traces/twitter/asplos/low_load/300",
+    "trace_path": "traces/twitter/asplos/equal_gamma/300",
     "allowed_variants": "traces/model_variants_nosmallbert",
     "model_allocation": "infaas_v2",
     "job_scheduling": "infaas",

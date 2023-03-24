@@ -202,11 +202,6 @@ class Ilp(SchedulingAlgorithm):
 
         self.accelerator_dict = {'CPU': 0, 'GPU_AMPERE': 1, 'VPU': 2, 'GPU_PASCAL': 3}
 
-        # accelerators = [NodeModelAcceleratorType.ONNXRUNTIME_GPU_PASCAL,
-        #                 NodeModelAcceleratorType.ONNXRUNTIME_GPU_AMPERE,
-        #                 NodeModelAcceleratorType.ONNXRUNTIME_CPU,
-        #                 NodeModelAcceleratorType.OPENVINO_CPU]
-
         # A(j)
         # Accuracy of model variant j
         A = {}
@@ -228,9 +223,6 @@ class Ilp(SchedulingAlgorithm):
         ik_dict = {}
         
         largest_batch_sizes = self.simulator.get_largest_batch_sizes()
-
-        # self.set_largest_batch_sizes(slo_dict=slo, all_model_variants=self.simulator.model_variants,
-        #                             accelerators=list(self.accelerator_dict.keys()))
 
         for isi in range(num_isi):
             rtypes.append(isi)
@@ -278,10 +270,6 @@ class Ilp(SchedulingAlgorithm):
                     ik_dict[accelerator, isi] = 1
 
                 for isi in range(num_isi):
-                    # if model == isi:
-                    #     b[model, isi] = 1
-                    # else:
-                    #     b[model, isi] = 0
                     if model_variant in self.simulator.model_variants[self.simulator.idx_to_executor[isi]]:
                         b[model_variant, isi] = 1
                     else:
@@ -311,7 +299,6 @@ class Ilp(SchedulingAlgorithm):
             # z = m.addVars(jk_pairs, name='z', vtype=GRB.POSITIVE)
             y = m.addVars(accelerators, name='y')
             yp = m.addVars(accelerators, name='yp')
-            ind = m.addVars(accelerators, name='ind', vtype=GRB.BINARY)
             z = m.addVars(ik_pairs, name='z')
             zp = m.addVars(accelerators, name='z')
             # aux = m.addVar(name='aux')
@@ -323,12 +310,11 @@ class Ilp(SchedulingAlgorithm):
             else:
                 self.log.debug('\nIncoming requests:' + str(sum(s.values())))
             
-            # TODO: how to set accelerators for each model variant (and specify model variant while doing so)?
             # Set the objective
-            # m.setObjective(alpha * gp.quicksum(w) * aux + (1-alpha) * gp.quicksum(y) / sum(s.values()), GRB.MAXIMIZE)
             m.setObjective((gp.quicksum(w) / sum(s.values()) / 100), GRB.MAXIMIZE)
 
-            m.addConstr((gp.quicksum(w) / sum(s.values())) >= MINIMUM_ACCURACY, 'c_min_acc')
+            if 'accscale' in self.simulator.model_assignment:
+                m.addConstr((gp.quicksum(w) / sum(s.values())) >= MINIMUM_ACCURACY, 'c_min_acc')
             # Add constraints
             # m.addConstrs((w[k] == sum(sum(s[k]*b[j, k]*A[j]*z[j, k]*x[i, j] for j in models)
             #                           for i in accelerators) for k in rtypes), 'c1')
@@ -341,17 +327,11 @@ class Ilp(SchedulingAlgorithm):
                 # m.addConstr(w[k] == sum(s[k]*z[j,k]*b[j,k]*A[j] for j in models), 'c1_3' + str(k))
                 # m.addConstr(w[k] <= sum(sum(y[j]*A[j]*x[i, j] for j in models)
                                         # for i in accelerators), 'c1_4_' + str(k))
-                # TODO: how of many of the requests in y[j] belong to isi k?
-                # m.addConstr(w[k] <= sum(y[j]*z[j,k]*A[j] for j in models), 'c1_5_' + str(k))
-                # TODO: Probably this constraint is forcing z[j,k] to be either 1 or 0
-                #       When alpha = 0, z[j,k] varies from 0 to 1 quite often
+                                        
                 m.addConstr(w[k] <= sum(sum(s[k]*z[i,k]*x[i,j]*A[j] for j in models) for i in accelerators), 'c1_5_' + str(k))
                 # m.addConstr(sum(b[j, k] * z[j, k] for j in models) <= 1, 'c3_' + str(k))
                 # m.addConstr(sum(z[j, k] for j in models) <= 1, 'c3_2_' + str(k))
 
-                # TODO: Jun 1: model is infeasible due to this particular constraint, without it the model
-                #               works but gives weird result
-                # TODO: edit: it seems like this issue has been resolved with constraint c3_3_
                 # m.addConstr(sum(b[j, k] * z[j, k] for j in models) == sum(b[j, k] for j in models), 'c3_' + str(k))
                 m.addConstr(sum(sum(b[j, k] * z[i, k] * x[i, j] for j in models) for i in accelerators) == sum(z[i, k] for i in accelerators), 'c3_3k_' + str(k))
                 

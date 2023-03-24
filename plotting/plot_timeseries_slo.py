@@ -5,18 +5,25 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 
+# trace = 'zipf_exponential'
+trace = 'zipf_gamma'
+# trace = 'equal_exponential'
+# trace = 'equal_gamma'
+
+path = '../logs/throughput/selected_asplos'
+
 logfile_list = [
-                '../logs/throughput/selected_asplos/infaas_accuracy_300ms.csv',
-                # '../logs/throughput/selected_asplos/clipper_ht_aimd_300ms.csv',
-                # '../logs/throughput/selected_asplos/clipper_ht_nexus_300ms.csv',
-                # '../logs/throughput/selected_asplos/clipper_ht_asb_300ms.csv',
+                f'{path}/{trace}/infaas_accuracy_300ms.csv',
+                f'{path}/{trace}/clipper_ht_aimd_300ms.csv',
+                f'{path}/{trace}/clipper_ht_nexus_300ms.csv',
+                f'{path}/{trace}/clipper_ht_asb_300ms.csv',
                 # '../logs/throughput/selected_asplos/clipper_optstart_300ms.csv',
-                '../logs/throughput/selected_asplos/sommelier_aimd_300ms.csv',
-                '../logs/throughput/selected_asplos/sommelier_asb_300ms.csv',
+                # '../logs/throughput/selected_asplos/sommelier_aimd_300ms.csv',
+                # '../logs/throughput/selected_asplos/sommelier_asb_300ms.csv',
                 # '../logs/throughput/selected_asplos/sommelier_nexus_300ms.csv',
                 # '../logs/throughput/selected_asplos/proteus_aimd_300ms.csv',
                 # '../logs/throughput/selected_asplos/proteus_nexus_300ms.csv',
-                '../logs/throughput/selected_asplos/proteus_300ms.csv',
+                f'{path}/{trace}/proteus_300ms.csv',
                 # '../logs/throughput/selected_asplos/clipper_ht_asb_300ms.csv',
                 # '../logs/throughput/selected_asplos/sommelier_uniform_asb_300ms.csv'
                 ]
@@ -34,12 +41,12 @@ markers = ['+', 'o', 'v', '^', '*', 's', 'x']
 #             'INFaaS-Instance', 'INFaaS-Accuracy', 'AccScale']
 algorithms = [
               'INFaaS-Accuracy',
-            #   'Clipper-HT-AIMD',
-            #   'Clipper-HT-Nexus',
-            #   'Clipped-HT-ASB'
+              'Clipper-HT-AIMD',
+              'Clipper-HT-Nexus',
+              'Clipped-HT-ASB',
             #   'Clipper-HT Optimized Start',
-              'Sommelier-AIMD',
-              'Sommelier-ASB',
+              # 'Sommelier-AIMD',
+              # 'Sommelier-ASB',
             #   'Sommelier-Nexus'
             #   'Proteus-Clipper',
             #   'Proteus-Nexus',
@@ -48,7 +55,7 @@ algorithms = [
             #   'Sommelier-ASB (Uniform Start)'
               ]
 colors = ['#729ECE', '#FF9E4A', '#ED665D', '#AD8BC9', '#67BF5C', '#8C564B',
-          '#E377C2']
+          '#E377C2', 'tab:olive', 'tab:cyan']
 
 fig, (ax1, ax2, ax3) = plt.subplots(3)
 color_idx = 0
@@ -162,11 +169,3 @@ plt.savefig(os.path.join('..', 'figures', 'timeseries_slo.pdf'), dpi=500, bbox_i
 print(f'Warning! We should not be using mean to aggregate, instead we should be using sum')
 print(f'Warning! There are some points where requests served are greater than incoming '
       f'demand. Fix this or find the cause')
-
-# accuracy_logfile = os.path.join('..', 'logs', 'log_ilp_accuracy.txt')
-# accuracy_rf = open(accuracy_logfile, mode='r')
-# accuracies = accuracy_rf.readlines()
-# accuracies = [float(x.rstrip('\n')) for x in accuracies]
-# print('Sum of accuracies:', sum(accuracies))
-# print('Requests served:', len(accuracies))
-# print('Effective accuracy:', sum(accuracies)/len(accuracies))

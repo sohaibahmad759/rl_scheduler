@@ -1,11 +1,11 @@
 {
     "profiling_data": "profiling/aggregate_profiled.csv",
-    "trace_path": "traces/twitter/asplos/300",
+    "trace_path": "traces/twitter/asplos/equal_gamma/300",
     "allowed_variants": "traces/model_variants",
     "model_allocation": "sommelier",
     "static_allocation": "algorithms/sommelier_solutions/starting_optimized.txt",
     "job_scheduling": "canary_routing",
-    "batching": "nexus",
+    "batching": "accscale",
     "beta": 0.85,
     "fixed_seed": true,
     "seed": 10,
