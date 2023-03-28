@@ -1,7 +1,7 @@
 {
     "profiling_data": "profiling/aggregate_profiled.csv",
     "trace_path": "traces/twitter/asplos/zipf_exponential/300",
-    "allowed_variants": "traces/model_variants_nosmallbert",
+    "allowed_variants": "traces/model_variants",
     "model_allocation": "infaas_v2",
     "job_scheduling": "infaas",
     "batching": "infaas",

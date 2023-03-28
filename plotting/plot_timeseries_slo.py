@@ -5,8 +5,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 
-# trace = 'zipf_exponential'
-trace = 'zipf_gamma'
+trace = 'zipf_exponential'
+# trace = 'zipf_gamma'
 # trace = 'equal_exponential'
 # trace = 'equal_gamma'
 
@@ -14,9 +14,9 @@ path = '../logs/throughput/selected_asplos'
 
 logfile_list = [
                 f'{path}/{trace}/infaas_accuracy_300ms.csv',
-                f'{path}/{trace}/clipper_ht_aimd_300ms.csv',
-                f'{path}/{trace}/clipper_ht_nexus_300ms.csv',
-                f'{path}/{trace}/clipper_ht_asb_300ms.csv',
+                # f'{path}/{trace}/clipper_ht_aimd_300ms.csv',
+                # f'{path}/{trace}/clipper_ht_nexus_300ms.csv',
+                # f'{path}/{trace}/clipper_ht_asb_300ms.csv',
                 # '../logs/throughput/selected_asplos/clipper_optstart_300ms.csv',
                 # '../logs/throughput/selected_asplos/sommelier_aimd_300ms.csv',
                 # '../logs/throughput/selected_asplos/sommelier_asb_300ms.csv',
@@ -24,6 +24,13 @@ logfile_list = [
                 # '../logs/throughput/selected_asplos/proteus_aimd_300ms.csv',
                 # '../logs/throughput/selected_asplos/proteus_nexus_300ms.csv',
                 f'{path}/{trace}/proteus_300ms.csv',
+                f'{path}/{trace}/proteus_300ms_beta1.4.csv',
+                f'{path}/{trace}/proteus_300ms_proportional.csv',
+                f'{path}/{trace}/proteus_300ms_beta1.4_proportional.csv',
+                f'{path}/{trace}/proteus_300ms_beta2.0_proportional.csv',
+                # f'{path}/{trace}/proteus_300ms_accconstraint.csv',
+                # f'{path}/{trace}/proteus_300ms_lawc.csv',
+                # f'{path}/{trace}/proteus_300ms_edwc.csv',
                 # '../logs/throughput/selected_asplos/clipper_ht_asb_300ms.csv',
                 # '../logs/throughput/selected_asplos/sommelier_uniform_asb_300ms.csv'
                 ]
@@ -41,16 +48,23 @@ markers = ['+', 'o', 'v', '^', '*', 's', 'x']
 #             'INFaaS-Instance', 'INFaaS-Accuracy', 'AccScale']
 algorithms = [
               'INFaaS-Accuracy',
-              'Clipper-HT-AIMD',
-              'Clipper-HT-Nexus',
-              'Clipped-HT-ASB',
+              # 'Clipper-HT-AIMD',
+              # 'Clipper-HT-Nexus',
+              # 'Clipped-HT-ASB',
             #   'Clipper-HT Optimized Start',
               # 'Sommelier-AIMD',
               # 'Sommelier-ASB',
             #   'Sommelier-Nexus'
             #   'Proteus-Clipper',
             #   'Proteus-Nexus',
-              'Proteus-Proteus'
+              'Proteus-Proteus',
+              'Proteus-Proteus (Beta 1.4)',
+              'Proteus-Proteus Proportional',
+              'Proteus-Proteus Proportional (Beta 1.4)',
+              'Proteus-Proteus Proportional (Beta 2.0)',
+              # 'Proteus-Proteus (Accuracy Constraint)',
+              # 'Proteus-Proteus (Late Allowed Work Conserving)',
+              # 'Proteus-Proteus (Early Drop Work Conserving)',
             #   'Clipper-HT-ASB',
             #   'Sommelier-ASB (Uniform Start)'
               ]
@@ -94,10 +108,10 @@ for idx in range(len(logfile_list)):
     if 'clipper' in algorithm:
         clipper_accuracy = effective_accuracy
 
-    if len(clipper_accuracy) > 0:
-        for i in range(len(effective_accuracy)):
-            if effective_accuracy[i] < clipper_accuracy[i]:
-                effective_accuracy[i] = clipper_accuracy[i]
+    # if len(clipper_accuracy) > 0:
+    #     for i in range(len(effective_accuracy)):
+    #         if effective_accuracy[i] < clipper_accuracy[i]:
+    #             effective_accuracy[i] = clipper_accuracy[i]
 
     successful = df['successful'].values[start_cutoff:]
 

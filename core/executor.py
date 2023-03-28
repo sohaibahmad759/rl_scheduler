@@ -870,13 +870,40 @@ class Executor:
                 self.simulator.bump_failed_request_stats(event)
                 self.log.error('failed request because routing table is empty')
                 return
-
-            selected = random.choices(list(self.canary_routing_table.keys()),
-                                    weights=list(self.canary_routing_table.values()),
-                                    k=1)[0]
-            (acc_type_unconvered, variant_name) = selected
-            acc_type_converted = ACC_CONVERSION[acc_type_unconvered]
-            selected = (acc_type_converted, variant_name)
+            
+            if self.simulator.model_assignment == 'ilp1':
+                # accuracy_filtered = list(filter(lambda x: x.profiled_accuracy > event.,
+                #                                 self.predictors.values()))
+                selected = None
+                weights = list(map(lambda x: x.peak_throughput, self.predictors.values()))
+                if not(any(x > 0 for x in weights)):
+                    self.simulator.bump_failed_request_stats(event)
+                    self.log.error('failed request because no predictor has throughput more than 0')
+                    return
+                selected = random.choices(list(self.predictors.values()),
+                                          weights=weights,
+                                          k=1)[0]
+                # print(f'enqueue_request: predictors: {list(map(lambda x: (AccType(x.acc_type).name, x.variant_name), self.predictors.values()))}')
+                # print(f'enqueue_request: weights: {list(map(lambda x: x.peak_throughput, self.predictors.values()))}')
+                # time.sleep(1)
+                acc_type_unconverted = AccType(selected.acc_type).name
+                # acc_type_converted = ACC_CONVERSION[acc_type_unconverted]
+                acc_type_converted = acc_type_unconverted
+                variant_name = selected.variant_name
+                selected = (acc_type_converted, variant_name)
+                # print(f'unconverted: {acc_type_converted}, converted: {acc_type_converted}, '
+                #       f'selected: {selected}')
+                # time.sleep(1)
+            else:
+                selected = random.choices(list(self.canary_routing_table.keys()),
+                                        weights=list(self.canary_routing_table.values()),
+                                        k=1)[0]
+                (acc_type_unconverted, variant_name) = selected
+                acc_type_converted = ACC_CONVERSION[acc_type_unconverted]
+                selected = (acc_type_converted, variant_name)
+                # print(f'unconverted: {acc_type_unconverted}, converted: {acc_type_converted}, '
+                #     f'selected: {selected}')
+                # time.sleep(1)
 
             # self.log.error(f'self.log.predictors: {list(map(lambda x: (AccType(x[1].acc_type).name, x[1].variant_name), self.predictors.items()))}')
             variants_dict = dict(filter(lambda x: (AccType(x[1].acc_type).name, x[1].variant_name) == selected,

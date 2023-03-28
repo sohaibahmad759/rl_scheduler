@@ -1511,8 +1511,21 @@ class Simulator:
             total_queued += sum(list(map(lambda x: len(x.request_queue), predictors.values())))
             # total_capacity += sum(list(map(lambda x: x.peak_throughput if 'prajjwal' not in x.variant_name else 0,
             #                                predictors.values())))
-            total_capacity += sum(list(map(lambda x: x.peak_throughput, predictors.values())))
+            peak_throughputs = list(map(lambda x: x.peak_throughput, predictors.values()))
+            total_capacity += sum(peak_throughputs)
+
             total_served += sum(list(map(lambda x: x.served_requests_per_step, predictors.values())))
+
+            incoming_requests = list(map(lambda x: x.incoming_requests_per_step, predictors.values()))
+            incoming_requests_predictors = list(map(lambda x: (AccType(x.acc_type).name, x.variant_name),
+                                                    predictors.values()))
+            incoming_requests_ratio = [i / j if j > 0 else 0 for i, j in zip(incoming_requests, peak_throughputs)]
+
+            if any(x > 1.0 for x in incoming_requests_ratio):
+                self.log.debug(f'executor: {key}, incoming requests ratio: {incoming_requests_ratio}')
+                self.log.debug(f'routing table: {self.executors[key].canary_routing_table}')
+                self.log.debug(f'predictors available: {incoming_requests_predictors}')
+            
             for key in predictors:
                 predictor = predictors[key]
                 predictor.served_requests_per_step = 0

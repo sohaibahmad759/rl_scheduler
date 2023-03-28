@@ -1,6 +1,7 @@
 import time
 import logging
 import pprint
+import math
 import numpy as np
 import gurobipy as gp
 from gurobipy import GRB
@@ -9,7 +10,8 @@ from core.exceptions import IlpException
 
 
 MINIMUM_BETA = 0.2
-MINIMUM_ACCURACY = 93.0
+MINIMUM_ACCURACY = 0.0
+LATENCY_GAP_FACTOR = 1.1
 
 
 class Ilp(SchedulingAlgorithm):
@@ -257,7 +259,7 @@ class Ilp(SchedulingAlgorithm):
                     if largest_batch_size == 0:
                         latency = None
                     else:
-                        latency = acc_latencies[(isi_name, model_variant, largest_batch_size)]
+                        latency = acc_latencies[(isi_name, model_variant, largest_batch_size)] * LATENCY_GAP_FACTOR
                         # latency = acc_latencies[(isi_name, model_variant, 1)]
 
                     if latency is None:
@@ -265,7 +267,7 @@ class Ilp(SchedulingAlgorithm):
                     else:
                         throughput = largest_batch_size * 1000 / latency
                         # throughput = 1000 / latency
-                    p[accelerator, model_variant] = throughput
+                    p[accelerator, model_variant] = math.floor(throughput)
 
                     ik_dict[accelerator, isi] = 1
 
@@ -287,7 +289,7 @@ class Ilp(SchedulingAlgorithm):
             m.setParam("LogToConsole", 0)
 
             m.setParam('NonConvex', 2)
-            m.setParam('TimeLimit', 20)
+            m.setParam('TimeLimit', 200)
             m.setParam('MIPGap', 0.5)
             m.setParam('Threads', 8)
 
@@ -299,6 +301,7 @@ class Ilp(SchedulingAlgorithm):
             # z = m.addVars(jk_pairs, name='z', vtype=GRB.POSITIVE)
             y = m.addVars(accelerators, name='y')
             yp = m.addVars(accelerators, name='yp')
+            ypp = m.addVars(accelerators, name='ypp')
             z = m.addVars(ik_pairs, name='z')
             zp = m.addVars(accelerators, name='z')
             # aux = m.addVar(name='aux')
@@ -356,11 +359,16 @@ class Ilp(SchedulingAlgorithm):
                 m.addConstr(zp[i] == sum(z[i, k] for k in rtypes), 'c_zp_' + str(i))
                 m.addConstr(sum(sum(b[j, k] * z[i, k] * x[i, j] for j in models) for k in rtypes) == zp[i], 'c3_3i_' + str(i))
 
-
                 m.addConstr(y[i] <= sum(p[i, j]*x[i, j] for j in models), 'c4_' + str(i))
-                m.addConstr(y[i] <= sum(z[i, k]*s[k] for k in rtypes), 'c5_' + str(i))
+                if self.beta <= 1:
+                    m.addConstr(y[i] <= sum(z[i, k]*s[k] for k in rtypes), 'c5_' + str(i))
+                    # m.addConstr(y[i] <= sum(sum(z[i, k]*s[k]*b[j,k]*x[i,j] for j in models) for k in rtypes),
+                    #             'c5_' + str(i))
+                else:
+                    m.addConstr(y[i] <= self.beta * sum(z[i, k]*s[k] for k in rtypes), 'c5_' + str(i))
 
                 m.addConstr(yp[i] == sum(p[i, j]*x[i, j] for j in models), 'c6_' + str(i))
+                m.addConstr(ypp[i] == sum(z[i, k]*s[k] for k in rtypes), 'c7_' + str(i))
 
                 # m.addConstr(10000000 * ind[i] >= sum(x[i, j] for j in models), 'c_ind_1_' + str(i))
                 # m.addConstr(ind[i] <= sum(x[i, j] for j in models), 'c_ind_2_' + str(i))
@@ -422,7 +430,7 @@ class Ilp(SchedulingAlgorithm):
                 self.log.warn(f'Overall throughput from objective: {throughput}')
                 self.log.warn(f'Total incoming demand: {sum(s.values())}')
                 self.log.warn(f'System serving capacity from ILP: {gp.quicksum(yp).getValue()}')
-                # time.sleep(5)
+                self.log.warn(f'System serving capacity from ILP (ypp): {gp.quicksum(ypp).getValue()}')
 
                 accuracy = gp.quicksum(w).getValue()
                 self.log.debug('Accuracy (objective):' + str(accuracy))
@@ -436,8 +444,13 @@ class Ilp(SchedulingAlgorithm):
                 #             print(f'{i}, {j}, x: {x[i, j].X}')
                 self.cached_solution = {}
                 self.cached_solution['x'] = x
+                self.cached_solution['y'] = y
+                self.cached_solution['z'] = z
+                self.cached_solution['s'] = s
+                self.cached_solution['p'] = p
                 self.cached_solution['accelerators'] = accelerators
                 self.cached_solution['models'] = models
+                self.cached_solution['rtypes'] = rtypes
 
                 effective_accuracy = gp.quicksum(w).getValue()/sum(s.values())
                 self.log.warn(f'w (effective accuracy): {effective_accuracy}')
@@ -458,8 +471,12 @@ class Ilp(SchedulingAlgorithm):
                 # self.log.error('No solution')
                 # TODO: perhaps we should use cached solution in this case
                 #       what if cached solution is also empty?
-                self.log.warn(f'No ILP solution with beta: {self.beta}, trying with: {(self.beta-0.05)}')
-                self.beta -= 0.05
+                if (self.beta > 1):
+                    decrement = 0.5
+                else:
+                    decrement = 0.05
+                self.log.warn(f'No ILP solution with beta: {self.beta}, trying with: {(self.beta-decrement)}')
+                self.beta -= decrement
                 # raise IlpException('No solution')
         if solution_found == False:
             raise IlpException(f'No solution found even with beta: {self.beta}')
@@ -523,16 +540,30 @@ class Ilp(SchedulingAlgorithm):
             self.log.info('ilp: No solution has been cached yet')
             return
         
-        self.log.info('ilp: Printing cached solution..')
-        self.log.info('\nx:')
+        self.log.warn('ilp: Printing cached solution..')
+        self.log.warn('\nx:')
         x = self.cached_solution['x']
+        y = self.cached_solution['y']
+        z = self.cached_solution['z']
+        s = self.cached_solution['s']
+        p = self.cached_solution['p']
         accelerators = self.cached_solution['accelerators']
         models = self.cached_solution['models']
+        rtypes = self.cached_solution['rtypes']
 
         for i in accelerators:
+            self.log.warn(f'y[{i}]: {y[i]}')
             for j in models:
                 if x[i, j].X > 0.0001:
-                    self.log.info(f'{i}, {j}, x: {x[i, j].X}')
+                    self.log.warn(f'{i}, {j}, x: {x[i, j].X}, peak throughput: {p[i, j]}')
+
+        for k in rtypes:
+            for i in accelerators:
+                if z[i, k].X > 0.0001:
+                    self.log.warn(f'{i}, {k}, z: {z[i, k].X}')
+
+        for k in rtypes:
+            self.log.warn(f's[{k}]: {s[k]}, times beta ({self.initial_beta}): {s[k]*self.initial_beta}')
         return
     
     def measure_routing_table_overhead(self):

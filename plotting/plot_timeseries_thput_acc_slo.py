@@ -5,8 +5,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 
-# trace = 'zipf_exponential'
-trace = 'zipf_gamma'
+trace = 'zipf_exponential'
+# trace = 'zipf_gamma'
 # trace = 'equal_exponential'
 # trace = 'equal_gamma'
 
@@ -14,16 +14,31 @@ path = '../logs/throughput/selected_asplos'
 
 logfile_list = [
                 f'{path}/{trace}/infaas_accuracy_300ms.csv',
-                f'{path}/{trace}/clipper_ht_aimd_300ms.csv',
-                f'{path}/{trace}/clipper_ht_nexus_300ms.csv',
-                f'{path}/{trace}/clipper_ht_asb_300ms.csv',
+                # f'{path}/{trace}/clipper_ht_aimd_300ms.csv',
+                # f'{path}/{trace}/clipper_ht_nexus_300ms.csv',
+                # f'{path}/{trace}/clipper_ht_asb_300ms.csv',
                 # '../logs/throughput/selected_asplos/clipper_optstart_300ms.csv',
                 # '../logs/throughput/selected_asplos/sommelier_aimd_300ms.csv',
                 # '../logs/throughput/selected_asplos/sommelier_asb_300ms.csv',
                 # '../logs/throughput/selected_asplos/sommelier_nexus_300ms.csv',
                 # '../logs/throughput/selected_asplos/proteus_aimd_300ms.csv',
                 # '../logs/throughput/selected_asplos/proteus_nexus_300ms.csv',
-                f'{path}/{trace}/proteus_300ms.csv',
+                # f'{path}/{trace}/proteus_300ms.csv',
+                # f'{path}/{trace}/proteus_300ms_beta1.4.csv',
+                # f'{path}/{trace}/proteus_300ms_proportional.csv',
+                f'{path}/{trace}/proteus_300ms_beta1.4_proportional.csv',
+                f'{path}/{trace}/proteus_300ms_beta1_proportional.csv',
+                f'{path}/{trace}/proteus_300ms_beta2_gap1.1.csv',
+                f'{path}/{trace}/proteus_300ms_beta3_gap1.1_edwc.csv',
+                f'{path}/{trace}/proteus_300ms_beta2_gap1.1_edwc.csv',
+                # f'{path}/{trace}/proteus_300ms_beta2.0_proportional.csv',
+                # f'{path}/{trace}/proteus_300ms_beta1.8_15acc_proportional.csv',
+                # f'{path}/{trace}/proteus_300ms_beta2.1_20acc_proportional.csv',
+                # f'{path}/{trace}/proteus_300ms_beta1.5_20acc_proportional.csv',
+                # f'{path}/{trace}/proteus_300ms_beta1.4_coldstart.csv',
+                # f'{path}/{trace}/proteus_300ms_accconstraint.csv',
+                # f'{path}/{trace}/proteus_300ms_lawc.csv',
+                # f'{path}/{trace}/proteus_300ms_edwc.csv',
                 # '../logs/throughput/selected_asplos/clipper_ht_asb_300ms.csv',
                 # '../logs/throughput/selected_asplos/sommelier_uniform_asb_300ms.csv'
                 ]
@@ -41,16 +56,31 @@ markers = ['+', 'o', 'v', '^', '*', 's', 'x']
 #             'INFaaS-Instance', 'INFaaS-Accuracy', 'AccScale']
 algorithms = [
               'INFaaS-Accuracy',
-              'Clipper-HT-AIMD',
-              'Clipper-HT-Nexus',
-              'Clipper-HT-ASB',
+            #   'Clipper-HT-AIMD',
+            #   'Clipper-HT-Nexus',
+            #   'Clipper-HT-ASB',
             #   'Clipper-HT Optimized Start',
             #   'Sommelier-AIMD',
               # 'Sommelier-ASB',
             #   'Sommelier-Nexus'
             #   'Proteus-Clipper',
             #   'Proteus-Nexus',
-              'Proteus'
+            #   'Proteus',
+            #   'Proteus (Beta 1.4)',
+            #   'Proteus Proportional',
+              'Proteus Proportional (Beta 1.4)',
+              'Proteus Proportional (Beta 1)',
+              'Proteus (Beta 2 Gap 1.1)',
+              'Proteus (Beta 3 Gap 1.1 EDWC)',
+              'Proteus (Beta 2 Gap 1.1 EDWC)',
+            #   'Proteus Proportional (Beta 2.0)',
+            #   'Proteus Proportional (Beta 1.8) 15 Acc',
+            #   'Proteus Proportional (Beta 2.1) 20 Acc',
+            #   'Proteus Proportional (Beta 1.5) 20 Acc',
+            #   'Proteus Proportional (Beta 1.4) Cold Start',
+            #   'Proteus (Accuracy Constraint)',
+            #   'Proteus (Late Allowed Work Conserving)',
+            #   'Proteus (Early Drop Work Conserving)'
             #   'Clipper-HT-ASB',
             #   'Sommelier-ASB (Uniform Start)'
               ]
@@ -70,9 +100,9 @@ for idx in range(len(logfile_list)):
 
     aggregated = df.groupby(df.index // 10).sum()
     aggregated = df.groupby(df.index // 5).mean()
+    df = aggregated
     # print(f'df: {df}')
     # print(f'aggregated: {aggregated}')
-    df = aggregated
 
     start_cutoff = 0
 
@@ -88,18 +118,22 @@ for idx in range(len(logfile_list)):
     late = df['late'].values[start_cutoff:]
     total_slo_violations = dropped + late
 
+    successful = df['successful'].values[start_cutoff:]
+
+    total_slo_violations = total_slo_violations / demand
+
     effective_accuracy = df['effective_accuracy'].values[start_cutoff:]
+    total_accuracy = df['total_accuracy'].values[start_cutoff:]
+    effective_accuracy = total_accuracy / successful
     # print(f'effective accuracy: {effective_accuracy}')
 
     if 'clipper' in algorithm:
         clipper_accuracy = effective_accuracy
 
-    if len(clipper_accuracy) > 0:
-        for i in range(len(effective_accuracy)):
-            if effective_accuracy[i] < clipper_accuracy[i]:
-                effective_accuracy[i] = clipper_accuracy[i]
-
-    successful = df['successful'].values[start_cutoff:]
+    # if len(clipper_accuracy) > 0:
+    #     for i in range(len(effective_accuracy)):
+    #         if effective_accuracy[i] < clipper_accuracy[i]:
+    #             effective_accuracy[i] = clipper_accuracy[i]
 
     difference = demand - successful - dropped
     # print(f'difference: {difference}')
@@ -131,7 +165,7 @@ for idx in range(len(logfile_list)):
         ax2.plot(time, effective_accuracy, label=algorithms[idx], color=colors[color_idx])
         ax3.plot(time, total_slo_violations, label=algorithms[idx], color=colors[color_idx])
 
-        if 'estimated_throughput' in df and sum(df['estimated_throughput'].values[start_cutoff:]) > 0:
+        if 'estimated_throughput' in df and sum(df['estimated_throughput'].values[start_cutoff:]) > 0 and algorithms[idx] == 'Proteus':
             estimated_throughput = df['estimated_throughput'].values[start_cutoff:]
             ax1.plot(time, estimated_throughput, label=f'Estimated throughput ({algorithms[idx]})',
                      color='black')
@@ -153,7 +187,7 @@ ax3.grid()
 y_cutoff += 50
 # y_cutoff = 200
 
-ax1.legend(loc='upper center', bbox_to_anchor=(0.5, 1.55), ncol=3, fontsize=12)
+ax1.legend(loc='upper center', bbox_to_anchor=(0.5, 1.85), ncol=3, fontsize=12)
 ax1.set_ylabel('Requests per sec', fontsize=15)
 ax1.set_xticks(np.arange(0, 25, 4), fontsize=15)
 ax1.set_yticks(np.arange(0, y_cutoff, y_cutoff/8), fontsize=15)
@@ -163,7 +197,7 @@ ax2.set_yticks(np.arange(80, 104, 5))
 ax2.set_ylabel('Effective Accuracy', fontsize=15)
 
 ax3.set_xticks(np.arange(0, 25, 4), fontsize=15)
-# ax2.set_yticks(np.arange(80, 104, 5))
+ax3.set_yticks(np.arange(0, 0.8, 0.1))
 ax3.set_ylabel('SLO Timeouts', fontsize=15)
 
 ax3.set_xlabel('Time (min)', fontsize=15)

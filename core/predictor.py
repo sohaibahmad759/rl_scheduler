@@ -63,6 +63,7 @@ class Predictor:
         self.max_batch_size = self.get_largest_batch_size()
 
         self.served_requests_per_step = 0
+        self.incoming_requests_per_step = 0
         if self.max_batch_size == 0:
             self.peak_throughput = 0
         else:
@@ -218,6 +219,7 @@ class Predictor:
         self.request_dict[event.id] = 1
         self.request_queue.append(event)
         self.event_counter += 1
+        self.incoming_requests_per_step += 1
 
         # If predictor is busy, we have to wait until we get a FINISH_BATCH event
         # before we further process this request
@@ -434,6 +436,14 @@ class Predictor:
         if self.task_assignment == TaskAssignment.CANARY:
             if self.batching_algo == 'accscale':
                 self.pop_while_first_expires(clock)
+                if len(self.request_queue) == 0:
+                    return
+                batch_size = self.find_batch_size(len(self.request_queue))
+                if batch_size == -1:
+                    batch_size = self.max_batch_size
+                self.process_batch(clock, batch_size)
+                return
+
                 # If we run the batch with the requests currently in the queue, we want to
                 # ensure that no request in the queue will expire by the time the batch
                 # finishes processing
