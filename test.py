@@ -436,6 +436,10 @@ def main(args):
                 if i % solve_interval == 0:
                     env.trigger_infaas_v2_upscaling()
                     env.trigger_infaas_v2_downscaling()
+            elif model_assignment == 'infaas_v3':
+                if i % solve_interval == 0:
+                    env.trigger_infaas_v3_upscaling()
+                    env.trigger_infaas_v3_downscaling()
             else:
                 print(f'Invalid verison of INFaaS: {model_assignment}')
             

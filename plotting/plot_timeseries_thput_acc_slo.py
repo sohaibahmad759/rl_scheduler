@@ -13,7 +13,7 @@ trace = 'zipf_exponential'
 path = '../logs/throughput/selected_asplos'
 
 logfile_list = [
-                # f'{path}/{trace}/infaas_accuracy_300ms.csv',
+                f'{path}/{trace}/infaas_accuracy_300ms.csv',
                 f'{path}/{trace}/clipper_ht_aimd_300ms.csv',
                 # f'{path}/{trace}/clipper_ht_nexus_300ms.csv',
                 f'{path}/{trace}/clipper_ht_asb_300ms.csv',
@@ -57,7 +57,7 @@ markers = ['+', 'o', 'v', '^', '*', 's', 'x']
 # algorithms = ['Clipper++ (High Throughput)', 'Clipper++ (High Accuracy)',
 #             'INFaaS-Instance', 'INFaaS-Accuracy', 'AccScale']
 algorithms = [
-            #   'INFaaS-Accuracy',
+              'INFaaS-Accuracy',
               'Clipper-HT-AIMD',
             #   'Clipper-HT-Nexus',
               'Clipper-HT-ASB',

@@ -120,7 +120,7 @@ class Simulator:
 
         self.model_assignment = model_assignment
 
-        self.infaas_slack = 0.95
+        self.infaas_slack = 3
 
         idx = 0
 
@@ -613,6 +613,11 @@ class Simulator:
             executor = self.executors[key]
             executor.trigger_infaas_v2_upscaling()
 
+    def trigger_infaas_v3_upscaling(self):
+        for key in self.executors:
+            executor = self.executors[key]
+            executor.trigger_infaas_v3_upscaling()
+
     def trigger_infaas_downscaling(self):
         for key in self.executors:
             executor = self.executors[key]
@@ -622,6 +627,11 @@ class Simulator:
         for key in self.executors:
             executor = self.executors[key]
             executor.trigger_infaas_v2_downscaling()
+
+    def trigger_infaas_v3_downscaling(self):
+        for key in self.executors:
+            executor = self.executors[key]
+            executor.trigger_infaas_v3_downscaling()
 
     def get_runtimes(self, isi_index):
         runtimes = []
