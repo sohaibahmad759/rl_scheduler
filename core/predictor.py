@@ -227,6 +227,9 @@ class Predictor:
             if self.batching_algo in ['aimd', 'nexus']:
                 if self.batch_expiring_set == False:
                     if self.batching_algo == 'nexus':
+                        if self.max_batch_size == 0:
+                            self.simulator.bump_failed_request_stats(event)
+                            return
                         batch_expiring_set = clock + event.deadline - self.batch_processing_latency(self.max_batch_size, event)
                     elif self.batching_algo == 'aimd':
                         batch_expiring_set = clock + event.deadline - self.batch_processing_latency(self.aimd_batch_size, event)
@@ -402,6 +405,8 @@ class Predictor:
                     # and that should be a feedback for AIMD
                     elif self.batching_algo == 'aimd':
                         aimd_negative_feedback = True
+                        self.simulator.bump_failed_request_stats(request)
+                        continue
                     elif self.batching_algo == 'nexus':
                         # pass
                         self.simulator.bump_failed_request_stats(request)
