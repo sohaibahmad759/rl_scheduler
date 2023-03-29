@@ -800,8 +800,8 @@ class Executor:
             self.add_predictor(acc_type=acc_type, variant_name=variant_name)
             self.simulator.available_predictors[acc_type.value-1] -= 1
 
-        self.log.info(f'predictors_to_add: {predictors_to_add}')
-        self.log.info(f'predictors_to_remove: {predictors_to_remove}')
+        self.log.debug(f'predictors_to_add: {predictors_to_add}')
+        self.log.debug(f'predictors_to_remove: {predictors_to_remove}')
         # time.sleep(5)
         
         return
@@ -1104,14 +1104,14 @@ class Executor:
                 total_peak_throughput = total_peak_throughput - predictor_peak_throughput + variant_throughputs[selected_variant]
                 new_accuracy = self.variant_accuracies[selected_variant]
                 old_accuracy = self.variant_accuracies[(self.isi, predictor.variant_name)]
-                self.log.info(f'Found a variant with lower accuracy to replace one with higher accuracy, '
-                      f'new (accuracy, variant): ({new_accuracy},{selected_variant_name}), '
-                      f'old (accuracy, variant: ({old_accuracy},{predictor.variant_name}), '
-                      f'old peak throughput: {old_throughput}, new peak throughput: {total_peak_throughput}')
+                self.log.debug(f'Found a variant with lower accuracy to replace one with higher accuracy, '
+                               f'new (accuracy, variant): ({new_accuracy},{selected_variant_name}), '
+                               f'old (accuracy, variant: ({old_accuracy},{predictor.variant_name}), '
+                               f'old peak throughput: {old_throughput}, new peak throughput: {total_peak_throughput}')
                 # time.sleep(1)
                 continue
             else:
-                self.log.info(f'Already running variant with lowest accuracy, checking other options for downgrading..')
+                self.log.debug(f'Already running variant with lowest accuracy, checking other options for downgrading..')
                 # time.sleep(0.1)
 
 
@@ -1123,7 +1123,7 @@ class Executor:
                 # keep ping-ponging between upscaling and downscaling
                 pass
             else:
-                self.log.info(f'no need to downscale')
+                self.log.debug(f'no need to downscale')
                 return
             
             # Then consider downgrading to smaller batch size, going in increasing order

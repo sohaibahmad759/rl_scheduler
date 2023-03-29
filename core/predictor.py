@@ -412,8 +412,9 @@ class Predictor:
                     # and that should be a feedback for AIMD
                     elif self.batching_algo == 'aimd':
                         aimd_negative_feedback = True
-                        self.simulator.bump_failed_request_stats(request)
-                        continue
+                        pass
+                        # self.simulator.bump_failed_request_stats(request)
+                        # continue
                     elif self.batching_algo == 'nexus':
                         # pass
                         self.simulator.bump_failed_request_stats(request)

@@ -5,6 +5,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 
+# trace = 'normal-high_load'
 trace = 'zipf_exponential'
 # trace = 'zipf_gamma'
 # trace = 'equal_exponential'
@@ -13,12 +14,13 @@ trace = 'zipf_exponential'
 path = '../logs/throughput/selected_asplos'
 
 logfile_list = [
-                f'{path}/{trace}/infaas_accuracy_300ms.csv',
+                f'{path}/{trace}/infaas_accuracy_300ms_interval2.csv',
+                f'{path}/{trace}/infaas_accuracy_300ms_interval10.csv',
                 # f'{path}/{trace}/infaas_accuracy_300ms_normalhighload.csv',
                 # f'{path}/{trace}/infaas_accuracy_300ms_slack3.csv',
-                f'{path}/{trace}/infaas_accuracy_300ms_slack2.csv',
-                f'{path}/{trace}/infaas_accuracy_300ms_slack1.csv',
-                f'{path}/{trace}/infaas_accuracy_300ms_slack1.5.csv',
+                # f'{path}/{trace}/infaas_accuracy_300ms_slack2.csv',
+                # f'{path}/{trace}/infaas_accuracy_300ms_slack1.csv',
+                # f'{path}/{trace}/infaas_accuracy_300ms_slack1.5.csv',
                 # f'{path}/{trace}/infaas_accuracy_300ms_slack0.15.csv',
                 # f'{path}/{trace}/clipper_ht_aimd_300ms.csv', # this
                 # f'{path}/{trace}/clipper_ht_nexus_300ms.csv',
@@ -35,8 +37,11 @@ logfile_list = [
                 # f'{path}/{trace}/proteus_300ms_beta1.4_proportional.csv',
                 # f'{path}/{trace}/proteus_300ms_beta1_proportional.csv',
                 # f'{path}/{trace}/proteus_300ms_beta2_gap1.1.csv',
-                f'{path}/{trace}/proteus_300ms_beta3_gap1.1_edwc.csv',
+                # f'{path}/{trace}/proteus_300ms_beta3_gap1.1_edwc.csv',
                 f'{path}/{trace}/proteus_aimd_300ms_beta1.05.csv',
+                f'{path}/{trace}/proteus_300ms_beta1.05.csv',
+                # f'{path}/{trace}/proteus_300ms_beta1.1.csv',
+                f'{path}/{trace}/proteus_300ms_beta1.05_interval2.csv',
                 # f'{path}/{trace}/proteus_300ms_beta2_gap1.1_edwc.csv',
                 # f'{path}/{trace}/proteus_300ms_beta3_gap1.1_aimd.csv', # this
                 # f'{path}/{trace}/proteus_300ms_beta3_gap1.1_nexus.csv', # this
@@ -64,12 +69,13 @@ markers = ['+', 'o', 'v', '^', '*', 's', 'x']
 # algorithms = ['Clipper++ (High Throughput)', 'Clipper++ (High Accuracy)',
 #             'INFaaS-Instance', 'INFaaS-Accuracy', 'AccScale']
 algorithms = [
-              'INFaaS-Accuracy',
+              'INFaaS-Accuracy Interval 2',
+              'INFaaS-Accuracy Interval 10',
             #   'INFaaS-Accuracy NormalHighLoad',
             #   'INFaaS-Accuracy (Slack 3)',
-              'INFaaS-Accuracy (Slack 2)',
-              'INFaaS-Accuracy (Slack 1)',
-              'INFaaS-Accuracy (Slack 1.5)',
+            #   'INFaaS-Accuracy (Slack 2)',
+            #   'INFaaS-Accuracy (Slack 1)',
+            #   'INFaaS-Accuracy (Slack 1.5)',
             #   'INFaaS-Accuracy (Slack 0.15)',
             #   'Clipper-HT-AIMD',
             #   'Clipper-HT-Nexus',
@@ -86,8 +92,11 @@ algorithms = [
             #   'Proteus Proportional (Beta 1.4)',
             #   'Proteus Proportional (Beta 1)',
             #   'Proteus (Beta 2 Gap 1.1)',
-              'Proteus (Beta 3 Gap 1.1 EDWC)',
+            #   'Proteus (Beta 3 Gap 1.1 EDWC)',
               'Proteus (AIMD Beta 1.05)',
+              'Proteus (Beta 1.05)',
+            #   'Proteus (Beta 1.1)',
+              'Proteus (Beta 1.05 Interval 2)',
             #   'Proteus (Beta 2 Gap 1.1 EDWC)',
             #   'Proteus (Beta 3 Gap 1.1 AIMD)',
             #   'Proteus (Beta 3 Gap 1.1 Nexus)',
