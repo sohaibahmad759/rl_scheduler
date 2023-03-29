@@ -14,6 +14,7 @@ path = '../logs/throughput/selected_asplos'
 
 logfile_list = [
                 f'{path}/{trace}/infaas_accuracy_300ms.csv',
+                # f'{path}/{trace}/infaas_accuracy_300ms_normalhighload.csv',
                 # f'{path}/{trace}/infaas_accuracy_300ms_slack3.csv',
                 f'{path}/{trace}/infaas_accuracy_300ms_slack2.csv',
                 f'{path}/{trace}/infaas_accuracy_300ms_slack1.csv',
@@ -35,6 +36,7 @@ logfile_list = [
                 # f'{path}/{trace}/proteus_300ms_beta1_proportional.csv',
                 # f'{path}/{trace}/proteus_300ms_beta2_gap1.1.csv',
                 f'{path}/{trace}/proteus_300ms_beta3_gap1.1_edwc.csv',
+                f'{path}/{trace}/proteus_aimd_300ms_beta1.05.csv',
                 # f'{path}/{trace}/proteus_300ms_beta2_gap1.1_edwc.csv',
                 # f'{path}/{trace}/proteus_300ms_beta3_gap1.1_aimd.csv', # this
                 # f'{path}/{trace}/proteus_300ms_beta3_gap1.1_nexus.csv', # this
@@ -63,6 +65,7 @@ markers = ['+', 'o', 'v', '^', '*', 's', 'x']
 #             'INFaaS-Instance', 'INFaaS-Accuracy', 'AccScale']
 algorithms = [
               'INFaaS-Accuracy',
+            #   'INFaaS-Accuracy NormalHighLoad',
             #   'INFaaS-Accuracy (Slack 3)',
               'INFaaS-Accuracy (Slack 2)',
               'INFaaS-Accuracy (Slack 1)',
@@ -84,6 +87,7 @@ algorithms = [
             #   'Proteus Proportional (Beta 1)',
             #   'Proteus (Beta 2 Gap 1.1)',
               'Proteus (Beta 3 Gap 1.1 EDWC)',
+              'Proteus (AIMD Beta 1.05)',
             #   'Proteus (Beta 2 Gap 1.1 EDWC)',
             #   'Proteus (Beta 3 Gap 1.1 AIMD)',
             #   'Proteus (Beta 3 Gap 1.1 Nexus)',

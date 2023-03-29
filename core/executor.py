@@ -583,87 +583,87 @@ class Executor:
             # Now we have three options: (1) upgrade accuracy while meeting throughput,
             # (2) replication, (3) upgrading to meet SLO
 
-            # Option 1: First consider upgrading accuracy
-            # If throughput is still met by upgrading accuracy, upgrade
-            self.log.debug(f'self.variant_accuracies: {self.variant_accuracies}')
-            executor_name = self.isi
-            available_variants = list(filter(lambda x: x[0] == executor_name, self.variant_accuracies))
-            self.log.debug(f'available_variants: {available_variants}')
+            # # Option 1: First consider upgrading accuracy
+            # # If throughput is still met by upgrading accuracy, upgrade
+            # self.log.debug(f'self.variant_accuracies: {self.variant_accuracies}')
+            # executor_name = self.isi
+            # available_variants = list(filter(lambda x: x[0] == executor_name, self.variant_accuracies))
+            # self.log.debug(f'available_variants: {available_variants}')
 
-            max_accuracy = 0
-            min_accuracy = math.inf
-            min_accuracy_variant = None
-            for availabe_variant in available_variants:
-                max_accuracy = max(max_accuracy, self.variant_accuracies[availabe_variant])
-                min_accuracy = min(min_accuracy, self.variant_accuracies[availabe_variant])
-                min_accuracy_variant = availabe_variant
+            # max_accuracy = 0
+            # min_accuracy = math.inf
+            # min_accuracy_variant = None
+            # for availabe_variant in available_variants:
+            #     max_accuracy = max(max_accuracy, self.variant_accuracies[availabe_variant])
+            #     min_accuracy = min(min_accuracy, self.variant_accuracies[availabe_variant])
+            #     min_accuracy_variant = availabe_variant
 
-            variant_throughputs = {}
-            variant_costs = {}
-            variant_throughput_gaps = {}
-            for availabe_variant in available_variants:
-                (isi, availabe_variant_name) = availabe_variant
-                batch_size = self.get_largest_batch_size(availabe_variant_name, predictor.acc_type)
-                if batch_size == 0:
-                    variant_throughput = 0
-                else:
-                    variant_latency = self.variant_runtimes[predictor.acc_type][(isi, availabe_variant_name, batch_size)]
-                    variant_throughput = batch_size * 1000 / variant_latency
+            # variant_throughputs = {}
+            # variant_costs = {}
+            # variant_throughput_gaps = {}
+            # for availabe_variant in available_variants:
+            #     (isi, availabe_variant_name) = availabe_variant
+            #     batch_size = self.get_largest_batch_size(availabe_variant_name, predictor.acc_type)
+            #     if batch_size == 0:
+            #         variant_throughput = 0
+            #     else:
+            #         variant_latency = self.variant_runtimes[predictor.acc_type][(isi, availabe_variant_name, batch_size)]
+            #         variant_throughput = batch_size * 1000 / variant_latency
 
-                variant_throughputs[availabe_variant] = variant_throughput
-                accuracy_drop = max_accuracy - self.variant_accuracies[availabe_variant]
-                variant_costs[availabe_variant] = accuracy_drop
+            #     variant_throughputs[availabe_variant] = variant_throughput
+            #     accuracy_drop = max_accuracy - self.variant_accuracies[availabe_variant]
+            #     variant_costs[availabe_variant] = accuracy_drop
 
-                proposed_throughput = total_peak_throughput - predictor_peak_throughput + variant_throughput
-                proposed_throughput_gap = max(0, incoming_load - proposed_throughput * infaas_slack)
-                variant_throughput_gaps[availabe_variant] = proposed_throughput_gap
-            self.log.debug(f'variant_throughputs: {variant_throughputs}')
-            self.log.debug(f'variant_costs: {variant_costs}')
-            self.log.debug(f'variant_throughput_gaps: {variant_throughput_gaps}')
-            # time.sleep(10)
+            #     proposed_throughput = total_peak_throughput - predictor_peak_throughput + variant_throughput
+            #     proposed_throughput_gap = max(0, incoming_load - proposed_throughput * infaas_slack)
+            #     variant_throughput_gaps[availabe_variant] = proposed_throughput_gap
+            # self.log.debug(f'variant_throughputs: {variant_throughputs}')
+            # self.log.debug(f'variant_costs: {variant_costs}')
+            # self.log.debug(f'variant_throughput_gaps: {variant_throughput_gaps}')
+            # # time.sleep(10)
 
-            selected_variant = None
-            least_cost_found = math.inf
-            for availabe_variant in available_variants:
-                proposed_accuracy = self.variant_accuracies[availabe_variant]
-                current_accuracy = self.variant_accuracies[(self.isi, predictor.variant_name)]
-                if proposed_accuracy > current_accuracy:
-                    print(f'proposed_accuracy: {proposed_accuracy}, current_accuracy: {current_accuracy}')
-                    print(f'variant_throughput_gaps[availabe_variant]: {variant_throughput_gaps[availabe_variant]}')
-                    # time.sleep(1)
-                    if variant_throughput_gaps[availabe_variant] == 0 and variant_costs[availabe_variant] < least_cost_found:
-                        selected_variant = availabe_variant
-                        least_cost_found = variant_costs[availabe_variant]
-                        print(f'selected variant: {selected_variant}')
-                        # time.sleep(1)
-                else:
-                    # We only want to upgrade variant here (i.e., if proposed variant's accuracy
-                    # is greater than current variant's accuracy)
-                    pass
+            # selected_variant = None
+            # least_cost_found = math.inf
+            # for availabe_variant in available_variants:
+            #     proposed_accuracy = self.variant_accuracies[availabe_variant]
+            #     current_accuracy = self.variant_accuracies[(self.isi, predictor.variant_name)]
+            #     if proposed_accuracy > current_accuracy:
+            #         print(f'proposed_accuracy: {proposed_accuracy}, current_accuracy: {current_accuracy}')
+            #         print(f'variant_throughput_gaps[availabe_variant]: {variant_throughput_gaps[availabe_variant]}')
+            #         # time.sleep(1)
+            #         if variant_throughput_gaps[availabe_variant] == 0 and variant_costs[availabe_variant] < least_cost_found:
+            #             selected_variant = availabe_variant
+            #             least_cost_found = variant_costs[availabe_variant]
+            #             print(f'selected variant: {selected_variant}')
+            #             # time.sleep(1)
+            #     else:
+            #         # We only want to upgrade variant here (i.e., if proposed variant's accuracy
+            #         # is greater than current variant's accuracy)
+            #         pass
 
-            # Go through all variants of this, if there is one that can meet throughput,
-            # select the one with the least accuracy drop
+            # # Go through all variants of this, if there is one that can meet throughput,
+            # # select the one with the least accuracy drop
             
-            # If there is no variant that can meet throughput, select one with least accuracy (highest throuhgput)
-            if selected_variant is not None:
-                (isi, selected_variant_name) = selected_variant
-                if selected_variant_name != predictor.variant_name:
-                    predictors_to_remove.append(predictor.id)
-                    predictors_to_add.append((AccType(predictor.acc_type), selected_variant_name))
-                    old_throughput = total_peak_throughput
-                    total_peak_throughput = total_peak_throughput - predictor_peak_throughput + variant_throughputs[selected_variant]
-                    new_accuracy = self.variant_accuracies[selected_variant]
-                    old_accuracy = self.variant_accuracies[(self.isi, predictor.variant_name)]
-                    self.log.info(f'Found a variant with lower accuracy to replace one with higher accuracy, '
-                        f'new (accuracy, variant): ({new_accuracy},{selected_variant_name}), '
-                        f'old (accuracy, variant: ({old_accuracy},{predictor.variant_name}), '
-                        f'old peak throughput: {old_throughput}, new peak throughput: {total_peak_throughput}')
-                    # time.sleep(10)
-                    continue
-                else:
-                    self.log.info(f'Cannot find a model that will meet throughput if we upgrade, '
-                                  f'checking other upgrade options')
-                    # time.sleep(1)
+            # # If there is no variant that can meet throughput, select one with least accuracy (highest throuhgput)
+            # if selected_variant is not None:
+            #     (isi, selected_variant_name) = selected_variant
+            #     if selected_variant_name != predictor.variant_name:
+            #         predictors_to_remove.append(predictor.id)
+            #         predictors_to_add.append((AccType(predictor.acc_type), selected_variant_name))
+            #         old_throughput = total_peak_throughput
+            #         total_peak_throughput = total_peak_throughput - predictor_peak_throughput + variant_throughputs[selected_variant]
+            #         new_accuracy = self.variant_accuracies[selected_variant]
+            #         old_accuracy = self.variant_accuracies[(self.isi, predictor.variant_name)]
+            #         self.log.info(f'Found a variant with lower accuracy to replace one with higher accuracy, '
+            #             f'new (accuracy, variant): ({new_accuracy},{selected_variant_name}), '
+            #             f'old (accuracy, variant: ({old_accuracy},{predictor.variant_name}), '
+            #             f'old peak throughput: {old_throughput}, new peak throughput: {total_peak_throughput}')
+            #         # time.sleep(10)
+            #         continue
+            #     else:
+            #         self.log.info(f'Cannot find a model that will meet throughput if we upgrade, '
+            #                       f'checking other upgrade options')
+            #         # time.sleep(1)
 
             # For option 2 and 3, calculate the cost for both and choose the cheaper option
 
@@ -1054,8 +1054,9 @@ class Executor:
             min_accuracy_variant = None
             for availabe_variant in available_variants:
                 max_accuracy = max(max_accuracy, self.variant_accuracies[availabe_variant])
-                min_accuracy = min(min_accuracy, self.variant_accuracies[availabe_variant])
-                min_accuracy_variant = availabe_variant
+                if self.variant_accuracies[availabe_variant] < min_accuracy:
+                    min_accuracy = self.variant_accuracies[availabe_variant]
+                    min_accuracy_variant = availabe_variant
 
             variant_throughputs = {}
             variant_costs = {}
@@ -1075,7 +1076,7 @@ class Executor:
                 variant_costs[availabe_variant] = accuracy_drop
 
                 proposed_throughput = total_peak_throughput - predictor_peak_throughput + variant_throughput
-                proposed_throughput_gap = max(0, incoming_load - proposed_throughput * infaas_slack)
+                proposed_throughput_gap = max(0, incoming_load - proposed_throughput * infaas_slack * self.simulator.infaas_downscale_slack)
                 variant_throughput_gaps[availabe_variant] = proposed_throughput_gap
             self.log.debug(f'variant_throughputs: {variant_throughputs}')
             self.log.debug(f'variant_costs: {variant_costs}')
@@ -1086,10 +1087,10 @@ class Executor:
             # otherwise, select the one with least accuracy (highest throughput)
             selected_variant = None
             least_cost_found = math.inf
-            for availabe_variant in available_variants:
-                if variant_throughput_gaps[availabe_variant] == 0 and variant_costs[availabe_variant] < least_cost_found:
-                    selected_variant = availabe_variant
-                    least_cost_found = variant_costs[availabe_variant]
+            # for availabe_variant in available_variants:
+            #     if variant_throughput_gaps[availabe_variant] == 0 and variant_costs[availabe_variant] < least_cost_found:
+            #         selected_variant = availabe_variant
+            #         least_cost_found = variant_costs[availabe_variant]
             
             # If there is no variant that can meet throughput, select one with least accuracy (highest throuhgput)
             if selected_variant is None:
@@ -1107,16 +1108,16 @@ class Executor:
                       f'new (accuracy, variant): ({new_accuracy},{selected_variant_name}), '
                       f'old (accuracy, variant: ({old_accuracy},{predictor.variant_name}), '
                       f'old peak throughput: {old_throughput}, new peak throughput: {total_peak_throughput}')
-                # time.sleep(10)
+                # time.sleep(1)
                 continue
             else:
                 self.log.info(f'Already running variant with lowest accuracy, checking other options for downgrading..')
-                # time.sleep(1)
+                # time.sleep(0.1)
 
 
-            if total_peak_throughput * infaas_slack * self.infaas_downscale_slack > incoming_load:
+            if total_peak_throughput * infaas_slack * self.simulator.infaas_downscale_slack > incoming_load:
                 # We need to downscale because our throughput is much bigger than incoming load
-                
+
                 # We have a separate infaas_downscale_slack multiplier because there needs
                 # to be a gap between upscale and downscale slack, otherwise we will just
                 # keep ping-ponging between upscaling and downscaling

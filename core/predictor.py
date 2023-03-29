@@ -227,16 +227,17 @@ class Predictor:
         if self.busy:
             if self.batching_algo in ['aimd', 'nexus', 'infaas']:
                 if self.batch_expiring_set == False:
+                    if self.max_batch_size == 0:
+                        self.simulator.bump_failed_request_stats(event)
+                        return
                     if self.batching_algo == 'nexus':
-                        if self.max_batch_size == 0:
-                            self.simulator.bump_failed_request_stats(event)
-                            return
                         batch_expiring_set = clock + event.deadline - self.batch_processing_latency(self.max_batch_size, event)
                     elif self.batching_algo == 'aimd':
                         batch_expiring_set = clock + event.deadline - self.batch_processing_latency(self.aimd_batch_size, event)
                     elif self.batching_algo == 'infaas':
-                        return
+                        batch_expiring_set = clock + event.deadline - self.batch_processing_latency(self.infaas_batch_size, event)
                     self.generate_batch_expiring(event, batch_expiring_set)
+                    return
             else:
                 self.generate_head_slo_expiring()
             return
@@ -275,9 +276,9 @@ class Predictor:
                 self.process_batch(clock, self.max_batch_size)
             return
         elif self.task_assignment == TaskAssignment.INFAAS:
-            self.pop_while_first_expires(clock)
+            # self.pop_while_first_expires(clock)
             batch_size = self.infaas_batch_size
-            if len(self.request_queue) > batch_size:
+            if len(self.request_queue) >= batch_size:
                 self.process_batch(clock, batch_size)
             return
         else:
@@ -667,6 +668,8 @@ class Predictor:
             self.nexus_expiring_callback(event, clock)
         elif self.batching_algo == 'aimd':
             self.aimd_expiring_callback(event, clock)
+        elif self.batching_algo == 'infaas':
+            self.infaas_expiring_callback(event, clock)
         else:
             raise PredictorException(f'Unexpected batching algo: {self.batching_algo}')
     
@@ -699,6 +702,26 @@ class Predictor:
         # this function will be implemented similar to nexus_expiring_callback()
         pass
 
+
+    def infaas_expiring_callback(self, event, clock):
+        ''' Callback to handle an INFaaS BATCH_EXPIRING event
+        '''
+        if self.busy is True:
+            return
+        
+        # self.pop_while_first_expires(clock)
+        
+        if len(self.request_queue) == 0:
+            return
+        
+        batch_size = min(self.infaas_batch_size, self.find_batch_size(len(self.request_queue)))
+        # batch_size = self.find_batch_size(len(self.request_queue)))
+        if batch_size == -1:
+            batch_size = self.infaas_batch_size
+
+        self.process_batch(clock, batch_size)
+        return
+
     
     def generate_head_slo_expiring(self):
         ''' If any request is popped from the head of the queue and the queue has
@@ -712,7 +735,8 @@ class Predictor:
         first_request_expiration = first_request.start_time + first_request.deadline
 
         while self.batch_processing_latency(batch_size=1, request=first_request) > first_request.deadline:
-            if 'infaas' in self.simulator.model_assignment or 'accscale' in self.simulator.model_assignment:
+            # if 'infaas' in self.simulator.model_assignment or 'accscale' in self.simulator.model_assignment:
+            if 'accscale' in self.simulator.model_assignment:
                 self.simulator.bump_failed_request_stats(first_request)
                 self.request_queue.pop(0)
                 if len(self.request_queue) == 0:
