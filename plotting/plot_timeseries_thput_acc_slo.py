@@ -14,12 +14,17 @@ path = '../logs/throughput/selected_asplos'
 
 logfile_list = [
                 f'{path}/{trace}/infaas_accuracy_300ms.csv',
-                f'{path}/{trace}/clipper_ht_aimd_300ms.csv',
+                # f'{path}/{trace}/infaas_accuracy_300ms_slack3.csv',
+                f'{path}/{trace}/infaas_accuracy_300ms_slack2.csv',
+                f'{path}/{trace}/infaas_accuracy_300ms_slack1.csv',
+                f'{path}/{trace}/infaas_accuracy_300ms_slack1.5.csv',
+                # f'{path}/{trace}/infaas_accuracy_300ms_slack0.15.csv',
+                # f'{path}/{trace}/clipper_ht_aimd_300ms.csv', # this
                 # f'{path}/{trace}/clipper_ht_nexus_300ms.csv',
-                f'{path}/{trace}/clipper_ht_asb_300ms.csv',
+                # f'{path}/{trace}/clipper_ht_asb_300ms.csv', # this
                 # '../logs/throughput/selected_asplos/clipper_optstart_300ms.csv',
                 # f'{path}/{trace}/sommelier_aimd_300ms.csv',
-                f'{path}/{trace}/sommelier_asb_300ms.csv',
+                # f'{path}/{trace}/sommelier_asb_300ms.csv', # this
                 # f'{path}/{trace}/sommelier_nexus_300ms.csv',
                 # '../logs/throughput/selected_asplos/proteus_aimd_300ms.csv',
                 # '../logs/throughput/selected_asplos/proteus_nexus_300ms.csv',
@@ -31,8 +36,8 @@ logfile_list = [
                 # f'{path}/{trace}/proteus_300ms_beta2_gap1.1.csv',
                 f'{path}/{trace}/proteus_300ms_beta3_gap1.1_edwc.csv',
                 # f'{path}/{trace}/proteus_300ms_beta2_gap1.1_edwc.csv',
-                f'{path}/{trace}/proteus_300ms_beta3_gap1.1_aimd.csv',
-                f'{path}/{trace}/proteus_300ms_beta3_gap1.1_nexus.csv',
+                # f'{path}/{trace}/proteus_300ms_beta3_gap1.1_aimd.csv', # this
+                # f'{path}/{trace}/proteus_300ms_beta3_gap1.1_nexus.csv', # this
                 # f'{path}/{trace}/proteus_300ms_beta2.0_proportional.csv',
                 # f'{path}/{trace}/proteus_300ms_beta1.8_15acc_proportional.csv',
                 # f'{path}/{trace}/proteus_300ms_beta2.1_20acc_proportional.csv',
@@ -58,12 +63,17 @@ markers = ['+', 'o', 'v', '^', '*', 's', 'x']
 #             'INFaaS-Instance', 'INFaaS-Accuracy', 'AccScale']
 algorithms = [
               'INFaaS-Accuracy',
-              'Clipper-HT-AIMD',
+            #   'INFaaS-Accuracy (Slack 3)',
+              'INFaaS-Accuracy (Slack 2)',
+              'INFaaS-Accuracy (Slack 1)',
+              'INFaaS-Accuracy (Slack 1.5)',
+            #   'INFaaS-Accuracy (Slack 0.15)',
+            #   'Clipper-HT-AIMD',
             #   'Clipper-HT-Nexus',
-              'Clipper-HT-ASB',
+            #   'Clipper-HT-ASB',
             #   'Clipper-HT Optimized Start',
             #   'Sommelier-AIMD',
-              'Sommelier-ASB',
+            #   'Sommelier-ASB',
             #   'Sommelier-Nexus'
             #   'Proteus-Clipper',
             #   'Proteus-Nexus',
@@ -75,8 +85,8 @@ algorithms = [
             #   'Proteus (Beta 2 Gap 1.1)',
               'Proteus (Beta 3 Gap 1.1 EDWC)',
             #   'Proteus (Beta 2 Gap 1.1 EDWC)',
-              'Proteus (Beta 3 Gap 1.1 AIMD)',
-              'Proteus (Beta 3 Gap 1.1 Nexus)',
+            #   'Proteus (Beta 3 Gap 1.1 AIMD)',
+            #   'Proteus (Beta 3 Gap 1.1 Nexus)',
             #   'Proteus Proportional (Beta 2.0)',
             #   'Proteus Proportional (Beta 1.8) 15 Acc',
             #   'Proteus Proportional (Beta 2.1) 20 Acc',

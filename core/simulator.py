@@ -120,7 +120,8 @@ class Simulator:
 
         self.model_assignment = model_assignment
 
-        self.infaas_slack = 3
+        self.infaas_slack = 0.75
+        self.infaas_downscale_slack = 0.75
 
         idx = 0
 

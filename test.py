@@ -435,6 +435,7 @@ def main(args):
             elif model_assignment == 'infaas_v2':
                 if i % solve_interval == 0:
                     env.trigger_infaas_v2_upscaling()
+                if i % solve_interval == 0:
                     env.trigger_infaas_v2_downscaling()
             elif model_assignment == 'infaas_v3':
                 if i % solve_interval == 0:

@@ -519,7 +519,10 @@ class Executor:
         # # and pick the one that minimizes the objective cost function
 
         self.log.debug('infaas v2 upscaling triggered')
+        infaas_slack = self.simulator.infaas_slack
 
+        incoming_load = self.simulator.total_requests_arr[self.simulator.isi_to_idx[self.isi]]
+        total_peak_throughput = 0
         for key in self.predictors:
             predictor = self.predictors[key]
             batch_size = predictor.get_infaas_batch_size()
@@ -528,155 +531,280 @@ class Executor:
                 peak_throughput = 0
             else:
                 runtime = self.variant_runtimes[predictor.acc_type][(self.isi, predictor.variant_name, batch_size)]
-                peak_throughput = batch_size * 1000 / runtime
-            queued_requests = len(predictor.request_dict)
+                peak_throughput = predictor.get_largest_batch_size() * 1000 / runtime
+            total_peak_throughput += peak_throughput
 
-            infaas_slack = self.simulator.infaas_slack
+
+        if math.floor(total_peak_throughput * infaas_slack) >= incoming_load:
+            self.log.debug(f'no need for upscaling, incoming load: {incoming_load}')
+            return
+
+        predictors_to_add = []
+        predictors_to_remove = []
+        for key in self.predictors:
+            predictor = self.predictors[key]
+            batch_size = predictor.get_infaas_batch_size()
+            if batch_size == 0:
+                runtime = math.inf
+                peak_throughput = 0
+            else:
+                runtime = self.variant_runtimes[predictor.acc_type][(self.isi, predictor.variant_name, batch_size)]
+                peak_throughput = predictor.get_largest_batch_size() * 1000 / runtime
+            queued_requests = len(predictor.request_dict)
 
             # TODO: should this be > or >=? previously it was set to be >, but it
             #       gets triggered even if queued requests are 0 and floor(peak throughput * slack)
             #       is 0
-            if math.floor(peak_throughput * infaas_slack) >= queued_requests:
-                # no need for scaling
-                self.log.debug(f'no need for upscaling, queued_requests: {queued_requests}')
-            else:
-                self.log.debug(f'INFaaS autoscaling triggered at predictor {predictor.id}, '
-                             f'executor {self.isi}')
-                self.log.debug(f'peak_throughput: {peak_throughput}')
-                self.log.debug(f'floor(peak_throughput * infaas_slack): {(math.floor(peak_throughput * infaas_slack))}')
-                self.log.debug(f'queued requests: {queued_requests}')
+            # if math.floor(peak_throughput * infaas_slack) >= incoming_load:
+            #     # no need for scaling
+            #     self.log.debug(f'no need for upscaling, queued_requests: {queued_requests}')
+            # else:
+            self.log.debug(f'INFaaS autoscaling triggered at predictor {predictor.id}, '
+                            f'executor {self.isi}')
+            self.log.debug(f'peak_throughput: {peak_throughput}')
+            self.log.debug(f'floor(peak_throughput * infaas_slack): {(math.floor(peak_throughput * infaas_slack))}')
+            self.log.debug(f'queued requests: {queued_requests}')
 
-                # First we consider batch size increase, which costs 0 to change
-                # Technically it is an upgrade, but we can increase it first and
-                # see if anything still needs to be changed
-                for batch_size in self.simulator.allowed_batch_sizes:
-                    # if batch_size > predictor.get_largest_batch_size():
-                    #     break
-                    # else:
+            # First we consider batch size increase, which costs 0 to change
+            # Technically it is an upgrade, but we can increase it first and
+            # see if anything still needs to be changed
+            for batch_size in self.simulator.allowed_batch_sizes:
+                if batch_size > predictor.get_largest_batch_size():
+                    break
+                else:
                     predictor.set_infaas_batch_size(batch_size)
-                
-                peak_throughput = predictor.get_infaas_batch_size() * 1000 / runtime
+            
+            old_predictor_throughput = peak_throughput
+            peak_throughput = predictor.get_infaas_batch_size() * 1000 / runtime
+            predictor_peak_throughput = peak_throughput
 
-                # Now we have two options: (1) replication, (2) upgrading to meet SLO
-                # Calculate the cost for both and choose the cheaper option
+            total_peak_throughput = total_peak_throughput - old_predictor_throughput + predictor_peak_throughput
 
-                # Option 1: Replication
-                incoming_load = self.simulator.total_requests_arr[self.simulator.isi_to_idx[self.isi]]
-                self.log.debug(f'incoming load: {incoming_load}')
-                if peak_throughput == 0:
-                    replicas_needed = math.inf
+            # Now we have three options: (1) upgrade accuracy while meeting throughput,
+            # (2) replication, (3) upgrading to meet SLO
+
+            # Option 1: First consider upgrading accuracy
+            # If throughput is still met by upgrading accuracy, upgrade
+            self.log.debug(f'self.variant_accuracies: {self.variant_accuracies}')
+            executor_name = self.isi
+            available_variants = list(filter(lambda x: x[0] == executor_name, self.variant_accuracies))
+            self.log.debug(f'available_variants: {available_variants}')
+
+            max_accuracy = 0
+            min_accuracy = math.inf
+            min_accuracy_variant = None
+            for availabe_variant in available_variants:
+                max_accuracy = max(max_accuracy, self.variant_accuracies[availabe_variant])
+                min_accuracy = min(min_accuracy, self.variant_accuracies[availabe_variant])
+                min_accuracy_variant = availabe_variant
+
+            variant_throughputs = {}
+            variant_costs = {}
+            variant_throughput_gaps = {}
+            for availabe_variant in available_variants:
+                (isi, availabe_variant_name) = availabe_variant
+                batch_size = self.get_largest_batch_size(availabe_variant_name, predictor.acc_type)
+                if batch_size == 0:
+                    variant_throughput = 0
                 else:
-                    replicas_needed = math.ceil(incoming_load / (peak_throughput * infaas_slack))
+                    variant_latency = self.variant_runtimes[predictor.acc_type][(isi, availabe_variant_name, batch_size)]
+                    variant_throughput = batch_size * 1000 / variant_latency
 
-                # Replicating this given predictor will have as much cost as the
-                # cost of this predictor, i.e., the accuracy drop of this predictor
+                variant_throughputs[availabe_variant] = variant_throughput
+                accuracy_drop = max_accuracy - self.variant_accuracies[availabe_variant]
+                variant_costs[availabe_variant] = accuracy_drop
 
-                self.log.debug(f'replicas needed: {replicas_needed}, accuracy drop of '
-                             f'this variant: {predictor.get_infaas_cost()}')
-                # The cost for all replicas of this predictor is the same
-                cost_replication = predictor.get_infaas_cost() * replicas_needed
-                self.log.debug(f'total cost of replication: {cost_replication}')
+                proposed_throughput = total_peak_throughput - predictor_peak_throughput + variant_throughput
+                proposed_throughput_gap = max(0, incoming_load - proposed_throughput * infaas_slack)
+                variant_throughput_gaps[availabe_variant] = proposed_throughput_gap
+            self.log.debug(f'variant_throughputs: {variant_throughputs}')
+            self.log.debug(f'variant_costs: {variant_costs}')
+            self.log.debug(f'variant_throughput_gaps: {variant_throughput_gaps}')
+            # time.sleep(10)
 
-                # Option 2: Upgrade
-                # Old: We might not upgrade to a model variant with higher accuracy, but we
-                # could upgrade to a different accelerator type with higher throughput
-                # NEW: Upgrade could also mean upgrading to a higher batch size,
-                #      or upgrading to a model variant with different/higher accuracy
+            selected_variant = None
+            least_cost_found = math.inf
+            for availabe_variant in available_variants:
+                proposed_accuracy = self.variant_accuracies[availabe_variant]
+                current_accuracy = self.variant_accuracies[(self.isi, predictor.variant_name)]
+                if proposed_accuracy > current_accuracy:
+                    print(f'proposed_accuracy: {proposed_accuracy}, current_accuracy: {current_accuracy}')
+                    print(f'variant_throughput_gaps[availabe_variant]: {variant_throughput_gaps[availabe_variant]}')
+                    # time.sleep(1)
+                    if variant_throughput_gaps[availabe_variant] == 0 and variant_costs[availabe_variant] < least_cost_found:
+                        selected_variant = availabe_variant
+                        least_cost_found = variant_costs[availabe_variant]
+                        print(f'selected variant: {selected_variant}')
+                        # time.sleep(1)
+                else:
+                    # We only want to upgrade variant here (i.e., if proposed variant's accuracy
+                    # is greater than current variant's accuracy)
+                    pass
 
-                # Option 2a: Change to a different model variant
-                # Option 2b: Change to a different hardware accelerator and make multiple copies
-
-                # Consider the different model variants
-                # Based on Section 4.2.2, "Scaling up algorithm", it seems we have to
-                # run (2b) for every model variant of this model family that can meet
-                # SLO and support a higher throughput than the currently running variant
-                # We calculate the cost_upgrade for each of these variants, then take
-                # the minimum cost_upgrade and compare that with cost_replication, to take
-                # the appropriate action
-
-                model_variants = dict(filter(lambda x: x[0][0]==self.isi, predictor.profiled_latencies.items()))
-                self.log.debug(f'self.isi: {self.isi}, model_variants: {model_variants}')
-                cost_upgrade = np.inf
-                upgrade_needed = None
-                type_needed = None
-                selected_variant = None
-                for model_variant in model_variants:
-                    variant_name = model_variant[1]
-                    batch_size = model_variant[2]
-
-                    cpu_peak_throughput = self.variant_runtimes[AccType.CPU.value][(self.isi, variant_name, batch_size)]
-                    gpu_peak_throughput = self.variant_runtimes[AccType.GPU.value][(self.isi, variant_name, batch_size)]
-                    vpu_peak_throughput = self.variant_runtimes[AccType.VPU.value][(self.isi, variant_name, batch_size)]
-                    fpga_peak_throughput = self.variant_runtimes[AccType.FPGA.value][(self.isi, variant_name, batch_size)]
-                    
-                    cpu_needed = math.ceil(incoming_load / (cpu_peak_throughput * infaas_slack))
-                    gpu_needed = math.ceil(incoming_load / (gpu_peak_throughput * infaas_slack))
-                    vpu_needed = math.ceil(incoming_load / (vpu_peak_throughput * infaas_slack))
-                    fpga_needed = math.ceil(incoming_load / (fpga_peak_throughput * infaas_slack))
-
-                    cpu_available = self.simulator.available_predictors[0]
-                    gpu_available = self.simulator.available_predictors[1]
-                    vpu_available = self.simulator.available_predictors[2]
-                    fpga_available = self.simulator.available_predictors[3]
-
-                    if cpu_available == 0:
-                        cpu_needed = math.inf
-                    if gpu_available == 0:
-                        gpu_needed = math.inf
-                    if vpu_available == 0:
-                        vpu_needed = math.inf
-                    if fpga_available == 0:
-                        fpga_needed = math.inf
-
-                    upgrade_needed_variant = min([cpu_needed, gpu_needed, vpu_needed, fpga_needed])
-                    type_needed_variant = [cpu_needed, gpu_needed, vpu_needed, fpga_needed].index(upgrade_needed_variant)
-                    cost_upgrade_variant = self.model_variant_infaas_cost(variant_name) * upgrade_needed_variant
-                    self.log.debug(f'variant: {model_variant}, upgrade_needed_variant: {upgrade_needed_variant},' 
-                                 f' type_needed_variant: {type_needed_variant}, cost per instance: '
-                                 f'{self.model_variant_infaas_cost(variant_name)}')
-
-                    if cost_upgrade_variant < cost_upgrade:
-                        cost_upgrade = cost_upgrade_variant
-                        upgrade_needed = upgrade_needed_variant
-                        type_needed = type_needed_variant
-                        selected_variant = variant_name
-                if type_needed is None:
+            # Go through all variants of this, if there is one that can meet throughput,
+            # select the one with the least accuracy drop
+            
+            # If there is no variant that can meet throughput, select one with least accuracy (highest throuhgput)
+            if selected_variant is not None:
+                (isi, selected_variant_name) = selected_variant
+                if selected_variant_name != predictor.variant_name:
+                    predictors_to_remove.append(predictor.id)
+                    predictors_to_add.append((AccType(predictor.acc_type), selected_variant_name))
+                    old_throughput = total_peak_throughput
+                    total_peak_throughput = total_peak_throughput - predictor_peak_throughput + variant_throughputs[selected_variant]
+                    new_accuracy = self.variant_accuracies[selected_variant]
+                    old_accuracy = self.variant_accuracies[(self.isi, predictor.variant_name)]
+                    self.log.info(f'Found a variant with lower accuracy to replace one with higher accuracy, '
+                        f'new (accuracy, variant): ({new_accuracy},{selected_variant_name}), '
+                        f'old (accuracy, variant: ({old_accuracy},{predictor.variant_name}), '
+                        f'old peak throughput: {old_throughput}, new peak throughput: {total_peak_throughput}')
+                    # time.sleep(10)
                     continue
-                self.log.debug(f'selected variant for upgrade: {selected_variant}, cost '
-                              f'of upgrade: {cost_upgrade}')
-
-                self.log.debug(f'upgrade of type {type_needed} needed: {upgrade_needed},'
-                             f'accuracy drop of this variant: {predictor.get_infaas_cost()}')
-                self.log.debug(f'total cost of upgrade: {cost_upgrade}')
-
-                if cost_upgrade <= cost_replication:
-                    self.log.debug(f'available predictors left: {self.simulator.available_predictors[type_needed]}')
-                    # add 'upgrade_needed' predictors of type 'type_needed' or as many as possible
-                    while self.simulator.available_predictors[type_needed] > 0 and upgrade_needed > 0:
-                        # time.sleep(5)
-                        self.add_predictor(acc_type=AccType(type_needed+1), variant_name=selected_variant)
-                        upgrade_needed -= 1
-                        self.simulator.available_predictors[type_needed] -= 1
-                        print(f'infaas upgraded predictor of type: {type_needed}, available predictors: {self.simulator.available_predictors}')
-                    self.log.debug(f'upgrade needed: {upgrade_needed}')
-                    self.log.debug(f'available predictors left: {self.simulator.available_predictors[type_needed]}')
-                    return
                 else:
-                    # add 'replicas_needed' predictors of type 'predictor.acc_type' or as many as possible
-                    type_needed = predictor.acc_type - 1
-                    self.log.debug(f'replicas needed: {replicas_needed}')
-                    self.log.debug(f'type needed: {type_needed}')
-                    self.log.debug(f'available predictors left: {self.simulator.available_predictors[type_needed]}')
-                    # add 'upgrade_needed' predictors of type 'type_needed' or as many as possible
-                    while self.simulator.available_predictors[type_needed] > 0 and replicas_needed > 0:
-                        # time.sleep(5)
-                        self.add_predictor(acc_type=AccType(type_needed+1))
-                        replicas_needed -= 1
-                        self.simulator.available_predictors[type_needed] -= 1
-                        print(f'infaas replicated predictor of type: {type_needed}, available predictors: {self.simulator.available_predictors}')
-                    self.log.debug(f'replicas needed: {upgrade_needed}')
-                    self.log.debug(f'available predictors left: {self.simulator.available_predictors[type_needed]}')
-                    return
+                    self.log.info(f'Cannot find a model that will meet throughput if we upgrade, '
+                                  f'checking other upgrade options')
+                    # time.sleep(1)
+
+            # For option 2 and 3, calculate the cost for both and choose the cheaper option
+
+            # Option 2: Replication
+            incoming_load = self.simulator.total_requests_arr[self.simulator.isi_to_idx[self.isi]]
+            self.log.debug(f'incoming load: {incoming_load}')
+            if peak_throughput == 0:
+                replicas_needed = math.inf
+            else:
+                replicas_needed = math.ceil(incoming_load / (peak_throughput * infaas_slack))
+
+            # Replicating this given predictor will have as much cost as the
+            # cost of this predictor, i.e., the accuracy drop of this predictor
+
+            self.log.debug(f'replicas needed: {replicas_needed}, accuracy drop of '
+                            f'this variant: {predictor.get_infaas_cost()}')
+            # The cost for all replicas of this predictor is the same
+            cost_replication = predictor.get_infaas_cost() * replicas_needed
+            self.log.debug(f'total cost of replication: {cost_replication}')
+
+            # Option 3: Upgrade
+            # Old: We might not upgrade to a model variant with higher accuracy, but we
+            # could upgrade to a different accelerator type with higher throughput
+            # NEW: Upgrade could also mean upgrading to a higher batch size,
+            #      or upgrading to a model variant with different/higher accuracy
+
+            # Option 3a: Change to a different model variant
+            # Option 3b: Change to a different hardware accelerator and make multiple copies
+
+            # Consider the different model variants
+            # Based on Section 4.2.2, "Scaling up algorithm", it seems we have to
+            # run (2b) for every model variant of this model family that can meet
+            # SLO and support a higher throughput than the currently running variant
+            # We calculate the cost_upgrade for each of these variants, then take
+            # the minimum cost_upgrade and compare that with cost_replication, to take
+            # the appropriate action
+
+            model_variants = dict(filter(lambda x: x[0][0]==self.isi, predictor.profiled_latencies.items()))
+            self.log.debug(f'self.isi: {self.isi}, model_variants: {model_variants}')
+            cost_upgrade = np.inf
+            upgrade_needed = None
+            type_needed = None
+            selected_variant = None
+            for model_variant in model_variants:
+                variant_name = model_variant[1]
+                batch_size = model_variant[2]
+
+                cpu_peak_throughput = self.variant_runtimes[AccType.CPU.value][(self.isi, variant_name, batch_size)]
+                gpu_peak_throughput = self.variant_runtimes[AccType.GPU.value][(self.isi, variant_name, batch_size)]
+                vpu_peak_throughput = self.variant_runtimes[AccType.VPU.value][(self.isi, variant_name, batch_size)]
+                fpga_peak_throughput = self.variant_runtimes[AccType.FPGA.value][(self.isi, variant_name, batch_size)]
+                
+                cpu_needed = math.ceil(incoming_load / (cpu_peak_throughput * infaas_slack))
+                gpu_needed = math.ceil(incoming_load / (gpu_peak_throughput * infaas_slack))
+                vpu_needed = math.ceil(incoming_load / (vpu_peak_throughput * infaas_slack))
+                fpga_needed = math.ceil(incoming_load / (fpga_peak_throughput * infaas_slack))
+
+                cpu_available = self.simulator.available_predictors[0]
+                gpu_available = self.simulator.available_predictors[1]
+                vpu_available = self.simulator.available_predictors[2]
+                fpga_available = self.simulator.available_predictors[3]
+
+                if cpu_available == 0:
+                    cpu_needed = math.inf
+                if gpu_available == 0:
+                    gpu_needed = math.inf
+                if vpu_available == 0:
+                    vpu_needed = math.inf
+                if fpga_available == 0:
+                    fpga_needed = math.inf
+
+                upgrade_needed_variant = min([cpu_needed, gpu_needed, vpu_needed, fpga_needed])
+                type_needed_variant = [cpu_needed, gpu_needed, vpu_needed, fpga_needed].index(upgrade_needed_variant)
+                cost_upgrade_variant = self.model_variant_infaas_cost(variant_name) * upgrade_needed_variant
+                self.log.debug(f'variant: {model_variant}, upgrade_needed_variant: {upgrade_needed_variant},' 
+                                f' type_needed_variant: {type_needed_variant}, cost per instance: '
+                                f'{self.model_variant_infaas_cost(variant_name)}')
+
+                if cost_upgrade_variant < cost_upgrade:
+                    cost_upgrade = cost_upgrade_variant
+                    upgrade_needed = upgrade_needed_variant
+                    type_needed = type_needed_variant
+                    selected_variant = variant_name
+            if type_needed is None:
+                continue
+            self.log.debug(f'selected variant for upgrade: {selected_variant}, cost '
+                            f'of upgrade: {cost_upgrade}')
+
+            self.log.debug(f'upgrade of type {type_needed} needed: {upgrade_needed},'
+                            f'accuracy drop of this variant: {predictor.get_infaas_cost()}')
+            self.log.debug(f'total cost of upgrade: {cost_upgrade}')
+
+            if cost_upgrade <= cost_replication:
+                self.log.debug(f'available predictors left: {self.simulator.available_predictors[type_needed]}')
+                # add 'upgrade_needed' predictors of type 'type_needed' or as many as possible
+                while self.simulator.available_predictors[type_needed] > 0 and upgrade_needed > 0:
+                    # time.sleep(5)
+                    self.add_predictor(acc_type=AccType(type_needed+1), variant_name=selected_variant)
+                    upgrade_needed -= 1
+                    self.simulator.available_predictors[type_needed] -= 1
+                    print(f'infaas upgraded predictor of type: {type_needed}, available predictors: {self.simulator.available_predictors}')
+                self.log.debug(f'upgrade needed: {upgrade_needed}')
+                self.log.debug(f'available predictors left: {self.simulator.available_predictors[type_needed]}')
+                return
+            else:
+                # add 'replicas_needed' predictors of type 'predictor.acc_type' or as many as possible
+                type_needed = predictor.acc_type - 1
+                self.log.debug(f'replicas needed: {replicas_needed}')
+                self.log.debug(f'type needed: {type_needed}')
+                self.log.debug(f'available predictors left: {self.simulator.available_predictors[type_needed]}')
+                # add 'upgrade_needed' predictors of type 'type_needed' or as many as possible
+                while self.simulator.available_predictors[type_needed] > 0 and replicas_needed > 0:
+                    # time.sleep(5)
+                    self.add_predictor(acc_type=AccType(type_needed+1))
+                    replicas_needed -= 1
+                    self.simulator.available_predictors[type_needed] -= 1
+                    print(f'infaas replicated predictor of type: {type_needed}, available predictors: {self.simulator.available_predictors}')
+                self.log.debug(f'replicas needed: {upgrade_needed}')
+                self.log.debug(f'available predictors left: {self.simulator.available_predictors[type_needed]}')
+                return
+        
+        # We can't remove predictors inside the above loop since it will
+        # change the size of the loop
+        for id in predictors_to_remove:
+            # print(f'infaas removed predictor')
+            # time.sleep(1)
+            predictor_type = self.predictors[id].acc_type
+            removed = self.remove_predictor_by_id(id)
+            if removed:
+                self.simulator.available_predictors[predictor_type-1] += 1
+
+        for tuple in predictors_to_add:
+            acc_type, variant_name = tuple
+            self.add_predictor(acc_type=acc_type, variant_name=variant_name)
+            self.simulator.available_predictors[acc_type.value-1] -= 1
+
+        self.log.info(f'predictors_to_add: {predictors_to_add}')
+        self.log.info(f'predictors_to_remove: {predictors_to_remove}')
+        # time.sleep(5)
+        
+        return
                 
     
     def trigger_infaas_v3_upscaling(self):
@@ -911,11 +1039,96 @@ class Executor:
             downgraded = False
 
             # We could downgrade to smaller batch size, or running on different hardware
+
+            incoming_load = self.simulator.total_requests_arr[self.simulator.isi_to_idx[self.isi]]
+
+            # First consider downgrading accuracy
+            # If throughput improves by downgrading accuracy, downgrade
+            self.log.debug(f'self.variant_accuracies: {self.variant_accuracies}')
+            executor_name = self.isi
+            available_variants = list(filter(lambda x: x[0] == executor_name, self.variant_accuracies))
+            self.log.debug(f'available_variants: {available_variants}')
+
+            max_accuracy = 0
+            min_accuracy = math.inf
+            min_accuracy_variant = None
+            for availabe_variant in available_variants:
+                max_accuracy = max(max_accuracy, self.variant_accuracies[availabe_variant])
+                min_accuracy = min(min_accuracy, self.variant_accuracies[availabe_variant])
+                min_accuracy_variant = availabe_variant
+
+            variant_throughputs = {}
+            variant_costs = {}
+            variant_throughput_gaps = {}
+            for availabe_variant in available_variants:
+                (isi, availabe_variant_name) = availabe_variant
+                batch_size = self.get_largest_batch_size(availabe_variant_name, predictor.acc_type)
+                if batch_size == 0:
+                    variant_latency = math.inf
+                    variant_throughput = 0
+                else:
+                    variant_latency = self.variant_runtimes[predictor.acc_type][(isi, availabe_variant_name, batch_size)]
+                    variant_throughput = batch_size * 1000 / variant_latency
+
+                variant_throughputs[availabe_variant] = variant_throughput
+                accuracy_drop = max_accuracy - self.variant_accuracies[availabe_variant]
+                variant_costs[availabe_variant] = accuracy_drop
+
+                proposed_throughput = total_peak_throughput - predictor_peak_throughput + variant_throughput
+                proposed_throughput_gap = max(0, incoming_load - proposed_throughput * infaas_slack)
+                variant_throughput_gaps[availabe_variant] = proposed_throughput_gap
+            self.log.debug(f'variant_throughputs: {variant_throughputs}')
+            self.log.debug(f'variant_costs: {variant_costs}')
+            self.log.debug(f'variant_throughput_gaps: {variant_throughput_gaps}')
+            # time.sleep(10)
+
+            # Go through all variants of this, if there is one that can meet throughput, select that,
+            # otherwise, select the one with least accuracy (highest throughput)
+            selected_variant = None
+            least_cost_found = math.inf
+            for availabe_variant in available_variants:
+                if variant_throughput_gaps[availabe_variant] == 0 and variant_costs[availabe_variant] < least_cost_found:
+                    selected_variant = availabe_variant
+                    least_cost_found = variant_costs[availabe_variant]
             
-            # First consider smaller batch sizes, going in increasing order
+            # If there is no variant that can meet throughput, select one with least accuracy (highest throuhgput)
+            if selected_variant is None:
+                selected_variant = min_accuracy_variant
+            
+            (isi, selected_variant_name) = selected_variant
+            if selected_variant_name != predictor.variant_name:
+                predictors_to_remove.append(predictor.id)
+                predictors_to_add.append((AccType(predictor.acc_type), selected_variant_name))
+                old_throughput = total_peak_throughput
+                total_peak_throughput = total_peak_throughput - predictor_peak_throughput + variant_throughputs[selected_variant]
+                new_accuracy = self.variant_accuracies[selected_variant]
+                old_accuracy = self.variant_accuracies[(self.isi, predictor.variant_name)]
+                self.log.info(f'Found a variant with lower accuracy to replace one with higher accuracy, '
+                      f'new (accuracy, variant): ({new_accuracy},{selected_variant_name}), '
+                      f'old (accuracy, variant: ({old_accuracy},{predictor.variant_name}), '
+                      f'old peak throughput: {old_throughput}, new peak throughput: {total_peak_throughput}')
+                # time.sleep(10)
+                continue
+            else:
+                self.log.info(f'Already running variant with lowest accuracy, checking other options for downgrading..')
+                # time.sleep(1)
+
+
+            if total_peak_throughput * infaas_slack * self.infaas_downscale_slack > incoming_load:
+                # We need to downscale because our throughput is much bigger than incoming load
+                
+                # We have a separate infaas_downscale_slack multiplier because there needs
+                # to be a gap between upscale and downscale slack, otherwise we will just
+                # keep ping-ponging between upscaling and downscaling
+                pass
+            else:
+                self.log.info(f'no need to downscale')
+                return
+            
+            # Then consider downgrading to smaller batch size, going in increasing order
             for batch_size in self.simulator.allowed_batch_sizes:
-                # if batch_size > predictor.get_largest_batch_size():
-                #     break
+                if batch_size > predictor.get_largest_batch_size():
+                    break
 
                 batch_peak_throughput = batch_size * 1000 / runtime
                 new_throughput = total_peak_throughput - predictor_peak_throughput + batch_peak_throughput
@@ -941,11 +1154,11 @@ class Executor:
                 cpu_available = self.simulator.available_predictors[0]
                 vpu_available = self.simulator.available_predictors[2]
 
-                # if self.get_largest_batch_size(predictor.variant_name, 'CPU') == 0:
-                #     continue
+                if self.get_largest_batch_size(predictor.variant_name, 'CPU') == 0:
+                    continue
 
                 if cpu_available > 0 or vpu_available > 0:
-                    if predictor.get_infaas_batch_size() == 0:
+                    if predictor.get_largest_batch_size() == 0:
                         cpu_peak_throughput = 0
                     else:
                         cpu_peak_throughput = self.variant_runtimes[AccType.CPU.value][(self.isi,

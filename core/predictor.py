@@ -144,7 +144,8 @@ class Predictor:
         '''
         all_variant_accuracies = self.executor.variant_accuracies
         model_name = self.executor.isi
-        model_variant_accuracies = dict(filter(lambda x: x[0][0]==model_name, all_variant_accuracies.items()))
+        model_variant_accuracies = dict(filter(lambda x: x[0][0]==model_name,
+                                               all_variant_accuracies.items()))
 
         highest_accuracy = max(model_variant_accuracies.values())
         accuracy_drop = highest_accuracy - self.profiled_accuracy
@@ -224,7 +225,7 @@ class Predictor:
         # If predictor is busy, we have to wait until we get a FINISH_BATCH event
         # before we further process this request
         if self.busy:
-            if self.batching_algo in ['aimd', 'nexus']:
+            if self.batching_algo in ['aimd', 'nexus', 'infaas']:
                 if self.batch_expiring_set == False:
                     if self.batching_algo == 'nexus':
                         if self.max_batch_size == 0:
@@ -233,6 +234,8 @@ class Predictor:
                         batch_expiring_set = clock + event.deadline - self.batch_processing_latency(self.max_batch_size, event)
                     elif self.batching_algo == 'aimd':
                         batch_expiring_set = clock + event.deadline - self.batch_processing_latency(self.aimd_batch_size, event)
+                    elif self.batching_algo == 'infaas':
+                        return
                     self.generate_batch_expiring(event, batch_expiring_set)
             else:
                 self.generate_head_slo_expiring()
@@ -274,6 +277,9 @@ class Predictor:
         elif self.task_assignment == TaskAssignment.INFAAS:
             self.pop_while_first_expires(clock)
             batch_size = self.infaas_batch_size
+            if len(self.request_queue) > batch_size:
+                self.process_batch(clock, batch_size)
+            return
         else:
             raise PredictorException(f'Unexpected combination, task assignment: {self.task_assignment}, '
                                      f'batching algorithm: {self.batching_algo}')
@@ -414,8 +420,9 @@ class Predictor:
                     else:
                         raise PredictorException(f'unexpected batching algorithm: {self.batching_algo}')
                 elif self.task_assignment == TaskAssignment.INFAAS:
-                    self.simulator.bump_failed_request_stats(request)
-                    continue
+                    pass
+                    # self.simulator.bump_failed_request_stats(request)
+                    # continue
             self.simulator.generate_end_request_event(request, finish_time,
                                                     accuracy_seen, qos_met)
         self.simulator.generate_finish_batch_event(finish_time=finish_time,
@@ -596,7 +603,7 @@ class Predictor:
         if self.busy is True:
             return
         
-        if self.batching_algo == 'nexus' or self.batching_algo == 'aimd':
+        if self.batching_algo == 'nexus' or self.batching_algo == 'aimd' or self.batching_algo == 'infaas':
             self.log.debug(f'SLO expiring event encountered, ignoring for task assignment: '
                           f'{self.task_assignment}, batching algo: {self.batching_algo}')
             return
