@@ -9,7 +9,7 @@
     "beta": 1.05,
     "fixed_seed": true,
     "seed": 10,
-    "solve_interval": 2,
+    "solve_interval": 10,
     "short_run": false,
     "log_to_file": true
 }

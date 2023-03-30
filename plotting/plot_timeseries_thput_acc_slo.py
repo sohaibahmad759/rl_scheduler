@@ -6,16 +6,17 @@ import matplotlib.pyplot as plt
 
 
 # trace = 'normal-high_load'
-trace = 'zipf_exponential'
-# trace = 'zipf_gamma'
+# trace = 'zipf_exponential'
+trace = 'zipf_gamma'
 # trace = 'equal_exponential'
 # trace = 'equal_gamma'
 
 path = '../logs/throughput/selected_asplos'
 
 logfile_list = [
-                f'{path}/{trace}/infaas_accuracy_300ms_interval2.csv',
-                f'{path}/{trace}/infaas_accuracy_300ms_interval10.csv',
+                f'{path}/{trace}/infaas_accuracy_300ms.csv',
+                # f'{path}/{trace}/infaas_accuracy_300ms_interval2.csv',
+                # f'{path}/{trace}/infaas_accuracy_300ms_interval10.csv',
                 # f'{path}/{trace}/infaas_accuracy_300ms_normalhighload.csv',
                 # f'{path}/{trace}/infaas_accuracy_300ms_slack3.csv',
                 # f'{path}/{trace}/infaas_accuracy_300ms_slack2.csv',
@@ -31,21 +32,26 @@ logfile_list = [
                 # f'{path}/{trace}/sommelier_nexus_300ms.csv',
                 # '../logs/throughput/selected_asplos/proteus_aimd_300ms.csv',
                 # '../logs/throughput/selected_asplos/proteus_nexus_300ms.csv',
-                # f'{path}/{trace}/proteus_300ms.csv',
+                f'{path}/{trace}/proteus_300ms.csv',
+                # f'{path}/{trace}/proteus_300ms_beta1.15.csv',
+                # f'{path}/{trace}/proteus_300ms_beta1.1.csv',
+                # f'{path}/{trace}/proteus_aimd_300ms.csv',
                 # f'{path}/{trace}/proteus_300ms_beta1.4.csv',
                 # f'{path}/{trace}/proteus_300ms_proportional.csv',
                 # f'{path}/{trace}/proteus_300ms_beta1.4_proportional.csv',
                 # f'{path}/{trace}/proteus_300ms_beta1_proportional.csv',
                 # f'{path}/{trace}/proteus_300ms_beta2_gap1.1.csv',
                 # f'{path}/{trace}/proteus_300ms_beta3_gap1.1_edwc.csv',
-                f'{path}/{trace}/proteus_aimd_300ms_beta1.05.csv',
-                f'{path}/{trace}/proteus_300ms_beta1.05.csv',
+                # f'{path}/{trace}/proteus_aimd_300ms_beta1.05.csv',
+                # f'{path}/{trace}/proteus_300ms_beta1.05.csv',
+                # f'{path}/{trace}/proteus_300ms_beta1.05_lateallowed.csv',
                 # f'{path}/{trace}/proteus_300ms_beta1.1.csv',
-                f'{path}/{trace}/proteus_300ms_beta1.05_interval2.csv',
+                # f'{path}/{trace}/proteus_300ms_beta1.05_interval2.csv',
                 # f'{path}/{trace}/proteus_300ms_beta2_gap1.1_edwc.csv',
                 # f'{path}/{trace}/proteus_300ms_beta3_gap1.1_aimd.csv', # this
                 # f'{path}/{trace}/proteus_300ms_beta3_gap1.1_nexus.csv', # this
                 # f'{path}/{trace}/proteus_300ms_beta2.0_proportional.csv',
+                # f'{path}/{trace}/proteus_300ms_beta1.05_proportional.csv',
                 # f'{path}/{trace}/proteus_300ms_beta1.8_15acc_proportional.csv',
                 # f'{path}/{trace}/proteus_300ms_beta2.1_20acc_proportional.csv',
                 # f'{path}/{trace}/proteus_300ms_beta1.5_20acc_proportional.csv',
@@ -69,8 +75,9 @@ markers = ['+', 'o', 'v', '^', '*', 's', 'x']
 # algorithms = ['Clipper++ (High Throughput)', 'Clipper++ (High Accuracy)',
 #             'INFaaS-Instance', 'INFaaS-Accuracy', 'AccScale']
 algorithms = [
-              'INFaaS-Accuracy Interval 2',
-              'INFaaS-Accuracy Interval 10',
+              'INFaaS-Accuracy',
+            #   'INFaaS-Accuracy Interval 2',
+            #   'INFaaS-Accuracy Interval 10',
             #   'INFaaS-Accuracy NormalHighLoad',
             #   'INFaaS-Accuracy (Slack 3)',
             #   'INFaaS-Accuracy (Slack 2)',
@@ -86,21 +93,26 @@ algorithms = [
             #   'Sommelier-Nexus'
             #   'Proteus-Clipper',
             #   'Proteus-Nexus',
-            #   'Proteus',
+              'Proteus',
+            #   'Proteus (Beta 1.15)',
+            #   'Proteus (Beta 1.1)',
+            #   'Proteus AIMD',
             #   'Proteus (Beta 1.4)',
             #   'Proteus Proportional',
             #   'Proteus Proportional (Beta 1.4)',
             #   'Proteus Proportional (Beta 1)',
             #   'Proteus (Beta 2 Gap 1.1)',
             #   'Proteus (Beta 3 Gap 1.1 EDWC)',
-              'Proteus (AIMD Beta 1.05)',
-              'Proteus (Beta 1.05)',
+            #   'Proteus (AIMD Beta 1.05)',
+            #   'Proteus (Beta 1.05)',
+            #   'Proteus (Beta 1.05 Late Allowed)',
             #   'Proteus (Beta 1.1)',
-              'Proteus (Beta 1.05 Interval 2)',
+            #   'Proteus (Beta 1.05 Interval 2)',
             #   'Proteus (Beta 2 Gap 1.1 EDWC)',
             #   'Proteus (Beta 3 Gap 1.1 AIMD)',
             #   'Proteus (Beta 3 Gap 1.1 Nexus)',
             #   'Proteus Proportional (Beta 2.0)',
+            #   'Proteus Proportional (Beta 1.05)',
             #   'Proteus Proportional (Beta 1.8) 15 Acc',
             #   'Proteus Proportional (Beta 2.1) 20 Acc',
             #   'Proteus Proportional (Beta 1.5) 20 Acc',
@@ -144,6 +156,7 @@ for idx in range(len(logfile_list)):
     dropped = df['dropped'].values[start_cutoff:]
     late = df['late'].values[start_cutoff:]
     total_slo_violations = dropped + late
+    # total_slo_violations = dropped
 
     successful = df['successful'].values[start_cutoff:]
 
@@ -192,10 +205,10 @@ for idx in range(len(logfile_list)):
         ax2.plot(time, effective_accuracy, label=algorithms[idx], color=colors[color_idx])
         ax3.plot(time, total_slo_violations, label=algorithms[idx], color=colors[color_idx])
 
-        if 'estimated_throughput' in df and sum(df['estimated_throughput'].values[start_cutoff:]) > 0 and algorithms[idx] == 'Proteus':
-            estimated_throughput = df['estimated_throughput'].values[start_cutoff:]
-            ax1.plot(time, estimated_throughput, label=f'Estimated throughput ({algorithms[idx]})',
-                     color='black')
+        # if 'estimated_throughput' in df and sum(df['estimated_throughput'].values[start_cutoff:]) > 0 and algorithms[idx] == 'Proteus':
+        #     estimated_throughput = df['estimated_throughput'].values[start_cutoff:]
+        #     ax1.plot(time, estimated_throughput, label=f'Estimated throughput ({algorithms[idx]})',
+        #              color='black')
         # ax1.plot(time, successful, label=algorithms[idx])
         # ax2.plot(time, effective_accuracy, label=algorithms[idx])
     color_idx += 1
@@ -214,22 +227,25 @@ ax3.grid()
 y_cutoff += 50
 # y_cutoff = 200
 
-ax1.legend(loc='upper center', bbox_to_anchor=(0.5, 1.85), ncol=3, fontsize=12)
-ax1.set_ylabel('Requests per sec', fontsize=15)
+ax1.set_title(trace)
+
+ax1.legend(loc='upper center', bbox_to_anchor=(0.5, 1.75), ncol=3, fontsize=12)
+
 ax1.set_xticks(np.arange(0, 25, 4), fontsize=15)
-ax1.set_yticks(np.arange(0, y_cutoff, y_cutoff/8), fontsize=15)
+ax1.set_yticks(np.arange(0, y_cutoff + 50, 200), fontsize=12)
+ax1.set_ylabel('Requests per\nsecond', fontsize=11)
 
 ax2.set_xticks(np.arange(0, 25, 4), fontsize=15)
-ax2.set_yticks(np.arange(80, 104, 5))
-ax2.set_ylabel('Effective Accuracy', fontsize=15)
+ax2.set_yticks(np.arange(80, 104, 5), fontsize=12)
+ax2.set_ylabel('Effective\nAccuracy', fontsize=11)
 
 ax3.set_xticks(np.arange(0, 25, 4), fontsize=15)
-ax3.set_yticks(np.arange(0, 0.8, 0.1))
-ax3.set_ylabel('SLO Timeouts', fontsize=15)
+ax3.set_yticks(np.arange(0, 0.6, 0.1), fontsize=12)
+ax3.set_ylabel('SLO Violation\nRatio', fontsize=11)
 
-ax3.set_xlabel('Time (min)', fontsize=15)
+ax3.set_xlabel('Time (min)', fontsize=12)
 
-plt.savefig(os.path.join('..', 'figures', 'timeseries_thput_accuracy_slo.pdf'), dpi=500, bbox_inches='tight')
+plt.savefig(os.path.join('..', 'figures', f'timeseries_{trace}.pdf'), dpi=500, bbox_inches='tight')
 
 print(f'Warning! We should not be using mean to aggregate, instead we should be using sum')
 print(f'Warning! There are some points where requests served are greater than incoming '

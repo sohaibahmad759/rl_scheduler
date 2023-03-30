@@ -1375,7 +1375,7 @@ class Executor:
                 self.log.error('failed request because routing table is empty')
                 return
             
-            if self.simulator.model_assignment == 'ilp1':
+            if self.simulator.model_assignment == 'ilp' and self.simulator.use_proportional == True:
                 # accuracy_filtered = list(filter(lambda x: x.profiled_accuracy > event.,
                 #                                 self.predictors.values()))
                 selected = None

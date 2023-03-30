@@ -383,8 +383,8 @@ def main(args):
 
             if ilp_applied == True:
                 period_tuning = solve_interval
-                # if i >= 50 and i <= 100:
-                #     period_tuning = 5
+                if i >= 60 and i <= 100:
+                    period_tuning = 5
                 # TODO: Tune how frequently the ILP is run by tuning 'period_tuning'
                 #       The bigger it is, the less frequently the ILP is invoked
                 #       Also, what are its implications on allocation window sizes and

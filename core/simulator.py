@@ -21,6 +21,7 @@ MAX_CLOCK_VALUE = 0
 # the last request in queue for a given executor, it will refill the event
 # queue
 QUEUE_REFILL_THRESHOLD = 2000
+CHANGE_PROPORTION_THRESHOLD = 0.35
 
 
 class Simulator:
@@ -782,9 +783,96 @@ class Simulator:
         self.log.debug(f'len: {len(canary_dict)}, canary_dict: {canary_dict}')
         self.log.debug('')
         self.log.debug(f'len: {len(ilp_x)}, ilp_x: {ilp_x}')
+        required_predictors, ilp_x = self.postprocess_predictor_dict(required_predictors,
+                                                                     canary_dict,
+                                                                     ilp_x)
         self.apply_predictor_dict(required_predictors)
         self.apply_canary_dict(canary_dict, ilp_x)
         return
+    
+    def postprocess_predictor_dict(self, required_predictors, canary_dict, ilp_x):
+        """ Upgrade predictors that are not present in canary dict to highest
+        accuracy.
+        """
+        if len(required_predictors) == 0 or len(canary_dict) == 0 or len(ilp_x) == 0:
+            return required_predictors
+        
+        new_ilp_x = {}
+        
+        accelerators_in_canary = set(map(lambda x: x[0], canary_dict))
+        self.log.debug(f'accelerators_in_canary: {accelerators_in_canary}')
+
+        changed = 0
+        total = 0
+        for tuple in ilp_x:
+            total += 1
+            (variant, accelerator) = tuple
+            # We don't want to replace those that are present in canary_dict
+            if accelerator in accelerators_in_canary:
+                new_ilp_x[tuple] = ilp_x[tuple]
+                continue
+
+            # But if it is not present, replace it with highest accuracy variant
+            # This is to ensure the cluster does not go under utilized since ILP
+            # will only try to meet throughput, but will not use beyond it
+            # This is used in conjunction with proportional routing
+            upgraded_variant = self.find_most_accurate_feasible_variant(variant,
+                                                                        accelerator.split('-')[0])
+            new_tuple = (upgraded_variant, accelerator)
+            new_ilp_x[new_tuple] = ilp_x[tuple]
+            
+            changed += 1
+
+        new_required_predictors = self.get_required_predictors_from_ilpx(new_ilp_x)
+
+        if changed / total >= CHANGE_PROPORTION_THRESHOLD:
+            self.use_proportional = True
+        else:
+            self.use_proportional = False
+        self.log.info(f'Use proportional: {self.use_proportional}, changed '
+                      f'proportion: {changed/total}')
+
+        return new_required_predictors, new_ilp_x
+    
+    def get_required_predictors_from_ilpx(self, ilp_x):
+        """ Takes in an ilp_x dictionary and forms a required_predictors dictionary
+        """
+        required_predictors = {}
+        for tuple in ilp_x:
+            (variant, accelerator) = tuple
+            acc_type = accelerator.split('-')[0]
+
+            if (variant, acc_type) in required_predictors:
+                required_predictors[(variant, acc_type)] += 1
+            else:
+                required_predictors[(variant, acc_type)] = 1
+
+        return required_predictors
+    
+    def find_most_accurate_feasible_variant(self, variant, accelerator):
+        """ Given a model variant, finds the most accurate variant in its
+        model family whose maximum batch size is not 0 on given accelerator
+        """
+        isi = self.get_isi_from_variant_name(variant)
+        variants = list(filter(lambda x: x[0] == isi, self.model_variant_accuracies))
+
+        max_accuracy = 0
+        max_accuracy_variant = None
+
+        largest_batch_sizes = self.get_largest_batch_sizes()
+
+        for candidate in variants:
+            candidate_accuracy = self.model_variant_accuracies[candidate]
+            candidate_largest_batch_size = largest_batch_sizes[(accelerator, candidate[1])]
+
+            if candidate_accuracy > max_accuracy and candidate_largest_batch_size > 0:
+                max_accuracy = candidate_accuracy
+                max_accuracy_variant = candidate
+
+        if max_accuracy_variant is None:
+            return variant
+        else:
+            return max_accuracy_variant[1]
 
     def apply_predictor_dict(self, required_predictors={}):
         """ Takes in a dictionary 'required_predictors' with

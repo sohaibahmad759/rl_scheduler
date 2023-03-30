@@ -49,6 +49,7 @@ class Predictor:
         self.request_queue = []
         self.event_counter = 0
         self.slo_expiring_dict = {}
+        self.expiring_waiting = False
 
         self.load = None
 
@@ -405,16 +406,16 @@ class Predictor:
             if finish_time > request.start_time + request.deadline:
                 if self.task_assignment == TaskAssignment.CANARY:
                     if self.batching_algo == 'accscale':
-                        raise PredictorException(f'process_batch: Something is wrong, first request '
-                                                 f'in queue will expire before batch finishes processing '
-                                                 f'for batching algo: {self.batching_algo}')
-                    # # Again, we don't want to early drop here. The request will finish late
-                    # and that should be a feedback for AIMD
+                        pass
+                        # raise PredictorException(f'process_batch: Something is wrong, first request '
+                        #                          f'in queue will expire before batch finishes processing '
+                        #                          f'for batching algo: {self.batching_algo}')
+                    # # AIMD performs lazy-dropping
                     elif self.batching_algo == 'aimd':
                         aimd_negative_feedback = True
-                        pass
-                        # self.simulator.bump_failed_request_stats(request)
-                        # continue
+                        # pass
+                        self.simulator.bump_failed_request_stats(request)
+                        continue
                     elif self.batching_algo == 'nexus':
                         # pass
                         self.simulator.bump_failed_request_stats(request)
@@ -447,15 +448,27 @@ class Predictor:
         self.busy = False
         self.busy_till = None
 
+        if len(self.request_queue) == 0:
+            return
+
         if self.task_assignment == TaskAssignment.CANARY:
             if self.batching_algo == 'accscale':
-                self.pop_while_first_expires(clock)
-                if len(self.request_queue) == 0:
-                    return
-                batch_size = self.find_batch_size(len(self.request_queue))
-                if batch_size == -1:
-                    batch_size = self.max_batch_size
-                self.process_batch(clock, batch_size)
+                if self.expiring_waiting:
+                    self.expiring_waiting = False
+                    batch_size = self.find_batch_size(len(self.request_queue))
+                    if batch_size == -1:
+                        batch_size = self.max_batch_size
+                    self.process_batch(clock, batch_size)
+                else:
+                    # self.pop_while_first_expires(clock)
+                    # if len(self.request_queue) == 0:
+                    #     return
+                    # batch_size = self.find_batch_size(len(self.request_queue))
+                    # if batch_size == -1:
+                    #     batch_size = self.max_batch_size
+                    # self.process_batch(clock, batch_size)
+                    if len(self.request_queue) > self.max_batch_size:
+                        self.process_batch(clock, self.max_batch_size)
                 return
 
                 # If we run the batch with the requests currently in the queue, we want to
@@ -603,6 +616,7 @@ class Predictor:
         ''' Callback to handle an SLO_EXPIRING event
         '''
         if self.busy is True:
+            self.expiring_waiting = True
             return
         
         if self.batching_algo == 'nexus' or self.batching_algo == 'aimd' or self.batching_algo == 'infaas':
