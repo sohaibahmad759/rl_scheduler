@@ -783,6 +783,7 @@ class Simulator:
         self.log.debug(f'len: {len(canary_dict)}, canary_dict: {canary_dict}')
         self.log.debug('')
         self.log.debug(f'len: {len(ilp_x)}, ilp_x: {ilp_x}')
+        # time.sleep(5)
         required_predictors, ilp_x = self.postprocess_predictor_dict(required_predictors,
                                                                      canary_dict,
                                                                      ilp_x)

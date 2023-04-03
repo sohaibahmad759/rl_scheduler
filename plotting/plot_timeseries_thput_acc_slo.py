@@ -7,16 +7,17 @@ import matplotlib.pyplot as plt
 
 # trace = 'normal-high_load'
 # trace = 'zipf_exponential'
+trace = 'zipf_exponential_bursty'
 # trace = 'zipf_gamma'
 # trace = 'zipf_uniform'
-trace = 'zipf_uniform_random'
+# trace = 'zipf_uniform_random'
 # trace = 'equal_exponential'
 # trace = 'equal_gamma'
 
 path = '../logs/throughput/selected_asplos'
 
 logfile_list = [
-                # f'{path}/{trace}/infaas_accuracy_300ms.csv',
+                f'{path}/{trace}/infaas_accuracy_300ms.csv',
                 # f'{path}/{trace}/infaas_accuracy_300ms_interval2.csv',
                 # f'{path}/{trace}/infaas_accuracy_300ms_interval10.csv',
                 # f'{path}/{trace}/infaas_accuracy_300ms_normalhighload.csv',
@@ -26,11 +27,13 @@ logfile_list = [
                 # f'{path}/{trace}/infaas_accuracy_300ms_slack1.5.csv',
                 # f'{path}/{trace}/infaas_accuracy_300ms_slack0.15.csv',
                 # f'{path}/{trace}/clipper_ht_aimd_300ms.csv', # this
+                # f'{path}/{trace}/clipper_ht_aimd_lateallowed_300ms.csv',
                 # f'{path}/{trace}/clipper_ht_nexus_300ms.csv',
                 # f'{path}/{trace}/clipper_ht_asb_300ms.csv', # this
                 # '../logs/throughput/selected_asplos/clipper_optstart_300ms.csv',
                 # f'{path}/{trace}/sommelier_aimd_300ms.csv',
-                # f'{path}/{trace}/sommelier_asb_300ms.csv', # this
+                f'{path}/{trace}/sommelier_asb_300ms.csv', # this
+                # f'{path}/{trace}/sommelier_asb_300ms_intervaladaptive2.csv',
                 # f'{path}/{trace}/sommelier_nexus_300ms.csv',
                 # '../logs/throughput/selected_asplos/proteus_aimd_300ms.csv',
                 # '../logs/throughput/selected_asplos/proteus_nexus_300ms.csv',
@@ -38,9 +41,9 @@ logfile_list = [
                 # f'{path}/{trace}/proteus_300ms_beta1.15.csv',
                 # f'{path}/{trace}/proteus_300ms_beta1.1.csv',
                 # f'{path}/{trace}/proteus_aimd_300ms.csv',
-                f'{path}/{trace}/proteus_aimd_lateallowed_300ms.csv',
+                # f'{path}/{trace}/proteus_aimd_lateallowed_300ms.csv',
                 # f'{path}/{trace}/proteus_nexus_300ms.csv',
-                f'{path}/{trace}/proteus_nexus_lateallowed_300ms.csv',
+                # f'{path}/{trace}/proteus_nexus_lateallowed_300ms.csv',
                 # f'{path}/{trace}/proteus_300ms_beta1.4.csv',
                 # f'{path}/{trace}/proteus_300ms_proportional.csv',
                 # f'{path}/{trace}/proteus_300ms_beta1.4_proportional.csv',
@@ -80,7 +83,7 @@ markers = ['+', 'o', 'v', '^', '*', 's', 'x']
 # algorithms = ['Clipper++ (High Throughput)', 'Clipper++ (High Accuracy)',
 #             'INFaaS-Instance', 'INFaaS-Accuracy', 'AccScale']
 algorithms = [
-            #   'INFaaS-Accuracy',
+              'INFaaS-Accuracy',
             #   'INFaaS-Accuracy Interval 2',
             #   'INFaaS-Accuracy Interval 10',
             #   'INFaaS-Accuracy NormalHighLoad',
@@ -90,11 +93,13 @@ algorithms = [
             #   'INFaaS-Accuracy (Slack 1.5)',
             #   'INFaaS-Accuracy (Slack 0.15)',
             #   'Clipper-HT-AIMD',
+            #   'Clipper-HT-AIMD LateAllowed',
             #   'Clipper-HT-Nexus',
             #   'Clipper-HT-ASB',
             #   'Clipper-HT Optimized Start',
             #   'Sommelier-AIMD',
-            #   'Sommelier-ASB',
+              'Sommelier-ASB',
+            #   'Sommelier-ASB Interval2',
             #   'Sommelier-Nexus'
             #   'Proteus-Clipper',
             #   'Proteus-Nexus',
@@ -102,9 +107,9 @@ algorithms = [
             #   'Proteus (Beta 1.15)',
             #   'Proteus (Beta 1.1)',
             #   'Proteus AIMD',
-              'Proteus AIMD LateAllowed',
+            #   'Proteus AIMD LateAllowed',
             #   'Proteus Nexus',
-              'Proteus Nexus LateAllowed',
+            #   'Proteus Nexus LateAllowed',
             #   'Proteus (Beta 1.4)',
             #   'Proteus Proportional',
             #   'Proteus Proportional (Beta 1.4)',
@@ -177,6 +182,10 @@ for idx in range(len(logfile_list)):
 
     if 'clipper' in algorithm:
         clipper_accuracy = effective_accuracy
+
+    for i in range(len(successful)):
+        if successful[i] > demand[i]:
+            successful[i] = demand[i]
 
     # if len(clipper_accuracy) > 0:
     #     for i in range(len(effective_accuracy)):

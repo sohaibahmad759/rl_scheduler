@@ -349,6 +349,8 @@ class Predictor:
         if self.busy:
             raise PredictorException('process_batch called when predictor is busy')
         
+        self.drop_expired_requests(clock)
+        
         self.simulator.batch_size_counters[batch_size] += 1
 
         self.log.debug(f'process_batch called with batch size of {batch_size}')
@@ -413,9 +415,9 @@ class Predictor:
                     # # AIMD performs lazy-dropping
                     elif self.batching_algo == 'aimd':
                         aimd_negative_feedback = True
-                        # pass
-                        self.simulator.bump_failed_request_stats(request)
-                        continue
+                        pass
+                        # self.simulator.bump_failed_request_stats(request)
+                        # continue
                     elif self.batching_algo == 'nexus':
                         # pass
                         self.simulator.bump_failed_request_stats(request)
@@ -735,6 +737,26 @@ class Predictor:
             batch_size = self.infaas_batch_size
 
         self.process_batch(clock, batch_size)
+        return
+    
+
+    def drop_expired_requests(self, clock):
+        ''' Drop all expired requests from the queue
+        '''
+        drop_indices = []
+        for i in range(len(self.request_queue)):
+            request = self.request_queue[i]
+            if request.start_time > clock:
+                print(f'removing expired request, request start time: {request.start_time},'
+                      f'clock: {clock}')
+                time.sleep(1)
+                drop_indices.append(i)
+
+        dropped = 0
+        for i in range(len(drop_indices)):
+            drop_idx = drop_indices[i]
+            self.request_queue.pop(drop_idx-dropped)
+            dropped += 1
         return
 
     

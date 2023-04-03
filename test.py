@@ -260,6 +260,7 @@ def main(args):
     ilp_rounds = 0
     start = time.time()
     step_time = time.time()
+    last_10_demands = []
     for i in range(testing_steps):
         if model_assignment == 'random':
             action = env.action_space.sample()
@@ -383,8 +384,16 @@ def main(args):
 
             if ilp_applied == True:
                 period_tuning = solve_interval
-                if i >= 60 and i <= 100:
-                    period_tuning = 5
+                demand = np.sum(observation[:, -2])
+                last_10_demands.append(demand)
+                if len(last_10_demands) > 10:
+                    last_10_demands.pop(0)
+                if 'bursty' in trace_path and any(i > 200 for i in last_10_demands):
+                    period_tuning = 1
+                    if model_assignment == 'sommelier':
+                        period_tuning = 2
+                elif i >= 60 and i <= 100:
+                    period_tuning = solve_interval / 2
                 # TODO: Tune how frequently the ILP is run by tuning 'period_tuning'
                 #       The bigger it is, the less frequently the ILP is invoked
                 #       Also, what are its implications on allocation window sizes and
