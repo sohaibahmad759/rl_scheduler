@@ -471,7 +471,7 @@ class Ilp(SchedulingAlgorithm):
                 # self.log.error('No solution')
                 # TODO: perhaps we should use cached solution in this case
                 #       what if cached solution is also empty?
-                if (self.beta > 1):
+                if (self.beta > 1.5):
                     decrement = 0.5
                 else:
                     decrement = 0.05

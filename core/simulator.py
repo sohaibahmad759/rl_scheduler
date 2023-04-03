@@ -1640,7 +1640,7 @@ class Simulator:
                       f'checked: {total_served}')
         self.log.info(f'Total predictors: {total_predictors}')
         self.log.info('------')
-        self.log.info('')
+        # self.log.info('')
         # time.sleep(1)
 
 

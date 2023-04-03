@@ -6,10 +6,10 @@
     "static_allocation": "algorithms/proteus_starting_solutions/starting_solution.txt",
     "job_scheduling": "canary_routing",
     "batching": "aimd",
-    "beta": 1.0,
+    "beta": 1.05,
     "fixed_seed": true,
     "seed": 10,
     "solve_interval": 10,
-    "short_run": true,
+    "short_run": false,
     "log_to_file": true
 }

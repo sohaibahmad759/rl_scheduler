@@ -7,14 +7,16 @@ import matplotlib.pyplot as plt
 
 # trace = 'normal-high_load'
 # trace = 'zipf_exponential'
-trace = 'zipf_gamma'
+# trace = 'zipf_gamma'
+# trace = 'zipf_uniform'
+trace = 'zipf_uniform_random'
 # trace = 'equal_exponential'
 # trace = 'equal_gamma'
 
 path = '../logs/throughput/selected_asplos'
 
 logfile_list = [
-                f'{path}/{trace}/infaas_accuracy_300ms.csv',
+                # f'{path}/{trace}/infaas_accuracy_300ms.csv',
                 # f'{path}/{trace}/infaas_accuracy_300ms_interval2.csv',
                 # f'{path}/{trace}/infaas_accuracy_300ms_interval10.csv',
                 # f'{path}/{trace}/infaas_accuracy_300ms_normalhighload.csv',
@@ -36,6 +38,9 @@ logfile_list = [
                 # f'{path}/{trace}/proteus_300ms_beta1.15.csv',
                 # f'{path}/{trace}/proteus_300ms_beta1.1.csv',
                 # f'{path}/{trace}/proteus_aimd_300ms.csv',
+                f'{path}/{trace}/proteus_aimd_lateallowed_300ms.csv',
+                # f'{path}/{trace}/proteus_nexus_300ms.csv',
+                f'{path}/{trace}/proteus_nexus_lateallowed_300ms.csv',
                 # f'{path}/{trace}/proteus_300ms_beta1.4.csv',
                 # f'{path}/{trace}/proteus_300ms_proportional.csv',
                 # f'{path}/{trace}/proteus_300ms_beta1.4_proportional.csv',
@@ -75,7 +80,7 @@ markers = ['+', 'o', 'v', '^', '*', 's', 'x']
 # algorithms = ['Clipper++ (High Throughput)', 'Clipper++ (High Accuracy)',
 #             'INFaaS-Instance', 'INFaaS-Accuracy', 'AccScale']
 algorithms = [
-              'INFaaS-Accuracy',
+            #   'INFaaS-Accuracy',
             #   'INFaaS-Accuracy Interval 2',
             #   'INFaaS-Accuracy Interval 10',
             #   'INFaaS-Accuracy NormalHighLoad',
@@ -97,6 +102,9 @@ algorithms = [
             #   'Proteus (Beta 1.15)',
             #   'Proteus (Beta 1.1)',
             #   'Proteus AIMD',
+              'Proteus AIMD LateAllowed',
+            #   'Proteus Nexus',
+              'Proteus Nexus LateAllowed',
             #   'Proteus (Beta 1.4)',
             #   'Proteus Proportional',
             #   'Proteus Proportional (Beta 1.4)',
