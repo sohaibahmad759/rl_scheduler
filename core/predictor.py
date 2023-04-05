@@ -273,7 +273,7 @@ class Predictor:
                 self.process_batch(clock, self.aimd_batch_size)
             return
         elif self.task_assignment == TaskAssignment.CANARY and self.batching_algo == 'nexus':
-            self.pop_while_first_expires(clock)
+            # self.pop_while_first_expires(clock)
             if len(self.request_queue) >= self.max_batch_size:
                 self.process_batch(clock, self.max_batch_size)
             return
@@ -350,7 +350,7 @@ class Predictor:
         if self.busy:
             raise PredictorException('process_batch called when predictor is busy')
         
-        if 'ilp' not in self.simulator.model_assignment:
+        if 'ilp' not in self.simulator.model_assignment or 'accscale' not in self.simulator.batching_algo:
             self.drop_expired_requests(clock)
         
         self.simulator.batch_size_counters[batch_size] += 1
@@ -420,6 +420,7 @@ class Predictor:
                         pass
                         # self.simulator.bump_failed_request_stats(request)
                         # continue
+                    # Since Nexus performed early-drop, no need to drop here
                     elif self.batching_algo == 'nexus':
                         pass
                         # self.simulator.bump_failed_request_stats(request)
@@ -509,7 +510,7 @@ class Predictor:
                     return
             elif self.batching_algo == 'nexus':
                 self.batch_expiring_set = False
-                self.pop_while_first_expires(clock)
+                # self.pop_while_first_expires(clock)
                 if len(self.request_queue) >= self.max_batch_size:
                     self.process_batch(clock, self.max_batch_size)
                 elif len(self.request_queue) > 0 and len(self.request_queue) < self.max_batch_size:

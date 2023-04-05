@@ -395,7 +395,7 @@ def main(args):
                 last_10_demands.append(demand_sum)
                 if len(last_10_demands) > 10:
                     last_10_demands.pop(0)
-                if 'bursty' in trace_path and any(i > 200 for i in last_10_demands):
+                if 'zipf_exponential_bursty' in trace_path and any(i > 200 for i in last_10_demands):
                     period_tuning = 1
                     if model_assignment == 'sommelier':
                         period_tuning = 2

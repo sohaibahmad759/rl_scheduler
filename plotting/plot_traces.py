@@ -7,7 +7,8 @@ import matplotlib.pyplot as plt
 END_TIME = 1441
 END_TIME = 300
 
-path = ('../../datasets/infaas/asplos/zipf_exponential/trace_files/')
+# path = ('../../datasets/infaas/asplos/zipf_exponential/trace_files/')
+path = ('../traces/twitter/asplos/zipf_flat_bursty/300/')
 
 
 logfile_list = glob.glob(os.path.join(path, '*.txt'))

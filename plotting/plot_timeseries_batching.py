@@ -6,9 +6,10 @@ import matplotlib.pyplot as plt
 
 
 # trace = 'normal-high_load'
-trace = 'zipf_exponential'
+# trace = 'zipf_exponential'
 # trace = 'zipf_gamma'
 # trace = 'zipf_uniform'
+trace = 'zipf_flat_bursty'
 # trace = 'zipf_flat_uniform'
 # trace = 'zipf_uniform_random'
 # trace = 'equal_exponential'
@@ -38,10 +39,12 @@ logfile_list = [
                 f'{path}/{trace}/proteus_300ms.csv',
                 # f'{path}/{trace}/proteus_300ms_beta1.15.csv',
                 # f'{path}/{trace}/proteus_300ms_beta1.1.csv',
-                f'{path}/{trace}/proteus_aimd_300ms.csv',
+                # f'{path}/{trace}/proteus_aimd_300ms.csv',
                 f'{path}/{trace}/proteus_aimd_lateallowed_300ms.csv',
-                f'{path}/{trace}/proteus_nexus_300ms.csv',
+                # f'{path}/{trace}/proteus_aimd_latedropped_300ms.csv',
+                # f'{path}/{trace}/proteus_nexus_300ms.csv',
                 f'{path}/{trace}/proteus_nexus_lateallowed_300ms.csv',
+                # f'{path}/{trace}/proteus_nexus_latedropped_300ms.csv',
                 # f'{path}/{trace}/proteus_300ms_beta1.4.csv',
                 # f'{path}/{trace}/proteus_300ms_proportional.csv',
                 # f'{path}/{trace}/proteus_300ms_beta1.4_proportional.csv',
@@ -81,7 +84,7 @@ markers = ['+', 'o', 'v', '^', '*', 's', 'x']
 # algorithms = ['Clipper++ (High Throughput)', 'Clipper++ (High Accuracy)',
 #             'INFaaS-Instance', 'INFaaS-Accuracy', 'AccScale']
 algorithms = [
-            #   'INFaaS-Accuracy',
+              # 'INFaaS-Accuracy',
             #   'INFaaS-Accuracy Interval 2',
             #   'INFaaS-Accuracy Interval 10',
             #   'INFaaS-Accuracy NormalHighLoad',
@@ -104,11 +107,12 @@ algorithms = [
             #   'Proteus (Beta 1.1)',
             #   'Proteus AIMD',
               'Proteus w/ AIMD Batching',
-              'Proteus w/ AIMD Batching LateAllowed',
+              # 'Proteus w/ AIMD Batching LateAllowed',
               # 'Proteus w/ AIMD Batching LateDropped',
             #   'Proteus Nexus',
               'Proteus w/ Nexus Batching',
-              'Proteus w/ Nexus Batching LateAllowed',
+              # 'Proteus w/ Nexus Batching LateAllowed',
+              # 'Proteus w/ Nexus Batching LateDropped',
             #   'Proteus (Beta 1.4)',
             #   'Proteus Proportional',
             #   'Proteus Proportional (Beta 1.4)',
