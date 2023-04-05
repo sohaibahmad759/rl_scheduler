@@ -155,7 +155,7 @@ def main(args):
     file_log_level = logging.INFO if 'log_to_file' in config and config['log_to_file'] is True else logging.WARN
 
     trace_path = config['trace_path']
-    rtypes = len(glob.glob(trace_path + '.txt'))
+    rtypes = len(glob.glob(os.path.join(trace_path, '*.txt')))
     fixed_seed = int(config['seed']) if 'seed' in config else 0
     alpha = float(config['alpha']) if 'alpha' in config else -1
     beta = float(config['beta']) if 'beta' in config else -1
