@@ -1,4 +1,5 @@
 import os
+import glob
 import json
 import time
 import sys
@@ -154,6 +155,7 @@ def main(args):
     file_log_level = logging.INFO if 'log_to_file' in config and config['log_to_file'] is True else logging.WARN
 
     trace_path = config['trace_path']
+    rtypes = len(glob.glob(trace_path + '.txt'))
     fixed_seed = int(config['seed']) if 'seed' in config else 0
     alpha = float(config['alpha']) if 'alpha' in config else -1
     beta = float(config['beta']) if 'beta' in config else -1
@@ -238,7 +240,8 @@ def main(args):
     rate_logger.addHandler(logging.FileHandler(rate_loggerfile, mode='w'))
     rate_logger.setLevel(file_log_level)
     rate_logger.info('wallclock_time,simulation_time,demand,throughput,capacity,effective_accuracy,' +
-                     'total_accuracy,successful,dropped,late,estimated_throughput,estimated_effective_accuracy')
+                     'total_accuracy,successful,dropped,late,estimated_throughput,estimated_effective_accuracy,' +
+                     'ilp_utilization,proportional_lb,ilp_demand,demand_ewma')
 
     rate_logger_per_model = logging.getLogger('Rate logger per model')
     rate_logger_per_model_file = os.path.join('logs', 'throughput_per_model', str(time.time()) + '_' + model_assignment + '.csv')
@@ -384,21 +387,25 @@ def main(args):
 
             if ilp_applied == True:
                 period_tuning = solve_interval
-                demand = np.sum(observation[:, -2])
-                last_10_demands.append(demand)
+                demand_sum = np.sum(observation[:, -2])
+                demand = np.array(observation[:rtypes, -2])
+                # Convert horizontal array to vertical
+                demand = demand[:, None]
+                env.simulator.add_moving_demand(demand)
+                last_10_demands.append(demand_sum)
                 if len(last_10_demands) > 10:
                     last_10_demands.pop(0)
                 if 'bursty' in trace_path and any(i > 200 for i in last_10_demands):
                     period_tuning = 1
                     if model_assignment == 'sommelier':
                         period_tuning = 2
-                elif i >= 60 and i <= 100:
+                elif 'flat' not in trace_path and i >= 60 and i <= 100:
                     period_tuning = solve_interval / 2
                 # TODO: Tune how frequently the ILP is run by tuning 'period_tuning'
                 #       The bigger it is, the less frequently the ILP is invoked
                 #       Also, what are its implications on allocation window sizes and
                 #       action group sizes?
-                if i % period_tuning == 0 or i == 5:
+                if i % period_tuning == 0 or i == 5 or i == 20:
                     actions = ilp.run(observation, env.n_accelerators, env.max_no_of_accelerators)
                     ilp_rounds += 1
                 else:
@@ -505,15 +512,23 @@ def main(args):
         new_total_successful = env.simulator.total_successful
         new_dropped = env.simulator.slo_timeouts['timeouts']
         new_late = env.simulator.slo_timeouts['late']
-        estimated_throughput = env.simulator.estimated_throughput
-        estimated_effective_accuracy = env.simulator.estimated_effective_accuracy
+        estimated_throughput = env.simulator.ilp_stats['estimated_throughput']
+        estimated_effective_accuracy = env.simulator.ilp_stats['estimated_effective_accuracy']
+        ilp_utilization = env.simulator.ilp_stats['ilp_utilization']
+        ilp_demand = env.simulator.ilp_stats['demand']
+        proportional_lb = env.simulator.use_proportional
+        demand_ewma = sum(env.simulator.ewma_demand.ravel())
         utils.log_throughput(rate_logger, observation, i, allocation_window,
                              new_total_accuracy-total_accuracy,
                              new_total_successful-total_successful,
                              new_dropped-total_dropped,
                              new_late-total_late,
                              estimated_throughput,
-                             estimated_effective_accuracy)
+                             estimated_effective_accuracy,
+                             ilp_utilization,
+                             proportional_lb,
+                             ilp_demand,
+                             demand_ewma)
         total_accuracy = new_total_accuracy
         total_successful = new_total_successful
         total_dropped = new_dropped

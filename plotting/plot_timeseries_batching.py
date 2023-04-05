@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 trace = 'zipf_exponential'
 # trace = 'zipf_gamma'
 # trace = 'zipf_uniform'
+# trace = 'zipf_flat_uniform'
 # trace = 'zipf_uniform_random'
 # trace = 'equal_exponential'
 # trace = 'equal_gamma'
@@ -37,9 +38,9 @@ logfile_list = [
                 f'{path}/{trace}/proteus_300ms.csv',
                 # f'{path}/{trace}/proteus_300ms_beta1.15.csv',
                 # f'{path}/{trace}/proteus_300ms_beta1.1.csv',
-                # f'{path}/{trace}/proteus_aimd_300ms.csv',
+                f'{path}/{trace}/proteus_aimd_300ms.csv',
                 f'{path}/{trace}/proteus_aimd_lateallowed_300ms.csv',
-                # f'{path}/{trace}/proteus_nexus_300ms.csv',
+                f'{path}/{trace}/proteus_nexus_300ms.csv',
                 f'{path}/{trace}/proteus_nexus_lateallowed_300ms.csv',
                 # f'{path}/{trace}/proteus_300ms_beta1.4.csv',
                 # f'{path}/{trace}/proteus_300ms_proportional.csv',
@@ -103,8 +104,11 @@ algorithms = [
             #   'Proteus (Beta 1.1)',
             #   'Proteus AIMD',
               'Proteus w/ AIMD Batching',
+              'Proteus w/ AIMD Batching LateAllowed',
+              # 'Proteus w/ AIMD Batching LateDropped',
             #   'Proteus Nexus',
               'Proteus w/ Nexus Batching',
+              'Proteus w/ Nexus Batching LateAllowed',
             #   'Proteus (Beta 1.4)',
             #   'Proteus Proportional',
             #   'Proteus Proportional (Beta 1.4)',
@@ -145,13 +149,18 @@ for idx in range(len(logfile_list)):
 
     df = pd.read_csv(logfile)
 
+    start_cutoff = 0
+
     aggregated = df.groupby(df.index // 10).sum()
     aggregated = df.groupby(df.index // 5).mean()
     df = aggregated
     # print(f'df: {df}')
     # print(f'aggregated: {aggregated}')
 
-    start_cutoff = 0
+    if 'demand_ewma' in df:
+        demand_ewma = df['demand_ewma'].values[start_cutoff:]
+    else:
+        demand_ewma = None
 
     # time = df['wallclock_time'].values[start_cutoff:]
     time = df['simulation_time'].values[start_cutoff:]
@@ -168,7 +177,7 @@ for idx in range(len(logfile_list)):
 
     successful = df['successful'].values[start_cutoff:]
 
-    total_slo_violations = total_slo_violations / demand
+    # total_slo_violations = total_slo_violations / demand
 
     effective_accuracy = df['effective_accuracy'].values[start_cutoff:]
     total_accuracy = df['total_accuracy'].values[start_cutoff:]
@@ -201,6 +210,10 @@ for idx in range(len(logfile_list)):
         color_idx += 1
     # plt.plot(time, throughput, label=algorithm, marker=markers[idx])
     # plt.plot(time, throughput, label=algorithm)
+
+    # if demand_ewma is not None:
+    #     ax1.plot(time, demand_ewma, label='Demand EWMA')
+
     if MARKERS_ON == True:
         ax1.plot(time, successful, label=algorithms[idx], color=colors[color_idx],
                 marker=markers[color_idx])
@@ -248,8 +261,10 @@ ax2.set_yticks(np.arange(80, 104, 5), fontsize=12)
 ax2.set_ylabel('Effective\nAccuracy', fontsize=11)
 
 ax3.set_xticks(np.arange(0, 25, 4), fontsize=15)
-ax3.set_yticks(np.arange(0, 0.6, 0.1), fontsize=12)
-ax3.set_ylabel('SLO Violation\nRatio', fontsize=11)
+# ax3.set_yticks(np.arange(0, 0.6, 0.1), fontsize=12)
+# ax3.set_ylabel('SLO Violation\nRatio', fontsize=11)
+ax3.set_yticks(np.arange(0, 560, 100), fontsize=12)
+ax3.set_ylabel('SLO Violations', fontsize=11)
 
 ax3.set_xlabel('Time (min)', fontsize=12)
 

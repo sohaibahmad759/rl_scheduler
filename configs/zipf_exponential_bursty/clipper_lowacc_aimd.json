@@ -8,6 +8,6 @@
     "batching": "aimd",
     "fixed_seed": true,
     "seed": 10,
-    "short_run": true,
+    "short_run": false,
     "log_to_file": true
 }

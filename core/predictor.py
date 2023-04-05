@@ -273,6 +273,7 @@ class Predictor:
                 self.process_batch(clock, self.aimd_batch_size)
             return
         elif self.task_assignment == TaskAssignment.CANARY and self.batching_algo == 'nexus':
+            self.pop_while_first_expires(clock)
             if len(self.request_queue) >= self.max_batch_size:
                 self.process_batch(clock, self.max_batch_size)
             return
@@ -349,7 +350,8 @@ class Predictor:
         if self.busy:
             raise PredictorException('process_batch called when predictor is busy')
         
-        self.drop_expired_requests(clock)
+        if 'ilp' not in self.simulator.model_assignment:
+            self.drop_expired_requests(clock)
         
         self.simulator.batch_size_counters[batch_size] += 1
 
@@ -419,9 +421,9 @@ class Predictor:
                         # self.simulator.bump_failed_request_stats(request)
                         # continue
                     elif self.batching_algo == 'nexus':
-                        # pass
-                        self.simulator.bump_failed_request_stats(request)
-                        continue
+                        pass
+                        # self.simulator.bump_failed_request_stats(request)
+                        # continue
                     else:
                         raise PredictorException(f'unexpected batching algorithm: {self.batching_algo}')
                 elif self.task_assignment == TaskAssignment.INFAAS:
@@ -507,6 +509,7 @@ class Predictor:
                     return
             elif self.batching_algo == 'nexus':
                 self.batch_expiring_set = False
+                self.pop_while_first_expires(clock)
                 if len(self.request_queue) >= self.max_batch_size:
                     self.process_batch(clock, self.max_batch_size)
                 elif len(self.request_queue) > 0 and len(self.request_queue) < self.max_batch_size:
@@ -746,16 +749,14 @@ class Predictor:
         drop_indices = []
         for i in range(len(self.request_queue)):
             request = self.request_queue[i]
-            if request.start_time > clock:
-                print(f'removing expired request, request start time: {request.start_time},'
-                      f'clock: {clock}')
-                time.sleep(1)
+            if clock > request.start_time + request.deadline * 2:
                 drop_indices.append(i)
 
         dropped = 0
         for i in range(len(drop_indices)):
             drop_idx = drop_indices[i]
-            self.request_queue.pop(drop_idx-dropped)
+            request = self.request_queue.pop(drop_idx-dropped)
+            self.simulator.bump_failed_request_stats(request)
             dropped += 1
         return
 

@@ -21,7 +21,11 @@ MAX_CLOCK_VALUE = 0
 # the last request in queue for a given executor, it will refill the event
 # queue
 QUEUE_REFILL_THRESHOLD = 2000
-CHANGE_PROPORTION_THRESHOLD = 0.35
+# UTILIZATION_THRESHOLD = 0.5
+UTILIZATION_THRESHOLD = 0.65
+CHANGE_PROPORTION_THRESHOLD = 1 - UTILIZATION_THRESHOLD
+EWMA_WINDOW = 20
+EWMA_DECAY = 2.1
 
 
 class Simulator:
@@ -88,12 +92,6 @@ class Simulator:
         self.requests_per_model = {}
         self.failed_per_model = {}
         self.successful_per_model = {}
-
-        self.slo_timeouts = {'total': 0, 'succeeded': 0, 'timeouts': 0, 'late': 0}
-        self.aimd_stats = {'increased': 0, 'decreased': 0}
-        self.batch_size_counters = {1: 0, 2: 0, 4: 0, 8: 0, 16: 0}
-        self.estimated_throughput = 0
-        self.estimated_effective_accuracy = 0
 
         self.accuracy_per_model = {}
 
@@ -195,6 +193,13 @@ class Simulator:
         self.set_largest_batch_sizes()
 
         self.qos_stats = np.zeros((len(self.executors), n_qos_levels * 2))
+        self.slo_timeouts = {'total': 0, 'succeeded': 0, 'timeouts': 0, 'late': 0}
+        self.aimd_stats = {'increased': 0, 'decreased': 0}
+        self.batch_size_counters = {1: 0, 2: 0, 4: 0, 8: 0, 16: 0}
+        self.ilp_stats = {'estimated_throughput': 0, 'estimated_effective_accuracy': 0,
+                          'demand': 0, 'ilp_utilization': 0}
+        self.demand_moving_window = np.zeros((len(self.executors), 1))
+        self.ewma_demand = np.zeros((len(self.executors), 1))
 
         if not (mode == 'training' or mode == 'debugging'):
             # if the RL agent is being trained, we don't need to invoke scheduling microservice
@@ -262,6 +267,23 @@ class Simulator:
 
     def reset(self):
         print('Resetting simulator')
+        return
+    
+
+    def add_moving_demand(self, demand):
+        ''' Adds latest demand to moving window and updates EWMA demand
+        '''
+        self.demand_moving_window = np.hstack((self.demand_moving_window, demand))
+
+        while self.demand_moving_window.shape[1] > EWMA_WINDOW:
+            self.demand_moving_window = self.demand_moving_window[:, 1:]
+        
+        self.log.debug(f'demand_moving_window: {self.demand_moving_window}')
+        for i in range(len(self.executors)):
+            df = pd.DataFrame({'demand': self.demand_moving_window[i, :]})
+            ewma = df.ewm(com=EWMA_DECAY).mean()
+            ewma_value = ewma['demand'].to_list()[-1]
+            self.ewma_demand[i] = ewma_value
         return
 
 
@@ -825,13 +847,18 @@ class Simulator:
             changed += 1
 
         new_required_predictors = self.get_required_predictors_from_ilpx(new_ilp_x)
+        ilp_utilization = 1 - changed / total
 
-        if changed / total >= CHANGE_PROPORTION_THRESHOLD:
-            self.use_proportional = True
-        else:
-            self.use_proportional = False
+        # if ilp_utilization >= UTILIZATION_THRESHOLD:
+        #     self.use_proportional = False
+        # else:
+        #     self.use_proportional = True
+        self.use_proportional = True
+        # if self.batching_algo == 'nexus':
+        #     self.use_proportional = False
         self.log.info(f'Use proportional: {self.use_proportional}, changed '
-                      f'proportion: {changed/total}')
+                      f'proportion: {changed/total}, ilp utilization: {ilp_utilization}')
+        self.ilp_stats['ilp_utilization'] = ilp_utilization
 
         return new_required_predictors, new_ilp_x
     

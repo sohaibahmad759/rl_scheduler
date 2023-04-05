@@ -4,7 +4,9 @@ import numpy as np
 
 def log_throughput(logger, observation, simulation_time, allocation_window,
                    total_accuracy, total_successful, dropped, late,
-                   estimated_throughput, estimated_effective_accuracy):
+                   estimated_throughput, estimated_effective_accuracy,
+                   ilp_utilization, proportional_lb, ilp_demand,
+                   demand_ewma):
     ''' Writes aggregate throughput and accuracy logs in the following CSV format:
     wallclock_time,simulation_time,demand,throughput,capacity
     '''
@@ -31,7 +33,8 @@ def log_throughput(logger, observation, simulation_time, allocation_window,
     logger.info(f'{time.time()},{simulation_time},{demand},{throughput},{capacity},'
                 f'{effective_accuracy:.2f},{total_accuracy:.2f},{total_successful},'
                 f'{dropped},{late},{estimated_throughput:.1f},'
-                f'{estimated_effective_accuracy:.2f}')
+                f'{estimated_effective_accuracy:.2f},{ilp_utilization:.2f},'
+                f'{proportional_lb},{ilp_demand:.2f},{demand_ewma:.2f}')
 
 def log_thput_accuracy_per_model(logger, simulation_time, requests, failed, accuracy):
     ''' Writes throughput and accuracy logs per model in the following CSV format:

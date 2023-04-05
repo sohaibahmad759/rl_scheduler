@@ -11,7 +11,7 @@ from core.exceptions import IlpException
 
 MINIMUM_BETA = 0.2
 MINIMUM_ACCURACY = 0.0
-LATENCY_GAP_FACTOR = 1.1
+LATENCY_GAP_FACTOR = 1.0
 
 
 class Ilp(SchedulingAlgorithm):
@@ -175,7 +175,10 @@ class Ilp(SchedulingAlgorithm):
         
         current_alloc = observation[0:num_isi, 0:num_acc_types]
 
-        demand_since_last = observation[0:num_isi, -2]
+        # Old way to get demand
+        # demand_since_last = observation[0:num_isi, -2]
+        # New way to get demand (EWMA over sliding window)
+        demand_since_last = self.simulator.ewma_demand.ravel()
         # divide demand by time elapsed since last measurement to get demand in units of requests per second
         demand = demand_since_last / (self.allocation_window / 1000)
         self.log.info(f'demand: {sum(demand)}')
@@ -454,8 +457,9 @@ class Ilp(SchedulingAlgorithm):
 
                 effective_accuracy = gp.quicksum(w).getValue()/sum(s.values())
                 self.log.warn(f'w (effective accuracy): {effective_accuracy}')
-                self.simulator.estimated_effective_accuracy = effective_accuracy
-                self.simulator.estimated_throughput = throughput
+                self.simulator.ilp_stats['estimated_effective_accuracy'] = effective_accuracy
+                self.simulator.ilp_stats['estimated_throughput'] = throughput
+                self.simulator.ilp_stats['demand'] = sum(s.values())
                 # self.log.error(f'waiting 5 seconds before moving on..')
                 # time.sleep(5)
                 # self.log.error(f'now moving on..')

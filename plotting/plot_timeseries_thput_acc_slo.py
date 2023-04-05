@@ -26,12 +26,12 @@ logfile_list = [
                 # f'{path}/{trace}/infaas_accuracy_300ms_slack1.csv',
                 # f'{path}/{trace}/infaas_accuracy_300ms_slack1.5.csv',
                 # f'{path}/{trace}/infaas_accuracy_300ms_slack0.15.csv',
-                # f'{path}/{trace}/clipper_ht_aimd_300ms.csv', # this
+                f'{path}/{trace}/clipper_ht_aimd_300ms.csv', # this
                 # f'{path}/{trace}/clipper_ht_aimd_lateallowed_300ms.csv',
                 # f'{path}/{trace}/clipper_ht_nexus_300ms.csv',
-                # f'{path}/{trace}/clipper_ht_asb_300ms.csv', # this
+                f'{path}/{trace}/clipper_ht_asb_300ms.csv', # this
                 # '../logs/throughput/selected_asplos/clipper_optstart_300ms.csv',
-                # f'{path}/{trace}/sommelier_aimd_300ms.csv',
+                f'{path}/{trace}/sommelier_aimd_300ms.csv',
                 f'{path}/{trace}/sommelier_asb_300ms.csv', # this
                 # f'{path}/{trace}/sommelier_asb_300ms_intervaladaptive2.csv',
                 # f'{path}/{trace}/sommelier_nexus_300ms.csv',
@@ -92,12 +92,12 @@ algorithms = [
             #   'INFaaS-Accuracy (Slack 1)',
             #   'INFaaS-Accuracy (Slack 1.5)',
             #   'INFaaS-Accuracy (Slack 0.15)',
-            #   'Clipper-HT-AIMD',
+              'Clipper-HT-AIMD',
             #   'Clipper-HT-AIMD LateAllowed',
             #   'Clipper-HT-Nexus',
-            #   'Clipper-HT-ASB',
+              'Clipper-HT-ASB',
             #   'Clipper-HT Optimized Start',
-            #   'Sommelier-AIMD',
+              'Sommelier-AIMD',
               'Sommelier-ASB',
             #   'Sommelier-ASB Interval2',
             #   'Sommelier-Nexus'
@@ -173,7 +173,7 @@ for idx in range(len(logfile_list)):
 
     successful = df['successful'].values[start_cutoff:]
 
-    total_slo_violations = total_slo_violations / demand
+    # total_slo_violations = total_slo_violations / demand
 
     effective_accuracy = df['effective_accuracy'].values[start_cutoff:]
     total_accuracy = df['total_accuracy'].values[start_cutoff:]
@@ -257,8 +257,10 @@ ax2.set_yticks(np.arange(80, 104, 5), fontsize=12)
 ax2.set_ylabel('Effective\nAccuracy', fontsize=11)
 
 ax3.set_xticks(np.arange(0, 25, 4), fontsize=15)
-ax3.set_yticks(np.arange(0, 0.6, 0.1), fontsize=12)
-ax3.set_ylabel('SLO Violation\nRatio', fontsize=11)
+# ax3.set_yticks(np.arange(0, 0.6, 0.1), fontsize=12)
+# ax3.set_ylabel('SLO Violation\nRatio', fontsize=11)
+ax3.set_yticks(np.arange(0, 410, 100), fontsize=12)
+ax3.set_ylabel('SLO Violations', fontsize=11)
 
 ax3.set_xlabel('Time (min)', fontsize=12)
 
