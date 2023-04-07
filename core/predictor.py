@@ -27,7 +27,7 @@ class AccType(Enum):
 class Predictor:
     def __init__(self, logging_level, acc_type=AccType.CPU, qos_level=0,
                  profiled_accuracy=100.0, profiled_latencies={}, variant_name=None,
-                 executor=None, simulator=None):
+                 executor=None, simulator=None, configured_max_batch_size=None):
         # attributes related to predictor hardware
         self.log = logging.getLogger(__name__)
         self.log.setLevel(logging_level)
@@ -56,11 +56,8 @@ class Predictor:
         self.executor = executor
         self.simulator = simulator
 
-        # self.batch_sizes_allowed = [1]
-        # self.batch_sizes_allowed = [1, 2, 4, 8]
-        # self.batch_sizes_allowed = [1, 2, 4, 8, 16]
-        # self.batch_sizes_allowed = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
         self.batch_sizes_allowed = self.simulator.allowed_batch_sizes
+        self.configured_max_batch_size = configured_max_batch_size
         self.max_batch_size = self.get_largest_batch_size()
 
         self.served_requests_per_step = 0
@@ -177,6 +174,13 @@ class Predictor:
             acc_type = 'GPU_PASCAL'
         
         largest_batch_size = largest_batch_sizes[(acc_type, self.variant_name)]
+        
+        # If self.configured_max_batch_size is None, there is no maximum batch size
+        # specified, so we can use the largest batch size for the given accelerator
+        # Otherwise, we need to cap it by self.configured_max_batch_size which is a
+        # configuration parameter
+        if self.configured_max_batch_size is not None:
+            largest_batch_size = min(largest_batch_size, self.configured_max_batch_size)
         return largest_batch_size
     
 

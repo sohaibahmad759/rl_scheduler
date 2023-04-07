@@ -8,7 +8,8 @@ END_TIME = 1441
 END_TIME = 300
 
 # path = ('../../datasets/infaas/asplos/zipf_exponential/trace_files/')
-path = ('../traces/twitter/asplos/zipf_flat_bursty/300/')
+# path = ('../traces/twitter/asplos/zipf_flat_bursty/300/')
+path = ('../traces/twitter/asplos/low_load/300/')
 
 
 logfile_list = glob.glob(os.path.join(path, '*.txt'))

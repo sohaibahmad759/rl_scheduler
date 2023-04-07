@@ -25,7 +25,9 @@ QUEUE_REFILL_THRESHOLD = 2000
 UTILIZATION_THRESHOLD = 0.65
 CHANGE_PROPORTION_THRESHOLD = 1 - UTILIZATION_THRESHOLD
 EWMA_WINDOW = 20
-EWMA_DECAY = 2.1
+DEFAULT_EWMA_DECAY = 2.1
+EWMA_DECAY = 1.1
+INFAAS_SLACK = 0.95
 
 
 class Simulator:
@@ -33,7 +35,8 @@ class Simulator:
                  mode='training', max_acc_per_type=0, predictors_max=[10, 10, 10, 10],
                  n_qos_levels=1, random_runtimes=False, fixed_seed=0, batching=False,
                  model_assignment=None, batching_algo=None, profiling_data=None,
-                 allowed_variants_path=None):
+                 allowed_variants_path=None, max_batch_size=None,
+                 ewma_decay=None):
         self.log = logging.getLogger(__name__)
         self.log.setLevel(logging_level)
         self.logging_level=logging_level
@@ -113,16 +116,21 @@ class Simulator:
         self.batching_enabled = batching
         self.batching_algo = batching_algo
         self.largest_batch_sizes = {}
+        self.max_batch_size = max_batch_size
         self.slo_dict = {}
         self.allowed_batch_sizes = [1, 2, 4, 8]
         self.profiled_filename = profiling_data
 
         self.model_assignment = model_assignment
+        self.use_proportional = None
 
-        # self.infaas_slack = 0.75 * 0.5
-        # self.infaas_downscale_slack = 0.75 * 0.5
-        self.infaas_slack = 0.05
-        self.infaas_downscale_slack = 0.05
+        if ewma_decay is None:
+            self.ewma_decay = DEFAULT_EWMA_DECAY
+        else:
+            self.ewma_decay = ewma_decay
+
+        self.infaas_slack = 1 - INFAAS_SLACK
+        self.infaas_downscale_slack = 1 - INFAAS_SLACK
 
         idx = 0
 
@@ -281,7 +289,7 @@ class Simulator:
         self.log.debug(f'demand_moving_window: {self.demand_moving_window}')
         for i in range(len(self.executors)):
             df = pd.DataFrame({'demand': self.demand_moving_window[i, :]})
-            ewma = df.ewm(com=EWMA_DECAY).mean()
+            ewma = df.ewm(com=self.ewma_decay).mean()
             ewma_value = ewma['demand'].to_list()[-1]
             self.ewma_demand[i] = ewma_value
         return
@@ -537,23 +545,15 @@ class Simulator:
                             acc_latencies[(isi_name, model_variant, batch_size)] = np.inf
                         latency = acc_latencies[(isi_name, model_variant, batch_size)]
 
-                        # self.log.error(f'slo_dict: {self.slo_dict}')
-                        # if 'gpt' in model_variant:
-                        #     self.log.error(f'variant: {model_variant}, batch_size: {batch_size}, '
-                        #                    f'latency: {latency}, slo/2: {(self.slo_dict[isi_name]/2)}, '
-                        #                    f'latency < slo/2: {latency < self.slo_dict[isi_name]/2}, '
-                        #                    f'acc_type: {acc_type}')
-                        #     time.sleep(1)
                         if batch_size > max_batch_size and latency < self.slo_dict[isi_name] / 2:
                             max_batch_size = batch_size
 
                     max_batch_size_dict[(acc_type, model_variant)] = max_batch_size
                     self.log.debug(f'({acc_type}, {model_variant}): {max_batch_size}')
+
         self.log.debug(f'len(largest_batch_sizes): {len(max_batch_size_dict)}')
         self.log.info(f'largest_batch_sizes:')
         pprint.pprint(max_batch_size_dict)
-        # raise SimulatorException(f'if latency data is not present (OOM while profiling), '
-        #                          f'it is assuming largest batch size (8) for some reason')
         self.largest_batch_sizes = max_batch_size_dict
         return
     
@@ -1033,7 +1033,7 @@ class Simulator:
                                              f'peak throughput: {x.peak_throughput}',),
                                   predictors.values()))
         self.log.debug(f'Total queued requests: {total_queued}, system serving capacity: '
-                    f'{total_capacity} reqs/sec')
+                       f'{total_capacity:.2f} reqs/sec')
         self.log.debug(f'Total predictors: {total_predictors}')
         
         return
@@ -1525,7 +1525,8 @@ class Simulator:
                         model_variant_loadtimes=None, max_acc_per_type=0, simulator=None):
         executor = Executor(isi, job_sched_algo, self.logging_level, self.n_qos_levels,
                             runtimes, model_variant_runtimes, model_variant_loadtimes,
-                            max_acc_per_type=max_acc_per_type, simulator=simulator)
+                            max_acc_per_type=max_acc_per_type, simulator=simulator,
+                            configured_max_batch_size=self.max_batch_size)
         self.executors[executor.isi] = executor
         return executor.id
 
@@ -1630,7 +1631,6 @@ class Simulator:
         total_queued = 0
         total_capacity = 0
         total_served = 0
-        self.log.info('')
         self.log.info('------')
         self.log.info('Printing simulator\'s current allocation..')
         for key in self.executors:

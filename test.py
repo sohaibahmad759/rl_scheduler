@@ -123,6 +123,17 @@ def validate_config(config: dict, filename: str):
     if batching not in batching_algorithms:
         raise ConfigException(f'invalid batching algorithm specified: {batching}. '
                               f'\nPossible choices: {batching_algorithms}')
+
+    if 'max_batch_size' in config:
+        max_batch_size = config['max_batch_size']
+        if max_batch_size <= 0 or not(isinstance(max_batch_size, int)):
+            raise ConfigException(f'unexpected max_batch_size: {max_batch_size}, '
+                                  f'positive integer expected for max_batch_size')
+        
+    if 'ewma_decay' in config:
+        if config['ewma_decay'] < 0:
+            raise ConfigException(f'unexpected ewma_decay: {config["ewma_decay"]}, '
+                                  f'non-negative float expected for ewma_decay')
     
     if 'fixed_seed' in config:
         if 'seed' not in config:
@@ -159,9 +170,11 @@ def main(args):
     fixed_seed = int(config['seed']) if 'seed' in config else 0
     alpha = float(config['alpha']) if 'alpha' in config else -1
     beta = float(config['beta']) if 'beta' in config else -1
+    ewma_decay = float(config['ewma_decay']) if 'ewma_decay' in config else None
     enable_batching = False if batching_algo == 'disabled' else True
     profiling_data = config['profiling_data']
     allowed_variants_path = config['allowed_variants']
+    max_batch_size = config['max_batch_size'] if 'max_batch_size' in config else None
 
     env = SchedulingEnv(trace_dir=trace_path, job_sched_algo=job_scheduling,
                         action_group_size=action_group_size, logging_level=logging_level,
@@ -169,7 +182,8 @@ def main(args):
                         random_runtimes=args.random_runtimes, fixed_seed=fixed_seed,
                         allocation_window=allocation_window, model_assignment=model_assignment,
                         batching=enable_batching, batching_algo=batching_algo,
-                        profiling_data=profiling_data, allowed_variants_path=allowed_variants_path)
+                        profiling_data=profiling_data, allowed_variants_path=allowed_variants_path,
+                        max_batch_size=max_batch_size, ewma_decay=ewma_decay)
 
     policy_kwargs = dict(net_arch=[128, 128, dict(pi=[128, 128, 128],
                                         vf=[128, 128, 128])])

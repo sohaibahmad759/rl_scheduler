@@ -6,10 +6,11 @@ import matplotlib.pyplot as plt
 
 
 # trace = 'normal-high_load'
-# trace = 'zipf_exponential'
+# trace = 'normal_load'
+trace = 'zipf_exponential'
 # trace = 'zipf_gamma'
 # trace = 'zipf_uniform'
-trace = 'zipf_flat_bursty'
+# trace = 'zipf_flat_bursty'
 # trace = 'zipf_flat_uniform'
 # trace = 'zipf_uniform_random'
 # trace = 'equal_exponential'
@@ -37,6 +38,7 @@ logfile_list = [
                 # '../logs/throughput/selected_asplos/proteus_aimd_300ms.csv',
                 # '../logs/throughput/selected_asplos/proteus_nexus_300ms.csv',
                 f'{path}/{trace}/proteus_300ms.csv',
+                # f'{path}/{trace}/proteus_batchsize1_300ms.csv',
                 # f'{path}/{trace}/proteus_300ms_beta1.15.csv',
                 # f'{path}/{trace}/proteus_300ms_beta1.1.csv',
                 # f'{path}/{trace}/proteus_aimd_300ms.csv',
@@ -98,11 +100,12 @@ algorithms = [
             #   'Clipper-HT-ASB',
             #   'Clipper-HT Optimized Start',
             #   'Sommelier-AIMD',
-            #   'Sommelier-ASB',
+              # 'Sommelier-ASB',
             #   'Sommelier-Nexus'
             #   'Proteus-Clipper',
             #   'Proteus-Nexus',
               'Proteus',
+              # 'Proteus Batch Size 1',
             #   'Proteus (Beta 1.15)',
             #   'Proteus (Beta 1.1)',
             #   'Proteus AIMD',
@@ -215,8 +218,8 @@ for idx in range(len(logfile_list)):
     # plt.plot(time, throughput, label=algorithm, marker=markers[idx])
     # plt.plot(time, throughput, label=algorithm)
 
-    # if demand_ewma is not None:
-    #     ax1.plot(time, demand_ewma, label='Demand EWMA')
+    if demand_ewma is not None:
+        ax1.plot(time, demand_ewma, label='Demand EWMA', color='black')
 
     if MARKERS_ON == True:
         ax1.plot(time, successful, label=algorithms[idx], color=colors[color_idx],

@@ -18,7 +18,8 @@ ACC_CONVERSION = {'CPU': 'CPU', 'GPU_AMPERE': 'GPU', 'VPU': 'VPU', 'GPU_PASCAL':
 class Executor:
     def __init__(self, isi, task_assignment, logging_level, n_qos_levels=1,
                  behavior=Behavior.BESTEFFORT, runtimes=None, variant_runtimes=None,
-                 variant_loadtimes=None, max_acc_per_type=0, simulator=None):
+                 variant_loadtimes=None, max_acc_per_type=0, simulator=None,
+                 configured_max_batch_size=None):
         self.log = logging.getLogger(__name__)
         self.log.setLevel(logging_level)
         self.logging_level = logging_level
@@ -43,6 +44,8 @@ class Executor:
 
         self.model_variants = {}
         self.variants_for_this_executor = []
+
+        self.configured_max_batch_size = configured_max_batch_size
 
         # Mapping from model variant to percentage of requests to send to that variant
         self.canary_routing_table = {}
@@ -79,7 +82,8 @@ class Executor:
         predictor = Predictor(logging_level=self.logging_level, acc_type=acc_type.value,
                               qos_level=qos_level, profiled_accuracy=profiled_accuracy,
                               profiled_latencies=profiled_latencies, variant_name=variant_name,
-                              executor=self, simulator=self.simulator)
+                              executor=self, simulator=self.simulator,
+                              configured_max_batch_size=self.configured_max_batch_size)
         self.predictors[predictor.id] = predictor
         self.num_predictor_types[acc_type.value-1 + qos_level*4] += 1
         self.iterator = itertools.cycle(self.predictors)
