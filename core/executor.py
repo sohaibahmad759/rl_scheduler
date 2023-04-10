@@ -1588,9 +1588,9 @@ class Executor:
         '''
         self.log.debug(f'Executor: {self.isi}, Previous routing table: {self.canary_routing_table},'
                       f' new routing table: {routing_table}')
-        if len(routing_table) == 0:
-            # this should not be happening if there are still predictors for this isi
-            raise ExecutorException(f'Empty routing table passed for isi {self.isi}')
+        # if len(routing_table) == 0:
+        #     # this should not be happening if there are still predictors for this isi
+        #     raise ExecutorException(f'Empty routing table passed for isi {self.isi}')
 
         self.canary_routing_table = routing_table
         return

@@ -101,7 +101,7 @@ class Predictor:
 
     
     def increase_aimd_batch_size(self):
-        ''' Since we only allow batch sizes of [1, 2, 4, 8], AIMD can only
+        ''' Since we only allow multiple of 4 batch sizes after 8, AIMD can only
          go one step up to the next available batch size
         '''
         self.simulator.aimd_stats['increased'] += 1
@@ -118,7 +118,7 @@ class Predictor:
 
     
     def decrease_aimd_batch_size(self):
-        ''' Since we only allow batch sizes of [1, 2, 4, 8], AIMD can only
+        ''' Since we only allow multiple of 4 batch sizes after 8, AIMD can only
          go one step down to the previous available batch size
         '''
         self.simulator.aimd_stats['decreased'] += 1

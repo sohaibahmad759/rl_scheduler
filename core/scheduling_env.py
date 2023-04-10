@@ -16,7 +16,8 @@ class SchedulingEnv(gym.Env):
                  logging_level, reward_window_length=10, random_runtimes=False,
                  fixed_seed=0, allocation_window=1000, model_assignment='',
                  batching=False, batching_algo=None, profiling_data=None,
-                 allowed_variants_path=None, max_batch_size=None, ewma_decay=None):
+                 allowed_variants_path=None, max_batch_size=None, ewma_decay=None,
+                 infaas_slack=None, infaas_downscale_slack=None):
         super(SchedulingEnv, self).__init__()
 
         logging.basicConfig(level=logging.INFO)
@@ -58,7 +59,9 @@ class SchedulingEnv(gym.Env):
                                    profiling_data=profiling_data,
                                    allowed_variants_path=allowed_variants_path,
                                    max_batch_size=max_batch_size,
-                                   ewma_decay=ewma_decay)
+                                   ewma_decay=ewma_decay,
+                                   infaas_slack=infaas_slack,
+                                   infaas_downscale_slack=infaas_downscale_slack)
 
         # number of steps that we play into the future to get reward
         # Note: this is a tunable parameter

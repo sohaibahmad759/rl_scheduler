@@ -1,13 +1,12 @@
 import os
-import glob
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
 
 # trace = 'normal-high_load'
-# trace = 'normal_load'
-trace = 'zipf_exponential'
+trace = 'normal_load'
+# trace = 'zipf_exponential'
 # trace = 'zipf_gamma'
 # trace = 'zipf_uniform'
 # trace = 'zipf_flat_bursty'
@@ -37,15 +36,23 @@ logfile_list = [
                 # f'{path}/{trace}/sommelier_nexus_300ms.csv',
                 # '../logs/throughput/selected_asplos/proteus_aimd_300ms.csv',
                 # '../logs/throughput/selected_asplos/proteus_nexus_300ms.csv',
-                f'{path}/{trace}/proteus_300ms.csv',
+                # f'{path}/{trace}/proteus_300ms.csv',
+                # f'{path}/{trace}/proteus_morebatching_300ms.csv',
+                # f'{path}/{trace}/proteus_lessbatching_300ms.csv',
+                f'{path}/{trace}/proteus_lessbatching_ewma1.1_300ms.csv',
+                # f'{path}/{trace}/proteus_morebatching_ewma1.1_300ms.csv',
+                # f'{path}/{trace}/proteus_ewma3.1_morebatching_interval30.csv',
+                # f'{path}/{trace}/proteus_notalwayslb_300ms.csv',
+                # f'{path}/{trace}/proteus_300ms_ewma3.1_notalwayslb.csv',
                 # f'{path}/{trace}/proteus_batchsize1_300ms.csv',
+                f'{path}/{trace}/proteus_batchsize1_ewma1.1_300ms.csv',
                 # f'{path}/{trace}/proteus_300ms_beta1.15.csv',
                 # f'{path}/{trace}/proteus_300ms_beta1.1.csv',
                 # f'{path}/{trace}/proteus_aimd_300ms.csv',
-                f'{path}/{trace}/proteus_aimd_lateallowed_300ms.csv',
+                # f'{path}/{trace}/proteus_aimd_lateallowed_300ms.csv',
                 # f'{path}/{trace}/proteus_aimd_latedropped_300ms.csv',
                 # f'{path}/{trace}/proteus_nexus_300ms.csv',
-                f'{path}/{trace}/proteus_nexus_lateallowed_300ms.csv',
+                # f'{path}/{trace}/proteus_nexus_lateallowed_300ms.csv',
                 # f'{path}/{trace}/proteus_nexus_latedropped_300ms.csv',
                 # f'{path}/{trace}/proteus_300ms_beta1.4.csv',
                 # f'{path}/{trace}/proteus_300ms_proportional.csv',
@@ -104,16 +111,24 @@ algorithms = [
             #   'Sommelier-Nexus'
             #   'Proteus-Clipper',
             #   'Proteus-Nexus',
-              'Proteus',
+              # 'Proteus',
+              # 'Proteus MoreBatching',
+              # 'Proteus LessBatching',
+              'Proteus LessBatching EWMA 1.1',
+              # 'Proteus MoreBatching EWMA 1.1',
+              # 'Proteus EWMA 3.1 MoreBatching',
+              # 'Proteus NotAlwaysLB',
+              # 'Proteus NotAlwaysLB EWMA 3.1',
               # 'Proteus Batch Size 1',
+              'Proteus Batch Size 1 EWMA 1.1',
             #   'Proteus (Beta 1.15)',
             #   'Proteus (Beta 1.1)',
             #   'Proteus AIMD',
-              'Proteus w/ AIMD Batching',
+              # 'Proteus w/ AIMD Batching',
               # 'Proteus w/ AIMD Batching LateAllowed',
               # 'Proteus w/ AIMD Batching LateDropped',
             #   'Proteus Nexus',
-              'Proteus w/ Nexus Batching',
+              # 'Proteus w/ Nexus Batching',
               # 'Proteus w/ Nexus Batching LateAllowed',
               # 'Proteus w/ Nexus Batching LateDropped',
             #   'Proteus (Beta 1.4)',
@@ -183,6 +198,7 @@ for idx in range(len(logfile_list)):
     # total_slo_violations = dropped
 
     successful = df['successful'].values[start_cutoff:]
+    goodput = successful - late
 
     # total_slo_violations = total_slo_violations / demand
 
@@ -218,18 +234,18 @@ for idx in range(len(logfile_list)):
     # plt.plot(time, throughput, label=algorithm, marker=markers[idx])
     # plt.plot(time, throughput, label=algorithm)
 
-    if demand_ewma is not None:
-        ax1.plot(time, demand_ewma, label='Demand EWMA', color='black')
+    # if demand_ewma is not None:
+    #     ax1.plot(time, demand_ewma, label='Demand EWMA', color='black')
 
     if MARKERS_ON == True:
-        ax1.plot(time, successful, label=algorithms[idx], color=colors[color_idx],
+        ax1.plot(time, goodput, label=algorithms[idx], color=colors[color_idx],
                 marker=markers[color_idx])
         ax2.plot(time, effective_accuracy, label=algorithms[idx], color=colors[color_idx],
                 marker=markers[color_idx])
         ax3.plot(time, total_slo_violations, label=algorithms[idx], color=colors[color_idx],
                 marker=markers[color_idx])
     else:
-        ax1.plot(time, successful, label=algorithms[idx], color=colors[color_idx])
+        ax1.plot(time, goodput, label=algorithms[idx], color=colors[color_idx])
         ax2.plot(time, effective_accuracy, label=algorithms[idx], color=colors[color_idx])
         ax3.plot(time, total_slo_violations, label=algorithms[idx], color=colors[color_idx])
 

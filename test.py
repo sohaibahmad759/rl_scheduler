@@ -134,6 +134,16 @@ def validate_config(config: dict, filename: str):
         if config['ewma_decay'] < 0:
             raise ConfigException(f'unexpected ewma_decay: {config["ewma_decay"]}, '
                                   f'non-negative float expected for ewma_decay')
+        
+    if 'infaas_slack' in config:
+        if config['infaas_slack'] <= 0:
+            raise ConfigException(f'unexpected infaas_slack: {config["infaas_slack"]}, '
+                                  f'positive float expected for infaas_slack')
+        
+    if 'infaas_downscale_slack' in config:
+        if config['infaas_downscale_slack'] <= 0:
+            raise ConfigException(f'unexpected infaas_downscale_slack: {config["infaas_downscale_slack"]}, '
+                                  f'positive float expected for infaas_downscale_slack')
     
     if 'fixed_seed' in config:
         if 'seed' not in config:
@@ -171,6 +181,8 @@ def main(args):
     alpha = float(config['alpha']) if 'alpha' in config else -1
     beta = float(config['beta']) if 'beta' in config else -1
     ewma_decay = float(config['ewma_decay']) if 'ewma_decay' in config else None
+    infaas_slack = float(config['infaas_slack']) if 'infaas_slack' in config else None
+    infaas_downscale_slack = float(config['infaas_downscale_slack']) if 'infaas_downscale_slack' in config else None
     enable_batching = False if batching_algo == 'disabled' else True
     profiling_data = config['profiling_data']
     allowed_variants_path = config['allowed_variants']
@@ -183,7 +195,8 @@ def main(args):
                         allocation_window=allocation_window, model_assignment=model_assignment,
                         batching=enable_batching, batching_algo=batching_algo,
                         profiling_data=profiling_data, allowed_variants_path=allowed_variants_path,
-                        max_batch_size=max_batch_size, ewma_decay=ewma_decay)
+                        max_batch_size=max_batch_size, ewma_decay=ewma_decay,
+                        infaas_slack=infaas_slack, infaas_downscale_slack=infaas_downscale_slack)
 
     policy_kwargs = dict(net_arch=[128, 128, dict(pi=[128, 128, 128],
                                         vf=[128, 128, 128])])
@@ -420,6 +433,9 @@ def main(args):
                 #       Also, what are its implications on allocation window sizes and
                 #       action group sizes?
                 if i % period_tuning == 0 or i == 5 or i == 20:
+                    actions = ilp.run(observation, env.n_accelerators, env.max_no_of_accelerators)
+                    ilp_rounds += 1
+                elif (i == 47 or i == 59 or i == 71 or i == 83) and 'normal_load' in trace_path:
                     actions = ilp.run(observation, env.n_accelerators, env.max_no_of_accelerators)
                     ilp_rounds += 1
                 else:

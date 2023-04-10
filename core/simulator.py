@@ -26,8 +26,8 @@ UTILIZATION_THRESHOLD = 0.65
 CHANGE_PROPORTION_THRESHOLD = 1 - UTILIZATION_THRESHOLD
 EWMA_WINDOW = 20
 DEFAULT_EWMA_DECAY = 2.1
-EWMA_DECAY = 1.1
-INFAAS_SLACK = 0.95
+DEFAULT_INFAAS_SLACK = 0.95
+# INFAAS_SLACK = 1.05
 
 
 class Simulator:
@@ -35,8 +35,8 @@ class Simulator:
                  mode='training', max_acc_per_type=0, predictors_max=[10, 10, 10, 10],
                  n_qos_levels=1, random_runtimes=False, fixed_seed=0, batching=False,
                  model_assignment=None, batching_algo=None, profiling_data=None,
-                 allowed_variants_path=None, max_batch_size=None,
-                 ewma_decay=None):
+                 allowed_variants_path=None, max_batch_size=None, ewma_decay=None,
+                 infaas_slack=None, infaas_downscale_slack=None):
         self.log = logging.getLogger(__name__)
         self.log.setLevel(logging_level)
         self.logging_level=logging_level
@@ -118,6 +118,7 @@ class Simulator:
         self.largest_batch_sizes = {}
         self.max_batch_size = max_batch_size
         self.slo_dict = {}
+        # self.allowed_batch_sizes = [1, 2, 4, 8, 12, 16, 20, 24, 28, 32]
         self.allowed_batch_sizes = [1, 2, 4, 8]
         self.profiled_filename = profiling_data
 
@@ -129,8 +130,15 @@ class Simulator:
         else:
             self.ewma_decay = ewma_decay
 
-        self.infaas_slack = 1 - INFAAS_SLACK
-        self.infaas_downscale_slack = 1 - INFAAS_SLACK
+        if infaas_slack is None:
+            self.infaas_slack = 1 - DEFAULT_INFAAS_SLACK
+        else:
+            self.infaas_slack = 1 - infaas_slack
+
+        if infaas_downscale_slack is None:
+            self.infaas_downscale_slack = 1 - DEFAULT_INFAAS_SLACK
+        else:
+            self.infaas_downscale_slack = 1 - infaas_downscale_slack
 
         idx = 0
 
@@ -203,7 +211,7 @@ class Simulator:
         self.qos_stats = np.zeros((len(self.executors), n_qos_levels * 2))
         self.slo_timeouts = {'total': 0, 'succeeded': 0, 'timeouts': 0, 'late': 0}
         self.aimd_stats = {'increased': 0, 'decreased': 0}
-        self.batch_size_counters = {1: 0, 2: 0, 4: 0, 8: 0, 16: 0}
+        self.batch_size_counters = self.initialize_batch_size_counters()
         self.ilp_stats = {'estimated_throughput': 0, 'estimated_effective_accuracy': 0,
                           'demand': 0, 'ilp_utilization': 0}
         self.demand_moving_window = np.zeros((len(self.executors), 1))
@@ -449,6 +457,12 @@ class Simulator:
         for model_variant in model_variant_list:
             self.model_variant_loadtimes[(isi_name, model_variant)] = 0
 
+    def initialize_batch_size_counters(self):
+        batch_size_counters = {}
+        for batch_size in self.allowed_batch_sizes:
+            batch_size_counters[batch_size] = 0
+        return batch_size_counters
+
     def initialize_model_variant_runtimes(self):
         profiled = self.import_profiled_data()
         model_variants = profiled['model_variant']
@@ -466,7 +480,7 @@ class Simulator:
                 isi_list.append(isi_name)
             acc_type = acc_types[idx]
             batch_size = batch_sizes[idx]
-            latency = round(latencies[idx])
+            latency = latencies[idx]
 
             if batch_size not in self.allowed_batch_sizes:
                 continue
@@ -496,23 +510,26 @@ class Simulator:
 
                     if tuple not in self.cpu_variant_runtimes:
                         # self.cpu_variant_runtimes[tuple] = batch_size*100
+                        self.cpu_variant_runtimes[tuple] = np.inf
                         # self.log.error(f'{tuple} not found in cpu variant runtimes')
-                        raise SimulatorException(f'{tuple} not found in cpu variant runtimes')
+                        # raise SimulatorException(f'{tuple} not found in cpu variant runtimes')
                     if tuple not in self.gpu_variant_runtimes:
                         # self.gpu_variant_runtimes[tuple] = batch_size*100
+                        self.gpu_variant_runtimes[tuple] = np.inf
                         # self.log.error(f'{tuple} not found in gpu_ampere variant runtimes')
-                        raise SimulatorException(f'{tuple} not found in gpu_ampere variant runtimes')
+                        # raise SimulatorException(f'{tuple} not found in gpu_ampere variant runtimes')
                     if tuple not in self.vpu_variant_runtimes:
                         # self.vpu_variant_runtimes[tuple] = batch_size*100
+                        self.vpu_variant_runtimes[tuple] = np.inf
                         # print(f'{tuple} not found in vpu variant runtimes')
-                        raise SimulatorException(f'{tuple} not found in vpu variant runtimes')
+                        # raise SimulatorException(f'{tuple} not found in vpu variant runtimes')
                     if tuple not in self.fpga_variant_runtimes:
                         # self.fpga_variant_runtimes[tuple] = batch_size*100
-                        self.log.error(f'{tuple} not found in gpu_pascal variant runtimes')
+                        self.fpga_variant_runtimes[tuple] = np.inf
+                        # self.log.error(f'{tuple} not found in gpu_pascal variant runtimes')
                         # raise SimulatorException(f'{tuple} not found in gpu_pascal variant runtimes')
 
         self.log.debug(f'Total profiled entries: {profiled.shape[0]}')
-        # self.log.debug(f'Total expected entries: {(22*4*3)}')
 
         self.model_variant_runtimes = {1: self.cpu_variant_runtimes, 2: self.gpu_variant_runtimes,
                                        3: self.vpu_variant_runtimes, 4: self.fpga_variant_runtimes}
@@ -547,6 +564,11 @@ class Simulator:
 
                         if batch_size > max_batch_size and latency < self.slo_dict[isi_name] / 2:
                             max_batch_size = batch_size
+
+                        # if max_batch_size == 0 and latency < self.slo_dict[isi_name]:
+                        #     sesched-simulation-879-main.ziplf.log.error(f'maximum batch size is being set to 1, in this '
+                        #                    f'case there could be some SLO misses')
+                        #     max_batch_size = 1
 
                     max_batch_size_dict[(acc_type, model_variant)] = max_batch_size
                     self.log.debug(f'({acc_type}, {model_variant}): {max_batch_size}')
@@ -611,7 +633,7 @@ class Simulator:
         '''
         profiled = pd.read_csv(self.profiled_filename)
         profiled = profiled.rename({'Model': 'model_variant', 'Accel': 'acc_type',
-                                    'batchsize': 'batch_size', 'avg_latency(ms)': 'latency'},
+                                    'batchsize': 'batch_size', '50th_pct': 'latency'},
                                     axis='columns')
         profiled = profiled.applymap(self.replace_profiled_strings)
         
@@ -1067,10 +1089,10 @@ class Simulator:
             time.sleep(5)
             return
         
-        if len(ilp_x) < sum(self.predictors_max):
-            ilp_x = self.previous_ilp_x
-            canary_dict = self.previous_canary_dict
-            self.log.warn(f'Used previous allocation')
+        # if len(ilp_x) < sum(self.predictors_max):
+        #     ilp_x = self.previous_ilp_x
+        #     canary_dict = self.previous_canary_dict
+        #     self.log.warn(f'Used previous allocation')
         routing_table_ijk = {}
         for key1 in canary_dict:
             for key2 in ilp_x:

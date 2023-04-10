@@ -5,8 +5,8 @@ import matplotlib.pyplot as plt
 
 
 # trace = 'normal-high_load'
-# trace = 'zipf_exponential'
-trace = 'zipf_exponential_bursty'
+trace = 'zipf_exponential'
+# trace = 'zipf_exponential_bursty'
 # trace = 'zipf_gamma'
 # trace = 'zipf_uniform'
 # trace = 'zipf_uniform_random'
@@ -16,7 +16,8 @@ trace = 'zipf_exponential_bursty'
 path = '../logs/throughput/selected_asplos'
 
 logfile_list = [
-                f'{path}/{trace}/infaas_accuracy_300ms.csv',
+                # f'{path}/{trace}/infaas_accuracy_300ms.csv',
+                f'{path}/{trace}/50ms/infaas_accuracy_50ms.csv',
                 # f'{path}/{trace}/infaas_accuracy_300ms_interval2.csv',
                 # f'{path}/{trace}/infaas_accuracy_300ms_interval10.csv',
                 # f'{path}/{trace}/infaas_accuracy_300ms_normalhighload.csv',
@@ -25,18 +26,19 @@ logfile_list = [
                 # f'{path}/{trace}/infaas_accuracy_300ms_slack1.csv',
                 # f'{path}/{trace}/infaas_accuracy_300ms_slack1.5.csv',
                 # f'{path}/{trace}/infaas_accuracy_300ms_slack0.15.csv',
-                f'{path}/{trace}/clipper_ht_aimd_300ms.csv', # this
+                # f'{path}/{trace}/clipper_ht_aimd_300ms.csv', # this
                 # f'{path}/{trace}/clipper_ht_aimd_lateallowed_300ms.csv',
                 # f'{path}/{trace}/clipper_ht_nexus_300ms.csv',
-                f'{path}/{trace}/clipper_ht_asb_300ms.csv', # this
+                # f'{path}/{trace}/clipper_ht_asb_300ms.csv', # this
                 # '../logs/throughput/selected_asplos/clipper_optstart_300ms.csv',
-                f'{path}/{trace}/sommelier_aimd_300ms.csv',
-                f'{path}/{trace}/sommelier_asb_300ms.csv', # this
+                # f'{path}/{trace}/sommelier_aimd_300ms.csv',
+                # f'{path}/{trace}/sommelier_asb_300ms.csv', # this
                 # f'{path}/{trace}/sommelier_asb_300ms_intervaladaptive2.csv',
                 # f'{path}/{trace}/sommelier_nexus_300ms.csv',
                 # '../logs/throughput/selected_asplos/proteus_aimd_300ms.csv',
                 # '../logs/throughput/selected_asplos/proteus_nexus_300ms.csv',
-                f'{path}/{trace}/proteus_300ms.csv',
+                # f'{path}/{trace}/proteus_300ms.csv',
+                f'{path}/{trace}/50ms/proteus_50ms.csv',
                 # f'{path}/{trace}/proteus_300ms_beta1.15.csv',
                 # f'{path}/{trace}/proteus_300ms_beta1.1.csv',
                 # f'{path}/{trace}/proteus_aimd_300ms.csv',
@@ -91,13 +93,13 @@ algorithms = [
             #   'INFaaS-Accuracy (Slack 1)',
             #   'INFaaS-Accuracy (Slack 1.5)',
             #   'INFaaS-Accuracy (Slack 0.15)',
-              'Clipper-HT-AIMD',
+            #   'Clipper-HT-AIMD',
             #   'Clipper-HT-AIMD LateAllowed',
             #   'Clipper-HT-Nexus',
-              'Clipper-HT-ASB',
+            #   'Clipper-HT-ASB',
             #   'Clipper-HT Optimized Start',
-              'Sommelier-AIMD',
-              'Sommelier-ASB',
+            #   'Sommelier-AIMD',
+            #   'Sommelier-ASB',
             #   'Sommelier-ASB Interval2',
             #   'Sommelier-Nexus'
             #   'Proteus-Clipper',
