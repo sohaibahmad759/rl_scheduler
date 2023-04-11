@@ -40,13 +40,23 @@ logfile_list = [
                 # f'{path}/{trace}/proteus_300ms.csv',
                 # f'{path}/{trace}/proteus_morebatching_300ms.csv',
                 # f'{path}/{trace}/proteus_lessbatching_300ms.csv',
-                f'{path}/{trace}/proteus_lessbatching_ewma1.1_300ms.csv',
+
+                f'{path}/{trace}/proteus_lessbatching_ewma1.1_earlydrop_300ms.csv',
+                # f'{path}/{trace}/proteus_lessbatching_ewma1.1_300ms.csv',
+                f'{path}/{trace}/proteus_batchsize1_ewma1.1_300ms.csv',
+                f'{path}/{trace}/proteus_noscaling_300ms.csv',
+                f'{path}/{trace}/proteus_noscaling_batchsize1_300ms.csv',
+
+                # f'{path}/{trace}/proteus_lessbatching_ewma1.1_earlydrop_300ms.csv',
+                # f'{path}/{trace}/proteus_batchsize1_ewma1.1_earlydrop_300ms.csv',
+                # f'{path}/{trace}/proteus_noscaling_earlydrop_300ms.csv',
+                # f'{path}/{trace}/proteus_noscaling_batchsize1_earlydrop_300ms.csv',
+
                 # f'{path}/{trace}/proteus_morebatching_ewma1.1_300ms.csv',
                 # f'{path}/{trace}/proteus_ewma3.1_morebatching_interval30.csv',
                 # f'{path}/{trace}/proteus_notalwayslb_300ms.csv',
                 # f'{path}/{trace}/proteus_300ms_ewma3.1_notalwayslb.csv',
                 # f'{path}/{trace}/proteus_batchsize1_300ms.csv',
-                f'{path}/{trace}/proteus_batchsize1_ewma1.1_300ms.csv',
                 # f'{path}/{trace}/proteus_300ms_beta1.15.csv',
                 # f'{path}/{trace}/proteus_300ms_beta1.1.csv',
                 # f'{path}/{trace}/proteus_aimd_300ms.csv',
@@ -115,13 +125,19 @@ algorithms = [
               # 'Proteus',
               # 'Proteus MoreBatching',
               # 'Proteus LessBatching',
-              'Proteus LessBatching EWMA 1.1',
+              'MP+MS+QA+AB',
+              'MP+MS+QA',
+              'MP+QA+AB',
+              'MP+QA',
+              # 'MP+MS+QA+AB EarlyDrop',
+              # 'MP+MS+QA EarlyDrop',
+              # 'MP+QA+AB EarlyDrop',
+              # 'MP+QA EarlyDrop',
               # 'Proteus MoreBatching EWMA 1.1',
               # 'Proteus EWMA 3.1 MoreBatching',
               # 'Proteus NotAlwaysLB',
               # 'Proteus NotAlwaysLB EWMA 3.1',
               # 'Proteus Batch Size 1',
-              'Proteus Batch Size 1 EWMA 1.1',
             #   'Proteus (Beta 1.15)',
             #   'Proteus (Beta 1.1)',
             #   'Proteus AIMD',
@@ -287,7 +303,7 @@ ax2.set_ylabel('Effective\nAccuracy', fontsize=11)
 ax3.set_xticks(np.arange(0, 25, 4), fontsize=15)
 # ax3.set_yticks(np.arange(0, 0.6, 0.1), fontsize=12)
 # ax3.set_ylabel('SLO Violation\nRatio', fontsize=11)
-ax3.set_yticks(np.arange(0, 560, 100), fontsize=12)
+ax3.set_yticks(np.arange(0, 610, 100), fontsize=12)
 ax3.set_ylabel('SLO Violations', fontsize=11)
 
 ax3.set_xlabel('Time (min)', fontsize=12)
