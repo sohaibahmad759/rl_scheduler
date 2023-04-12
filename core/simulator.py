@@ -1686,7 +1686,7 @@ class Simulator:
                                   predictors.values()))
             # self.log.info(f'isi: {key}, predictors: {predictors}')
         self.log.info(f'Total queued requests: {total_queued}, system serving capacity: '
-                      f'{total_capacity} reqs/sec, total served by predictors since last '
+                      f'{total_capacity:.2f} reqs/sec, total served by predictors since last '
                       f'checked: {total_served}')
         self.log.info(f'Total predictors: {total_predictors}')
         self.log.info('------')

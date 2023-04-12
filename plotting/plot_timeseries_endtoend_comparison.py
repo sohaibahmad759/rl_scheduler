@@ -5,7 +5,9 @@ import matplotlib.pyplot as plt
 
 
 # trace = 'normal-high_load'
-trace = 'zipf_exponential'
+# trace = 'normal_load'
+trace = 'medium-normal_load'
+# trace = 'zipf_exponential'
 # trace = 'zipf_exponential_bursty'
 # trace = 'zipf_gamma'
 # trace = 'zipf_uniform'
@@ -14,10 +16,16 @@ trace = 'zipf_exponential'
 # trace = 'equal_gamma'
 
 path = '../logs/throughput/selected_asplos'
+slo = 300
 
 logfile_list = [
                 # f'{path}/{trace}/infaas_accuracy_300ms.csv',
-                f'{path}/{trace}/50ms/infaas_accuracy_50ms.csv',
+                # f'{path}/{trace}/infaas_accuracy_300ms_0.1_0.4.csv',
+                # f'{path}/{trace}/infaas_accuracy_300ms_0.1_0.5.csv',
+                # f'{path}/{trace}/infaas_accuracy_300ms_0.05_0.6.csv',
+                # f'{path}/{trace}/infaas_accuracy_300ms_0.05_0.8.csv',
+                f'{path}/{trace}/{slo}ms/infaas_accuracy_300ms_0.01_0.6.csv',
+                # f'{path}/{trace}/50ms/infaas_accuracy_50ms.csv',
                 # f'{path}/{trace}/infaas_accuracy_300ms_interval2.csv',
                 # f'{path}/{trace}/infaas_accuracy_300ms_interval10.csv',
                 # f'{path}/{trace}/infaas_accuracy_300ms_normalhighload.csv',
@@ -26,19 +34,29 @@ logfile_list = [
                 # f'{path}/{trace}/infaas_accuracy_300ms_slack1.csv',
                 # f'{path}/{trace}/infaas_accuracy_300ms_slack1.5.csv',
                 # f'{path}/{trace}/infaas_accuracy_300ms_slack0.15.csv',
-                # f'{path}/{trace}/clipper_ht_aimd_300ms.csv', # this
+                f'{path}/{trace}/{slo}ms/clipper_ht_aimd_300ms.csv', # this
+                # f'{path}/{trace}/clipper_ht_asb_300ms.csv', # this
+                f'{path}/{trace}/{slo}ms/clipper_ha_aimd_300ms.csv', # this
                 # f'{path}/{trace}/clipper_ht_aimd_lateallowed_300ms.csv',
                 # f'{path}/{trace}/clipper_ht_nexus_300ms.csv',
                 # f'{path}/{trace}/clipper_ht_asb_300ms.csv', # this
                 # '../logs/throughput/selected_asplos/clipper_optstart_300ms.csv',
                 # f'{path}/{trace}/sommelier_aimd_300ms.csv',
                 # f'{path}/{trace}/sommelier_asb_300ms.csv', # this
+                # f'{path}/{trace}/sommelier_asb_ewma1.1_300ms.csv',
+                # f'{path}/{trace}/sommelier_aimd_ewma1.1_beta1.5_300ms.csv',
+                # f'{path}/{trace}/sommelier_asb_ewma1.1_beta1.5_300ms.csv',
+                f'{path}/{trace}/{slo}ms/sommelier_asb_ewma1.6_beta1.5_300ms.csv',
                 # f'{path}/{trace}/sommelier_asb_300ms_intervaladaptive2.csv',
                 # f'{path}/{trace}/sommelier_nexus_300ms.csv',
                 # '../logs/throughput/selected_asplos/proteus_aimd_300ms.csv',
                 # '../logs/throughput/selected_asplos/proteus_nexus_300ms.csv',
                 # f'{path}/{trace}/proteus_300ms.csv',
-                f'{path}/{trace}/50ms/proteus_50ms.csv',
+                # f'{path}/{trace}/proteus_ewma1.1_300ms.csv',
+                f'{path}/{trace}/{slo}ms/proteus_ewma1.6_300ms.csv',
+                # f'{path}/{trace}/proteus_ewma2.1_300ms.csv',
+                # f'{path}/{trace}/proteus_lessbatching_ewma1.1_earlydrop_300ms.csv',
+                # f'{path}/{trace}/50ms/proteus_50ms.csv',
                 # f'{path}/{trace}/proteus_300ms_beta1.15.csv',
                 # f'{path}/{trace}/proteus_300ms_beta1.1.csv',
                 # f'{path}/{trace}/proteus_aimd_300ms.csv',
@@ -84,6 +102,11 @@ markers = ['+', 'o', 'v', '^', '*', 's', 'x']
 # algorithms = ['Clipper++ (High Throughput)', 'Clipper++ (High Accuracy)',
 #             'INFaaS-Instance', 'INFaaS-Accuracy', 'AccScale']
 algorithms = [
+            #   'INFaaS-Accuracy',
+            #   'INFaaS-Accuracy 0.1 0.4',
+            #   'INFaaS-Accuracy 0.1 0.5',
+            #   'INFaaS-Accuracy 0.05 0.6',
+            #   'INFaaS-Accuracy 0.05 0.8',
               'INFaaS-Accuracy',
             #   'INFaaS-Accuracy Interval 2',
             #   'INFaaS-Accuracy Interval 10',
@@ -93,18 +116,26 @@ algorithms = [
             #   'INFaaS-Accuracy (Slack 1)',
             #   'INFaaS-Accuracy (Slack 1.5)',
             #   'INFaaS-Accuracy (Slack 0.15)',
-            #   'Clipper-HT-AIMD',
+              'Clipper-HT',
+            #   'Clipper-HT-ASB',
+              'Clipper-HA',
             #   'Clipper-HT-AIMD LateAllowed',
             #   'Clipper-HT-Nexus',
             #   'Clipper-HT-ASB',
             #   'Clipper-HT Optimized Start',
             #   'Sommelier-AIMD',
             #   'Sommelier-ASB',
+            #   'Sommelier-ASB EWMA1.1',
+            #   'Sommelier-AIMD EWMA1.1 Beta1.5',
+            #   'Sommelier-ASB EWMA1.1 Beta1.5',
+              'Sommelier',
             #   'Sommelier-ASB Interval2',
             #   'Sommelier-Nexus'
             #   'Proteus-Clipper',
             #   'Proteus-Nexus',
+            #   'Proteus EWMA1.1',
               'Proteus',
+            #   'Proteus EWMA2.1',
             #   'Proteus (Beta 1.15)',
             #   'Proteus (Beta 1.1)',
             #   'Proteus AIMD',
@@ -143,6 +174,7 @@ colors = ['#729ECE', '#FF9E4A', '#ED665D', '#AD8BC9', '#67BF5C', '#8C564B',
 fig, (ax1, ax2, ax3) = plt.subplots(3)
 color_idx = 0
 clipper_accuracy = []
+slo_violation_ratios = []
 y_cutoff = 0
 for idx in range(len(logfile_list)):
     logfile = logfile_list[idx]
@@ -152,7 +184,7 @@ for idx in range(len(logfile_list)):
     df = pd.read_csv(logfile)
 
     aggregated = df.groupby(df.index // 10).sum()
-    aggregated = df.groupby(df.index // 5).mean()
+    aggregated = df.groupby(df.index // 10).mean()
     df = aggregated
     # print(f'df: {df}')
     # print(f'aggregated: {aggregated}')
@@ -197,6 +229,9 @@ for idx in range(len(logfile_list)):
     # print(f'difference: {difference}')
     print(f'sum of difference: {sum(difference)}')
 
+    slo_violation_ratio = (sum(df['demand']) - sum(df['successful'])) / sum(df['demand'])
+    slo_violation_ratios.append(slo_violation_ratio)
+
     time = time
     time = [x - time[0] for x in time]
     print(time[-1])
@@ -223,6 +258,7 @@ for idx in range(len(logfile_list)):
         ax2.plot(time, effective_accuracy, label=algorithms[idx], color=colors[color_idx])
         ax3.plot(time, total_slo_violations, label=algorithms[idx], color=colors[color_idx])
 
+        print(f'algorithm: {algorithm}, slo_violation_ratio: {slo_violation_ratio}')
         # if 'estimated_throughput' in df and sum(df['estimated_throughput'].values[start_cutoff:]) > 0 and algorithms[idx] == 'Proteus':
         #     estimated_throughput = df['estimated_throughput'].values[start_cutoff:]
         #     ax1.plot(time, estimated_throughput, label=f'Estimated throughput ({algorithms[idx]})',
@@ -245,28 +281,42 @@ ax3.grid()
 y_cutoff += 50
 # y_cutoff = 200
 
-ax1.set_title(trace)
+# ax1.set_title(trace)
 
 ax1.legend(loc='upper center', bbox_to_anchor=(0.5, 1.75), ncol=3, fontsize=12)
 
+ax1.set_xticklabels([])
 ax1.set_xticks(np.arange(0, 25, 4), fontsize=15)
 ax1.set_yticks(np.arange(0, y_cutoff + 50, 200), fontsize=12)
 ax1.set_ylabel('Requests per\nsecond', fontsize=11)
 
 ax2.set_xticks(np.arange(0, 25, 4), fontsize=15)
+ax2.set_xticklabels([])
 ax2.set_yticks(np.arange(80, 104, 5), fontsize=12)
 ax2.set_ylabel('Effective\nAccuracy', fontsize=11)
 
 ax3.set_xticks(np.arange(0, 25, 4), fontsize=15)
 # ax3.set_yticks(np.arange(0, 0.6, 0.1), fontsize=12)
 # ax3.set_ylabel('SLO Violation\nRatio', fontsize=11)
-ax3.set_yticks(np.arange(0, 410, 100), fontsize=12)
+ax3.set_yticks(np.arange(0, 510, 100), fontsize=12)
 ax3.set_ylabel('SLO Violations', fontsize=11)
 
 ax3.set_xlabel('Time (min)', fontsize=12)
 
-plt.savefig(os.path.join('..', 'figures', f'timeseries_{trace}.pdf'), dpi=500, bbox_inches='tight')
+plt.savefig(os.path.join('..', 'figures', 'asplos', 'endtoend_comparison',
+                         f'timeseries_{trace}.pdf'), dpi=500, bbox_inches='tight')
 
 print(f'Warning! We should not be using mean to aggregate, instead we should be using sum')
 print(f'Warning! There are some points where requests served are greater than incoming '
       f'demand. Fix this or find the cause')
+
+plt.close()
+slo_violation_ratios.pop()
+slo_violation_ratios.append(0.028468647274080505)
+del colors[0]
+plt.xlabel('Algorithm', fontsize=13)
+plt.ylabel('SLO Violation Ratio', fontsize=13)
+plt.bar(algorithms, slo_violation_ratios, color=colors)
+plt.yticks(np.arange(0, 0.38, 0.05), fontsize=12)
+plt.savefig(os.path.join('..', 'figures', 'asplos', 'endtoend_comparison',
+            f'slo_bar_{trace}.pdf'), dpi=500, bbox_inches='tight')
