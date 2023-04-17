@@ -13,6 +13,7 @@
 *smoke_result*
 *swp
 *vagrant*log
+*.jpg
 .DS_Store
 .coverage
 .env

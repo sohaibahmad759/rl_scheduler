@@ -6,7 +6,7 @@
     "static_allocation": "algorithms/sommelier_solutions/starting_optimized_new.txt",
     "job_scheduling": "canary_routing",
     "batching": "accscale",
-    "beta": 1.05,
+    "beta": 1.5,
     "fixed_seed": true,
     "seed": 10,
     "solve_interval": 10,

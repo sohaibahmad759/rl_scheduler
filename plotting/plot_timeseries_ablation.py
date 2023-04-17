@@ -125,10 +125,10 @@ algorithms = [
               # 'Proteus',
               # 'Proteus MoreBatching',
               # 'Proteus LessBatching',
-              'MP+MS+QA+AB',
-              'MP+MS+QA',
-              'MP+QA+AB',
-              'MP+QA',
+              'Proteus',
+              'Proteus w/o \nAB',
+              'Proteus w/o \nMS',
+              'Proteus w/o \nMS+AB',
               # 'MP+MS+QA+AB EarlyDrop',
               # 'MP+MS+QA EarlyDrop',
               # 'MP+QA+AB EarlyDrop',
@@ -180,6 +180,7 @@ colors = ['#729ECE', '#FF9E4A', '#ED665D', '#AD8BC9', '#67BF5C', '#8C564B',
 fig, (ax1, ax2, ax3) = plt.subplots(3)
 color_idx = 0
 clipper_accuracy = []
+slo_violation_ratios = []
 y_cutoff = 0
 for idx in range(len(logfile_list)):
     logfile = logfile_list[idx]
@@ -236,6 +237,9 @@ for idx in range(len(logfile_list)):
     # print(f'difference: {difference}')
     print(f'sum of difference: {sum(difference)}')
 
+    slo_violation_ratio = (sum(df['demand']) - sum(df['successful']) + sum(late)) / sum(df['demand'])
+    slo_violation_ratios.append(slo_violation_ratio)
+
     time = time
     time = [x - time[0] for x in time]
     print(time[-1])
@@ -285,17 +289,19 @@ ax3.grid()
 # plt.rc('ytick', labelsize=30)    # fontsize of the tick labels
 # plt.rc('legend', fontsize=30)    # legend
 
-y_cutoff += 50
+y_cutoff += 100
 # y_cutoff = 200
 
-ax1.set_title(trace)
+# ax1.set_title(trace)
 
-ax1.legend(loc='upper center', bbox_to_anchor=(0.5, 1.75), ncol=3, fontsize=12)
+ax1.legend(loc='upper center', bbox_to_anchor=(0.425, 1.75), ncol=3, fontsize=12)
 
+ax1.set_xticklabels([])
 ax1.set_xticks(np.arange(0, 25, 4), fontsize=15)
-ax1.set_yticks(np.arange(0, y_cutoff + 50, 200), fontsize=12)
+ax1.set_yticks(np.arange(0, y_cutoff + 50, 300), fontsize=12)
 ax1.set_ylabel('Requests per\nsecond', fontsize=11)
 
+ax2.set_xticklabels([])
 ax2.set_xticks(np.arange(0, 25, 4), fontsize=15)
 ax2.set_yticks(np.arange(80, 104, 5), fontsize=12)
 ax2.set_ylabel('Effective\nAccuracy', fontsize=11)
@@ -308,8 +314,19 @@ ax3.set_ylabel('SLO Violations', fontsize=11)
 
 ax3.set_xlabel('Time (min)', fontsize=12)
 
-plt.savefig(os.path.join('..', 'figures', 'ablation_study', f'timeseries_ablation_{trace}.pdf'), dpi=500, bbox_inches='tight')
+plt.savefig(os.path.join('..', 'figures', 'asplos', 'ablation_study',
+                         f'timeseries_ablation_{trace}.pdf'), dpi=500, bbox_inches='tight')
 
 print(f'Warning! We should not be using mean to aggregate, instead we should be using sum')
 print(f'Warning! There are some points where requests served are greater than incoming '
       f'demand. Fix this or find the cause')
+
+plt.close()
+del colors[0]
+plt.grid()
+plt.xlabel('Algorithm', fontsize=13)
+plt.ylabel('SLO Violation Ratio', fontsize=13)
+plt.bar(algorithms, slo_violation_ratios, color=colors)
+plt.yticks(np.arange(0, 0.41, 0.05), fontsize=12)
+plt.savefig(os.path.join('..', 'figures', 'asplos', 'ablation_study',
+            f'slo_bar_{trace}.pdf'), dpi=500, bbox_inches='tight')

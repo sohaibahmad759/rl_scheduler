@@ -4,7 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-SCALE_UP_MULTIPLIER = 1
+SCALE_UP_MULTIPLIER = 1.5
 
 
 def get_args():

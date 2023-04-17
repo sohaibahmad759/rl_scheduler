@@ -17,8 +17,8 @@ else:
 wf = open('yolo_profiled.csv', mode='w')
 wf.write('Model,Platform,Trials,Batch size,50th pct,90th pct,Average,Min,Max\n')
 
-models = ['yolov5n', 'yolov5s', 'yolov5m', 'yolov5l', 'yolov5x']
-# models = ['yolov5n']
+# models = ['yolov5n', 'yolov5s', 'yolov5m', 'yolov5l', 'yolov5x']
+models = ['yolov5n']
 batch_sizes = [1, 2, 4, 8, 16]
 # batch_sizes = [1]
 trials = 100
@@ -33,7 +33,7 @@ for model_name in models:
         idx += 1
         model = torch.hub.load('ultralytics/yolov5', model_name).to(device)
 
-        images = [Image.open('images/zidane.jpeg')] * batch_size
+        images = [Image.open('images/cat.jpg')] * batch_size
 
         latencies = []
         for i in range(trials):

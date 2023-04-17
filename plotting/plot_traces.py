@@ -10,7 +10,7 @@ END_TIME = 300
 # path = ('../../datasets/infaas/asplos/zipf_exponential/trace_files/')
 # path = ('../traces/twitter/asplos/zipf_flat_bursty/300/')
 # path = ('../traces/twitter/asplos/low_load/300/')
-path = ('../traces/twitter/asplos/zipf_exponential/300/')
+path = ('../traces/twitter/asplos/zipf_exponential_bursty/300/')
 # path = ('../traces/twitter/asplos/medium-normal_load/300/')
 
 

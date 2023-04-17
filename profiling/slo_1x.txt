@@ -1,0 +1,9 @@
+yolo,yolov5n,38,50
+t5,t5-base,259,300
+densenet,densenet121,79,100
+resnest,resnest14,71,100
+resnet,resnet34_v1,48,75
+mobilenet,mobilenet0.25,3,35
+gpt2,gpt2,264,300
+efficientnet,efficientnet-b0,27,75
+bert,,75,75
