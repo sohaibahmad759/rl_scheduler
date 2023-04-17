@@ -92,6 +92,17 @@ class Predictor:
             #     raise PredictorException(f'Predictor {self.id} cannot be used as it will exceed latency SLO, '
             #         f'model variant: {self.variant_name}, accelerator type: '
             #         f'{self.acc_type}')
+        
+        predictor_log = logging.FileHandler(f'logs/per_predictor/300ms/'
+                                                 f'{self.simulator.model_assignment}/'
+                                                 f'{self.id}.txt')
+        predictor_log.setLevel(logging.INFO)
+        self.predictor_log = logging.getLogger(self.id)
+        self.predictor_log.addHandler(predictor_log)
+        self.predictor_log.info(f'{self.variant_name},{self.acc_type},{self.max_batch_size},'
+                                f'{self.executor.isi}')
+        self.predictor_log.info(self.profiled_latencies)
+
         return
 
     
@@ -222,6 +233,7 @@ class Predictor:
     def enqueue_request(self, event, clock):
         ''' Add the request to the request queue of this predictor
         '''
+        self.predictor_log.info(f'enqueued,{clock}')
         self.request_dict[event.id] = 1
         self.request_queue.append(event)
         self.event_counter += 1
@@ -351,10 +363,14 @@ class Predictor:
         ''' Dequeue the first `batch_size` requests from the queue and process
         them in a batch.
         '''
+        self.predictor_log.info(f'process_batch,{clock},{batch_size}')
+
         if self.busy:
             raise PredictorException('process_batch called when predictor is busy')
         
-        if 'ilp' not in self.simulator.model_assignment or 'accscale' not in self.simulator.batching_algo:
+        # if 'ilp' not in self.simulator.model_assignment or 'accscale' not in self.simulator.batching_algo:
+        model_asn = self.simulator.model_assignment
+        if 'ilp' in model_asn or 'infaas' in model_asn:
             self.drop_expired_requests(clock)
         
         self.simulator.batch_size_counters[batch_size] += 1
@@ -454,6 +470,8 @@ class Predictor:
     def finish_batch_callback(self, clock):
         ''' Callback to handle a FINISH_BATCH event
         '''
+        self.predictor_log.info(f'finish_batch_callback,{clock}')
+
         self.busy = False
         self.busy_till = None
 
@@ -779,7 +797,7 @@ class Predictor:
 
         while self.batch_processing_latency(batch_size=1, request=first_request) > first_request.deadline:
             # if 'infaas' in self.simulator.model_assignment or 'accscale' in self.simulator.model_assignment:
-            if 'accscale' in self.simulator.model_assignment:
+            if 'accscale' in self.simulator.model_assignment or 'accscale' in self.simulator.batching_algo:
                 self.simulator.bump_failed_request_stats(first_request)
                 self.request_queue.pop(0)
                 if len(self.request_queue) == 0:

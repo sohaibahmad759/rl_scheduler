@@ -423,7 +423,8 @@ def main(args):
                 if len(last_10_demands) > 10:
                     last_10_demands.pop(0)
                 if 'zipf_exponential_bursty' in trace_path and any(i > 200 for i in last_10_demands):
-                    period_tuning = 1
+                # if 'zipf_exponential_bursty' in trace_path:
+                    period_tuning = 2
                     if model_assignment == 'sommelier':
                         period_tuning = 2
                 elif 'flat' not in trace_path and i >= 60 and i <= 100:
@@ -619,6 +620,8 @@ def main(args):
     print(f'Late requests: {bumped_late}, late ratio: {bumped_late_ratio}')
     print(f'SLO violations (dropped + late): {total_slo_violations}, violation ratio: '
           f'{slo_violation_ratio}')
+    print(f'SLO violations per ISI: {env.simulator.slo_timeouts_per_executor}')
+    print(f'Requests per ISI: {env.simulator.requests_per_executor}')
     
     if env.simulator.batching_algo == 'aimd':
         print(f'AIMD increased batch size {env.simulator.aimd_stats["increased"]} times '
