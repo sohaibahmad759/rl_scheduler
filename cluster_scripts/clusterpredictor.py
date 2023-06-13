@@ -1,3 +1,4 @@
+import os
 import logging
 import time
 import traceback
@@ -5,6 +6,10 @@ import uuid
 import pprint
 import numpy as np
 from enum import Enum
+
+import sys
+sys.path.append('../')
+from core.common import Event, EventType
 
 
 # TODO: the number of accelerator types should be parameterizable
@@ -27,7 +32,9 @@ class ClusterPredictor:
                  profiled_accuracy=100.0, profiled_latencies={}, variant_name=None,
                  executor=None, simulator=None, configured_max_batch_size=None,
                  batching_algo=None, task_assignment=None, max_batch_size=None,
-                 model_assignment=None):
+                 model_assignment=None, model=None, input_batch_1=None,
+                 input_batch_2=None, input_batch_4=None, input_batch_8=None,
+                 filename=None):
         # attributes related to predictor hardware
         self.log = logging.getLogger(__name__)
         self.log.setLevel(logging_level)
@@ -44,8 +51,10 @@ class ClusterPredictor:
         self.busy = False
         self.busy_till = None
         self.request_dict = {}
+        self.clock = 0
 
         # Batching-related variables (by default we have a batch size of 1)
+        self.event_queue = []
         self.request_queue = []
         self.event_counter = 0
         self.slo_expiring_dict = {}
@@ -92,6 +101,12 @@ class ClusterPredictor:
 
         # traceback.print_stack()
         # time.sleep(1)
+
+        self.model = model
+        self.input_batch_1 = input_batch_1
+        self.input_batch_2 = input_batch_2
+        self.input_batch_4 = input_batch_4
+        self.input_batch_8 = input_batch_8
         
         # If the maximum batch size is 0, that means that predictor cannot even
         # serve a batch size of 1 without violating latency SLO
@@ -109,14 +124,40 @@ class ClusterPredictor:
         # predictor_log.setLevel(logging.INFO)
         # self.predictor_log = logging.getLogger(self.id)
         # self.predictor_log.addHandler(predictor_log)
-        # self.predictor_log.info(f'variant name: {self.variant_name}, acc_type: {self.acc_type}')
+
+        if filename is None:
+            raise Exception('filename is not given')
+        
+        if os.path.exists(f'cluster_logs/{filename}'):
+            raise Exception(f'file already exists: cluster_logs/{filename}')
+        
+        filehandler = logging.FileHandler(f'cluster_logs/{filename}')
+        filehandler.setLevel(logging.DEBUG)
+        self.predictor_log = logging.getLogger(self.id)
+        self.predictor_log.addHandler(filehandler)
+        self.predictor_log.warn(f'variant name: {self.variant_name}, acc_type: {self.acc_type}')
 
         return
+    
+
+    def append_to_event_queue(self, event):
+        self.event_queue.append(event)
 
     
     def set_load(self, load):
         self.load = load
         return
+    
+
+    def run_main_loop(self):
+        self.predictor_log.warn('running main loop')
+        while len(self.event_queue) > 0:
+            event = self.event_queue.pop(0)
+            # self.predictor_log.warn(f'event: {event.start_time}, type: {event.type}')
+            if event.type == EventType.START_REQUEST:
+                self.enqueue_request(event, event.start_time)
+            elif event.type == EventType.FINISH_BATCH:
+                self.finish_batch_callback(event.start_time, event.late)
 
     
     def increase_aimd_batch_size(self):
@@ -241,7 +282,7 @@ class ClusterPredictor:
     def enqueue_request(self, event, clock):
         ''' Add the request to the request queue of this predictor
         '''
-        # self.predictor_log.info(f'enqueued,{clock}')
+        self.predictor_log.warn(f'enqueued,{clock}')
         # self.request_dict[event.id] = 1
         self.request_queue.append(event)
         self.event_counter += 1
@@ -294,7 +335,7 @@ class ClusterPredictor:
             #     return
             batch_size = self.aimd_batch_size
             if len(self.request_queue) >= self.aimd_batch_size:
-                self.log.debug(f'aimd calling process_batch from enqueue_request')
+                print(f'aimd calling process_batch from enqueue_request')
                 self.process_batch(clock, self.aimd_batch_size)
             return
         elif self.task_assignment == 'canary' and self.batching_algo == 'nexus':
@@ -378,7 +419,7 @@ class ClusterPredictor:
         ''' Dequeue the first `batch_size` requests from the queue and process
         them in a batch.
         '''
-        # self.predictor_log.info(f'process_batch,{clock},{batch_size}')
+        # self.predictor_log.warn(f'process_batch,{clock},{batch_size}')
 
         if self.busy:
             raise Exception('process_batch called when predictor is busy')
@@ -409,6 +450,7 @@ class ClusterPredictor:
             #     time.sleep(10)
             # else:
             #     batch_size = self.max_batch_size
+            # self.predictor_log.warn(f'reducing batch size from {batch_size} to {self.max_batch_size}')
             batch_size = self.max_batch_size
 
         temp_queue = []
@@ -438,38 +480,73 @@ class ClusterPredictor:
         qos_met = True
 
         aimd_negative_feedback = False
-        for request in temp_queue:
-            # self.log.error(f'request: {request}')
-            # self.log.error(f'finish_time: {finish_time}, request.start_time: {request.start_time}, '
-                        #    f'request.deadline: {request.deadline}')
-            if finish_time > request.start_time + request.deadline:
-                if self.task_assignment == 'canary':
-                    if self.batching_algo == 'accscale':
-                        pass
-                        # raise PredictorException(f'process_batch: Something is wrong, first request '
-                        #                          f'in queue will expire before batch finishes processing '
-                        #                          f'for batching algo: {self.batching_algo}')
-                    # # AIMD performs lazy-dropping
-                    elif self.batching_algo == 'aimd':
-                        aimd_negative_feedback = True
-                        pass
-                        # self.simulator.bump_failed_request_stats(request)
-                        # continue
-                    # Since Nexus performed early-drop, no need to drop here
-                    elif self.batching_algo == 'nexus':
-                        pass
-                        # self.simulator.bump_failed_request_stats(request)
-                        # continue
-                    else:
-                        raise Exception(f'unexpected batching algorithm: {self.batching_algo}')
-                elif self.task_assignment == 'infaas':
-                    pass
-                    # self.simulator.bump_failed_request_stats(request)
-                    # continue
-            self.generate_end_request_event(request, finish_time, accuracy_seen, qos_met)
-        self.generate_finish_batch_event(finish_time=finish_time,
-                                         predictor=self,
-                                         executor=None)
+        execution_batch_size = len(temp_queue)
+
+        execution_start_time = time.time()
+
+        if execution_batch_size > 2 and execution_batch_size < 4:
+            execution_batch_size = 2
+        elif execution_batch_size > 4 and execution_batch_size < 8:
+            execution_batch_size = 4
+
+        if execution_batch_size == 1:
+            input_batch = self.input_batch_1
+        elif execution_batch_size == 2:
+            input_batch = self.input_batch_2
+        elif execution_batch_size == 4:
+            input_batch = self.input_batch_4
+        elif execution_batch_size == 8:
+            input_batch = self.input_batch_8
+        else:
+            raise Exception(f'unexpected queue size: {execution_batch_size}')
+
+        # if 't5' in self.variant_name or 'gpt2' in self.variant_name:
+        if 't5' in self.variant_name:
+            self.model.generate(input_batch)
+        elif 'resnet' in self.variant_name or 'mobilenet' in self.variant_name or 'efficientnet' in self.variant_name:
+            self.model(**input_batch)
+        else:
+            self.model(input_batch)
+
+        execution_end_time = time.time()
+        execution_time = (execution_end_time - execution_start_time) * 1000
+        print(f'clock: {clock}, execution_time: {execution_time}, batch_size: {execution_batch_size}')
+
+        if clock + execution_time > temp_queue[0].start_time + temp_queue[0].deadline:
+            aimd_negative_feedback = True
+
+        # for request in temp_queue:
+        #     # self.log.error(f'request: {request}')
+        #     # self.log.error(f'finish_time: {finish_time}, request.start_time: {request.start_time}, '
+        #                 #    f'request.deadline: {request.deadline}')
+        #     if finish_time > request.start_time + request.deadline:
+        #         if self.task_assignment == 'canary':
+        #             if self.batching_algo == 'accscale':
+        #                 pass
+        #                 # raise PredictorException(f'process_batch: Something is wrong, first request '
+        #                 #                          f'in queue will expire before batch finishes processing '
+        #                 #                          f'for batching algo: {self.batching_algo}')
+        #             # # AIMD performs lazy-dropping
+        #             elif self.batching_algo == 'aimd':
+        #                 aimd_negative_feedback = True
+        #                 pass
+        #                 # self.simulator.bump_failed_request_stats(request)
+        #                 # continue
+        #             # Since Nexus performed early-drop, no need to drop here
+        #             elif self.batching_algo == 'nexus':
+        #                 pass
+        #                 # self.simulator.bump_failed_request_stats(request)
+        #                 # continue
+        #             else:
+        #                 raise Exception(f'unexpected batching algorithm: {self.batching_algo}')
+        #         elif self.task_assignment == 'infaas':
+        #             pass
+        #             # self.simulator.bump_failed_request_stats(request)
+        #             # continue
+        #     self.generate_end_request_event(request, finish_time, accuracy_seen, qos_met)
+        # self.generate_finish_batch_event(finish_time=finish_time,
+        #                                  predictor=self,
+        #                                  executor=None)
         
         if aimd_negative_feedback:
             self.decrease_aimd_batch_size()
@@ -478,6 +555,18 @@ class ClusterPredictor:
 
         self.busy = True
         self.busy_till = finish_time
+
+        if self.batching_algo == 'aimd':
+            self.generate_finish_batch_event(finish_time=clock+execution_time,
+                                             predictor=self,
+                                             executor=None,
+                                             late=aimd_negative_feedback)
+            # self.finish_batch_callback(clock+execution_time, aimd_negative_feedback)
+
+        # self.predictor_log.warn(f'end of process_batch, execution batch size: {execution_batch_size}, '
+        #                         f'request queue size: {len(self.request_queue)}')
+        self.predictor_log.warn(f'process_batch,{clock},{execution_batch_size}')
+
         return
     
     
@@ -485,17 +574,29 @@ class ClusterPredictor:
         return
     
 
-    def generate_finish_batch_event(self, finish_time, predictor, executor):
+    def generate_finish_batch_event(self, finish_time, predictor, executor, late):
+        ''' Insert finish batch callback in event queue
+        '''
+        event = Event(start_time=finish_time, type=EventType.FINISH_BATCH,
+                        desc='finish_batch', predictor=predictor, late=late
+                      )
+        idx = self.binary_find_index(self.event_queue, finish_time)
+        self.event_queue.insert(idx, event)
         return
     
     def generate_batch_expiring_event(self, time, event, predictor, executor, event_counter):
         return
+    
+
+    def generate_slo_expiring_event(self, time, event, predictor, executor, event_counter):
+        return
 
     
-    def finish_batch_callback(self, clock):
+    def finish_batch_callback(self, clock, late=False):
         ''' Callback to handle a FINISH_BATCH event
         '''
-        self.predictor_log.info(f'finish_batch_callback,{clock}')
+        self.predictor_log.warn(f'finish_batch_callback,{clock},{late}')
+        self.predictor_log.warn(f'request queue len: {len(self.request_queue)}')
 
         self.busy = False
         self.busy_till = None
@@ -622,10 +723,11 @@ class ClusterPredictor:
             return
         self.log.debug(f'Generating SLO_EXPIRING event for request {event.id} '
                       f'to expire at {time}')
-        self.simulator.generate_slo_expiring_event(time, event,
-                                                   predictor=self,
-                                                   executor=self.executor,
-                                                   event_counter=event.id)
+        self.generate_slo_expiring_event(time,
+                                         event,
+                                         predictor=self,
+                                         executor=None,
+                                         event_counter=event.id)
         self.slo_expiring_dict[event.id] = time
         # TODO: remove this line if SLO_EXPIRING works correctly
         self.event_counter += 1
@@ -784,7 +886,21 @@ class ClusterPredictor:
         for i in range(len(drop_indices)):
             drop_idx = drop_indices[i]
             request = self.request_queue.pop(drop_idx-dropped)
-            self.simulator.bump_failed_request_stats(request)
+            # print(f'we want to remove this from the event queue as well')
+            # time.sleep(1)
+            self.bump_failed_request_stats(request)
+            dropped += 1
+
+        drop_indices = []
+        for i in range(len(self.event_queue)):
+            request = self.event_queue[i]
+            if clock > request.start_time + request.deadline * 2:
+                drop_indices.append(i)
+
+        dropped = 0
+        for i in range(len(drop_indices)):
+            drop_idx = drop_indices[i]
+            request = self.event_queue.pop(drop_idx-dropped)
             dropped += 1
         return
 
@@ -898,6 +1014,23 @@ class ClusterPredictor:
             if arr[mid] == number:
                 return mid
             elif arr[mid] < number:
+                start = mid + 1
+            else:
+                end = mid - 1
+        # Return the insert position
+        return end + 1
+    
+    def binary_find_index(self, arr, number):
+        # Lower and upper bounds
+        start = 0
+        end = len(arr) - 1
+
+        # Traverse the search space
+        while start <= end:
+            mid = (start + end) // 2
+            if arr[mid].start_time == number:
+                return mid
+            elif arr[mid].start_time < number:
                 start = mid + 1
             else:
                 end = mid - 1
