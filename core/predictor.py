@@ -363,14 +363,12 @@ class Predictor:
         ''' Dequeue the first `batch_size` requests from the queue and process
         them in a batch.
         '''
-        self.predictor_log.info(f'process_batch,{clock},{batch_size}')
-
         if self.busy:
             raise PredictorException('process_batch called when predictor is busy')
         
         # if 'ilp' not in self.simulator.model_assignment or 'accscale' not in self.simulator.batching_algo:
         model_asn = self.simulator.model_assignment
-        if 'ilp' in model_asn or 'infaas' in model_asn:
+        if 'ilp' in model_asn or 'infaas' in model_asn or 'clipper' in model_asn:
             self.drop_expired_requests(clock)
         
         self.simulator.batch_size_counters[batch_size] += 1
@@ -422,6 +420,7 @@ class Predictor:
         #       if request is processed within deadline
         qos_met = True
 
+        batch_finished_late = False
         aimd_negative_feedback = False
         for request in temp_queue:
             # self.log.error(f'request: {request}')
@@ -430,6 +429,7 @@ class Predictor:
             if finish_time > request.start_time + request.deadline:
                 if self.task_assignment == TaskAssignment.CANARY:
                     if self.batching_algo == 'accscale':
+                        batch_finished_late = True
                         pass
                         # raise PredictorException(f'process_batch: Something is wrong, first request '
                         #                          f'in queue will expire before batch finishes processing '
@@ -437,23 +437,31 @@ class Predictor:
                     # # AIMD performs lazy-dropping
                     elif self.batching_algo == 'aimd':
                         aimd_negative_feedback = True
+                        batch_finished_late = True
                         pass
                         # self.simulator.bump_failed_request_stats(request)
                         # continue
                     # Since Nexus performed early-drop, no need to drop here
                     elif self.batching_algo == 'nexus':
+                        batch_finished_late = True
                         pass
                         # self.simulator.bump_failed_request_stats(request)
                         # continue
                     else:
                         raise PredictorException(f'unexpected batching algorithm: {self.batching_algo}')
                 elif self.task_assignment == TaskAssignment.INFAAS:
+                    batch_finished_late = True
                     pass
                     # self.simulator.bump_failed_request_stats(request)
                     # continue
             self.simulator.generate_end_request_event(request, finish_time,
                                                     accuracy_seen, qos_met)
-        self.simulator.generate_finish_batch_event(finish_time=finish_time,
+        # random_delta = batch_processing_time * (np.random.random()/5-0.1)
+        # random_delta = batch_processing_time * (np.random.random()/10-0.05)
+        random_delta = 0
+        # random_delta = batch_processing_time * (np.random.random()/3)
+        # print(f'batch processing time: {batch_processing_time}, delta: {random_delta}')
+        self.simulator.generate_finish_batch_event(finish_time=finish_time+random_delta,
                                                 predictor=self,
                                                 executor=self.executor)
         
@@ -464,6 +472,9 @@ class Predictor:
 
         self.busy = True
         self.busy_till = finish_time
+
+        self.predictor_log.info(f'process_batch,{clock},{batch_size},{batch_finished_late}')
+
         return
 
     

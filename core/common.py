@@ -14,7 +14,7 @@ class EventType(Enum):
 class Event:
     def __init__(self, start_time, type, desc, runtime=None, deadline=1000, id='',
                 qos_level=0, accuracy=100.0, predictor=None, executor=None,
-                event_counter=0, accuracy_seen = None):
+                event_counter=0, accuracy_seen=None, late=None):
         self.id = id
         if self.id == '':
             self.id = uuid.uuid4().hex
@@ -32,6 +32,7 @@ class Event:
         # event counter is only set if event is SLO_EXPIRING
         self.event_counter = event_counter
         self.accuracy_seen = accuracy_seen
+        self.late = late
 
     def __lt__(self, other):
         # return self.start_time < other.start_time
