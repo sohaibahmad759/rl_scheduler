@@ -1,0 +1,1 @@
+python test.py -ma 13 -js 6 -r -f 10 -p traces/azure --beta 0.5 --batching --batching_algo 1
