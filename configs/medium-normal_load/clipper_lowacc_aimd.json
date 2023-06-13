@@ -1,6 +1,6 @@
 {
     "profiling_data": "profiling/aggregate_profiled.csv",
-    "trace_path": "traces/twitter/asplos/medium-normal_load/3x",
+    "trace_path": "traces/twitter/asplos/medium-normal_load/300",
     "allowed_variants": "traces/model_variants_clipper_lowacc",
     "model_allocation": "clipper",
     "static_allocation": "algorithms/clipper_solutions/clipper_lowacc_mediumload.txt",
