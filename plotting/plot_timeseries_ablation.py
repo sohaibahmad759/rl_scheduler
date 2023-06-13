@@ -18,6 +18,9 @@ trace = 'normal_load'
 
 path = '../logs/throughput/selected_asplos'
 
+
+hatches = ['//', '\\', '/', '|', '+']
+
 logfile_list = [
                 # f'{path}/{trace}/infaas_accuracy_300ms.csv',
                 # f'{path}/{trace}/infaas_accuracy_300ms_interval2.csv',
@@ -43,9 +46,11 @@ logfile_list = [
 
                 f'{path}/{trace}/proteus_lessbatching_ewma1.1_earlydrop_300ms.csv',
                 # f'{path}/{trace}/proteus_lessbatching_ewma1.1_300ms.csv',
-                f'{path}/{trace}/proteus_batchsize1_ewma1.1_300ms.csv',
+                f'{path}/medium-normal_load/300ms/sommelier_asb_ewma1.6_beta1.5_300ms.csv',
                 f'{path}/{trace}/proteus_noscaling_300ms.csv',
-                f'{path}/{trace}/proteus_noscaling_batchsize1_300ms.csv',
+                f'{path}/{trace}/proteus_batchsize1_ewma1.1_300ms.csv',
+                f'{path}/{trace}/proteus_without_qa_300ms.csv',
+                # f'{path}/{trace}/proteus_noscaling_batchsize1_300ms.csv',
 
                 # f'{path}/{trace}/proteus_lessbatching_ewma1.1_earlydrop_300ms.csv',
                 # f'{path}/{trace}/proteus_batchsize1_ewma1.1_earlydrop_300ms.csv',
@@ -92,13 +97,15 @@ logfile_list = [
                 # '../logs/throughput/selected_asplos/sommelier_uniform_asb_300ms.csv'
                 ]
 
-MARKERS_ON = False
+MARKERS_ON = True
 
 # We want to print the latest log file
 logfile = logfile_list[-1]
 print(logfile)
 
-markers = ['+', 'o', 'v', '^', '*', 's', 'x']
+markers = ['.', 's', 'v', '^', 'x', '+', '*']
+# markersizes = [7, 3, 4, 4, 6, 5, 6]
+markersizes = [7, 3, 4, 4, 5, 6, 5]
 # algorithms = ['AccScale', 'Clipper++ (High Accuracy)', 'Clipper++ (High Throughput)',
 #             'INFaaS-Accuracy', 'INFaaS-Instance']
 # algorithms = ['Clipper++ (High Throughput)', 'Clipper++ (High Accuracy)',
@@ -126,9 +133,11 @@ algorithms = [
               # 'Proteus MoreBatching',
               # 'Proteus LessBatching',
               'Proteus',
-              'Proteus w/o \nAB',
-              'Proteus w/o \nMS',
-              'Proteus w/o \nMS+AB',
+              'Proteus w/o MP',
+              'Proteus w/o MS',
+              'Proteus w/o AB',
+              'Proteus w/o QA',
+              # 'Proteus w/o \nMS+AB',
               # 'MP+MS+QA+AB EarlyDrop',
               # 'MP+MS+QA EarlyDrop',
               # 'MP+QA+AB EarlyDrop',
@@ -260,11 +269,11 @@ for idx in range(len(logfile_list)):
 
     if MARKERS_ON == True:
         ax1.plot(time, goodput, label=algorithms[idx], color=colors[color_idx],
-                marker=markers[color_idx])
+                marker=markers[color_idx], markersize=markersizes[color_idx])
         ax2.plot(time, effective_accuracy, label=algorithms[idx], color=colors[color_idx],
-                marker=markers[color_idx])
+                marker=markers[color_idx], markersize=markersizes[color_idx])
         ax3.plot(time, total_slo_violations, label=algorithms[idx], color=colors[color_idx],
-                marker=markers[color_idx])
+                marker=markers[color_idx], markersize=markersizes[color_idx])
     else:
         ax1.plot(time, goodput, label=algorithms[idx], color=colors[color_idx])
         ax2.plot(time, effective_accuracy, label=algorithms[idx], color=colors[color_idx])
@@ -299,17 +308,17 @@ ax1.legend(loc='upper center', bbox_to_anchor=(0.425, 1.75), ncol=3, fontsize=12
 ax1.set_xticklabels([])
 ax1.set_xticks(np.arange(0, 25, 4), fontsize=15)
 ax1.set_yticks(np.arange(0, y_cutoff + 50, 300), fontsize=12)
-ax1.set_ylabel('Requests per\nsecond', fontsize=11)
+ax1.set_ylabel('Throughput', fontsize=11)
 
 ax2.set_xticklabels([])
 ax2.set_xticks(np.arange(0, 25, 4), fontsize=15)
 ax2.set_yticks(np.arange(80, 104, 5), fontsize=12)
-ax2.set_ylabel('Effective\nAccuracy', fontsize=11)
+ax2.set_ylabel('Effective Acc.', fontsize=11)
 
 ax3.set_xticks(np.arange(0, 25, 4), fontsize=15)
 # ax3.set_yticks(np.arange(0, 0.6, 0.1), fontsize=12)
 # ax3.set_ylabel('SLO Violation\nRatio', fontsize=11)
-ax3.set_yticks(np.arange(0, 610, 100), fontsize=12)
+ax3.set_yticks(np.arange(0, 510, 100), fontsize=12)
 ax3.set_ylabel('SLO Violations', fontsize=11)
 
 ax3.set_xlabel('Time (min)', fontsize=12)
@@ -323,10 +332,14 @@ print(f'Warning! There are some points where requests served are greater than in
 
 plt.close()
 del colors[0]
-plt.grid()
-plt.xlabel('Algorithm', fontsize=13)
-plt.ylabel('SLO Violation Ratio', fontsize=13)
-plt.bar(algorithms, slo_violation_ratios, color=colors)
-plt.yticks(np.arange(0, 0.41, 0.05), fontsize=12)
+# plt.grid()
+algorithms = ['Proteus', 'Proteus\nw/o MP', 'Proteus\nw/o MS',
+              'Proteus\nw/o AB', 'Proteus\nw/o QA']
+print(f'slo_violation_ratios: {slo_violation_ratios}')
+plt.xlabel('Algorithm', fontsize=16)
+plt.ylabel('SLO Violation Ratio', fontsize=16)
+plt.bar(algorithms, slo_violation_ratios, color=colors, hatch=hatches,
+        edgecolor='black')
+plt.yticks(np.arange(0, 0.21, 0.05), fontsize=14)
 plt.savefig(os.path.join('..', 'figures', 'asplos', 'ablation_study',
             f'slo_bar_{trace}.pdf'), dpi=500, bbox_inches='tight')

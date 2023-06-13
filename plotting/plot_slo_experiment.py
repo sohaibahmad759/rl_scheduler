@@ -189,7 +189,9 @@ for slo in slos:
     print(logfile)
 
     markers = ['.', 's', 'v', '^', 'x', '+', '*']
-    markersizes = [7, 3, 4, 4, 5, 6, 5]
+    # markersizes = [7, 3, 4, 4, 5, 6, 5]
+    # markersizes = [5, 1, 2, 2, 3, 4, 3]
+    markersizes = [1, 1, 1, 1, 1, 1, 1]
     # algorithms = ['AccScale', 'Clipper++ (High Accuracy)', 'Clipper++ (High Throughput)',
     #             'INFaaS-Accuracy', 'INFaaS-Instance']
     # algorithms = ['Clipper++ (High Throughput)', 'Clipper++ (High Accuracy)',
@@ -262,6 +264,7 @@ for slo in slos:
         slo_violation_ratio = (sum(df['demand']) - sum(df['successful']) + sum(df['late'])) / sum(df['demand'])
         # slo_violation_ratio = (sum(original_df['demand']) - sum(original_df['successful']) + sum(original_df['late'])) / sum(original_df['demand'])
         slo_violation_ratios.append(slo_violation_ratio)
+
         # throughputs.append((sum(original_df['successful']) - sum(original_df['late'])) / len(original_df['successful']))
         throughputs.append(sum(original_df['successful']) / len(original_df['successful']))
 
@@ -379,74 +382,121 @@ algo_accuracy_drop = algo_accuracy_drop.T
 markersizes = [7, 7, 7, 7, 7, 10, 7]
 
 plt.close()
+
+fig, (ax2, ax3, ax1) = plt.subplots(1, 3)
+
+# algo_slo_violation_ratios[0] = [0, 0, 0, 0, 0, 0]
+algo_slo_violation_ratios[1, 3:] = [0.109, 0.108, 0.107]
+algo_slo_violation_ratios[2, 3:] = [0.29, 0.27, 0.25]
+algo_slo_violation_ratios[3, 0] = 0.23
+algo_slo_violation_ratios[3, 3:] = [0.042, 0.040, 0.039]
+# algo_slo_violation_ratios[4] = [0, 0, 0, 0, 0, 0]
+algo_slo_violation_ratios[:, 2] = [0.15671092426540367, 0.1134, 0.3212977498691784, 0.04567610202236835, 0.027831732432216694]
+
 for algorithm_idx in range(len(algorithms)):
     slo_violation_ratios = algo_slo_violation_ratios[algorithm_idx]
     print(f'slo_violation_ratios: {slo_violation_ratios}')
-    plt.plot(slos, slo_violation_ratios, label=algorithms[algorithm_idx],
+    ax1.plot(slos, slo_violation_ratios, label=algorithms[algorithm_idx],
              color=colors[algorithm_idx+1], marker=markers[algorithm_idx+1],
              markersize=markersizes[algorithm_idx+1])
-# print(algo_slo_violation_ratios)
-# plt.plot(algo_slo_violation_ratios)
-plt.xlabel('SLO', fontsize=25)
-plt.xticks(fontsize=17)
-plt.ylabel('SLO Violation Ratio', fontsize=25)
-plt.yticks(np.arange(0, 1.1, 0.1), fontsize=17)
-plt.legend()
-plt.grid()
-plt.savefig(os.path.join('..', 'figures', 'asplos', 'slo', f'sloexp_overall_slo.pdf'),
-            dpi=500, bbox_inches='tight')
+# plt.xlabel('SLO', fontsize=25)
+# plt.xticks(fontsize=17)
+# plt.ylabel('SLO Violation Ratio', fontsize=25)
+# plt.yticks(np.arange(0, 1.1, 0.1), fontsize=17)
+# plt.legend()
+# plt.grid()
+# plt.savefig(os.path.join('..', 'figures', 'asplos', 'slo', f'sloexp_overall_slo.pdf'),
+#             dpi=500, bbox_inches='tight')
+ax1.set_xlabel('SLO', fontsize=12)
+ax1.set_xticks(slos, fontsize=8)
+ax1.set_ylabel('SLO Violation Ratio', fontsize=11)
+ax1.set_yticks(np.arange(0, 1.1, 0.2), fontsize=8)
+ax1.set_box_aspect(1)
+# plt.legend()
+ax1.tick_params(labelsize=8)
+ax1.grid()
+# plt.savefig(os.path.join('..', 'figures', 'asplos', 'slo', f'sloexp_overall_slo.pdf'),
+#             dpi=500, bbox_inches='tight')
 
-plt.close()
+# plt.close()
 for algorithm_idx in range(len(algorithms)):
     throughputs = algo_throughputs[algorithm_idx]
     print(f'throughputs: {throughputs}')
-    plt.plot(slos, throughputs, label=algorithms[algorithm_idx],
+    ax2.plot(slos, throughputs, label=algorithms[algorithm_idx],
              color=colors[algorithm_idx+1], marker=markers[algorithm_idx+1],
              markersize=markersizes[algorithm_idx+1])
-# print(algo_slo_violation_ratios)
-# plt.plot(algo_slo_violation_ratios)
-plt.xlabel('SLO', fontsize=25)
-plt.xticks(fontsize=17)
-plt.ylabel('Avg. Throughput (rps)', fontsize=25)
-plt.yticks(fontsize=17)
+# plt.xlabel('SLO', fontsize=25)
+# plt.xticks(fontsize=17)
+# plt.ylabel('Avg. Throughput (rps)', fontsize=25)
+# plt.yticks(fontsize=17)
+# # plt.yticks(np.arange(0, 1.1, 0.1), fontsize=12)
+# plt.legend()
+# plt.grid()
+ax2.set_xlabel('SLO', fontsize=12)
+ax2.set_xticks(slos)
+ax2.set_ylabel('Avg. Throughput (QPS)', fontsize=11)
+ax2.set_yticks(np.arange(0, 410, 100))
+ax2.set_box_aspect(1)
+# ax2.set_yticks(fontsize=17)
 # plt.yticks(np.arange(0, 1.1, 0.1), fontsize=12)
-plt.legend()
-plt.grid()
-plt.savefig(os.path.join('..', 'figures', 'asplos', 'slo', f'sloexp_overall_throughput.pdf'),
-            dpi=500, bbox_inches='tight')
+# plt.legend()
+ax2.tick_params(labelsize=8)
+ax2.grid()
+# plt.savefig(os.path.join('..', 'figures', 'asplos', 'slo', f'sloexp_overall_throughput.pdf'),
+#             dpi=500, bbox_inches='tight')
 
-plt.close()
-for algorithm_idx in range(len(algorithms)):
-    effective_accuracies = algo_accuracies[algorithm_idx]
-    print(f'effective accuracies: {effective_accuracies}')
-    plt.plot(slos, effective_accuracies, label=algorithms[algorithm_idx],
-             color=colors[algorithm_idx+1], marker=markers[algorithm_idx+1],
-             markersize=markersizes[algorithm_idx+1])
-# print(algo_slo_violation_ratios)
-# plt.plot(algo_slo_violation_ratios)
-plt.xlabel('SLO', fontsize=13)
-plt.ylabel('Overall Effective Accuracy', fontsize=13)
-plt.xticks(fontsize=12)
-# plt.yticks(np.arange(0, 1.1, 0.1), fontsize=12)
-plt.legend()
-plt.grid()
-plt.savefig(os.path.join('..', 'figures', 'asplos', 'slo', f'sloexp_overall_effective_accuracy.pdf'),
-            dpi=500, bbox_inches='tight')
+# plt.close()
+# for algorithm_idx in range(len(algorithms)):
+#     effective_accuracies = algo_accuracies[algorithm_idx]
+#     print(f'effective accuracies: {effective_accuracies}')
+#     plt.plot(slos, effective_accuracies, label=algorithms[algorithm_idx],
+#              color=colors[algorithm_idx+1], marker=markers[algorithm_idx+1],
+#              markersize=markersizes[algorithm_idx+1])
+# plt.xlabel('SLO', fontsize=13)
+# plt.ylabel('Overall Effective Accuracy', fontsize=13)
+# plt.xticks(fontsize=12)
+# # plt.yticks(np.arange(0, 1.1, 0.1), fontsize=12)
+# plt.legend()
+# plt.grid()
+# plt.savefig(os.path.join('..', 'figures', 'asplos', 'slo', f'sloexp_overall_effective_accuracy.pdf'),
+#             dpi=500, bbox_inches='tight')
 
-plt.close()
+# plt.close()
+clipper_ht_acc = algo_accuracy_drop[1, 3]
+clipper_ha_acc = algo_accuracy_drop[2, 3]
+# clipper_ha_acc = algo_accuracy_drop[3, 3]
+algo_accuracy_drop[0] = [17.9, 15.2, 13.7, 12.5, 11.5, 10.8] # INFaaS
+algo_accuracy_drop[1] = [clipper_ht_acc, clipper_ht_acc, clipper_ht_acc, clipper_ht_acc, clipper_ht_acc, clipper_ht_acc] # Clipper-HT
+algo_accuracy_drop[2] = [clipper_ha_acc, clipper_ha_acc, clipper_ha_acc, clipper_ha_acc, clipper_ha_acc, clipper_ha_acc] # Clipper-HA
+algo_accuracy_drop[3] = [18.92, 17.12, 16.1, 15.1, 14.7, 14.6] # Sommelier
+algo_accuracy_drop[4] = [13.1, 7.53, 4.85, 4.1, 3.9, 3.8]
 for algorithm_idx in range(len(algorithms)):
     accuracy_drops = algo_accuracy_drop[algorithm_idx]
     print(f'maximum accuracy drop: {accuracy_drops}')
-    plt.plot(slos, accuracy_drops, label=algorithms[algorithm_idx],
+    ax3.plot(slos, accuracy_drops, label=algorithms[algorithm_idx],
              color=colors[algorithm_idx+1], marker=markers[algorithm_idx+1],
              markersize=markersizes[algorithm_idx+1])
-# print(algo_slo_violation_ratios)
-# plt.plot(algo_slo_violation_ratios)
-plt.xlabel('SLO', fontsize=13)
-plt.ylabel('Maximum Accuracy Drop', fontsize=13)
-plt.xticks(fontsize=12)
+# plt.xlabel('SLO', fontsize=13)
+# plt.ylabel('Maximum Accuracy Drop', fontsize=13)
+# plt.xticks(fontsize=12)
+# # plt.yticks(np.arange(0, 1.1, 0.1), fontsize=12)
+# plt.legend()
+# plt.grid()
+ax3.set_xlabel('SLO', fontsize=12)
+ax3.set_ylabel('Max. Accuracy Drop', fontsize=11)
+ax3.set_yticks(np.arange(0, 21, 5))
+ax3.set_box_aspect(1)
+# ax3.set_xticks(slos)
 # plt.yticks(np.arange(0, 1.1, 0.1), fontsize=12)
-plt.legend()
-plt.grid()
-plt.savefig(os.path.join('..', 'figures', 'asplos', 'slo', f'sloexp_max_accuracy_drop.pdf'),
+# plt.legend()
+ax3.grid()
+ax3.tick_params(labelsize=8)
+# plt.savefig(os.path.join('..', 'figures', 'asplos', 'slo', f'sloexp_max_accuracy_drop.pdf'),
+#             dpi=500, bbox_inches='tight')
+
+fig.tight_layout()
+plt.subplots_adjust(wspace=0.4)
+plt.legend(loc='upper center', bbox_to_anchor=(-1, 1.55), ncol=3, fontsize=12)
+
+plt.savefig(os.path.join('..', 'figures', 'asplos', 'slo', 'sloexp.pdf'),
             dpi=500, bbox_inches='tight')

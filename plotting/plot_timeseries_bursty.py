@@ -19,7 +19,7 @@ path = '../logs/throughput/selected_asplos'
 slo = '300ms'
 
 logfile_list = [
-                f'{path}/{trace}/sommelier_asb_300ms.csv',
+                f'{path}/{trace}/infaas_accuracy_300ms.csv',
                 # f'{path}/{trace}/infaas_accuracy_300ms_0.1_0.4.csv',
                 # f'{path}/{trace}/infaas_accuracy_300ms_0.1_0.5.csv',
                 # f'{path}/{trace}/infaas_accuracy_300ms_0.05_0.6.csv',
@@ -36,7 +36,7 @@ logfile_list = [
                 # f'{path}/{trace}/infaas_accuracy_300ms_slack0.15.csv',
                 f'{path}/{trace}//clipper_ht_aimd_300ms.csv', # this
                 f'{path}/{trace}//clipper_ha_aimd_300ms.csv',
-                f'{path}/{trace}/infaas_accuracy_300ms.csv',
+                f'{path}/{trace}/sommelier_asb_300ms.csv',
                 # f'{path}/{trace}/clipper_ht_asb_300ms.csv',
                 # f'{path}/{trace}/{slo}/clipper_ha_aimd_300ms.csv', # this
                 # f'{path}/{trace}/clipper_ht_aimd_lateallowed_300ms.csv',
@@ -105,8 +105,7 @@ markersizes = [7, 3, 4, 4, 5, 6, 5]
 # algorithms = ['Clipper++ (High Throughput)', 'Clipper++ (High Accuracy)',
 #             'INFaaS-Instance', 'INFaaS-Accuracy', 'AccScale']
 algorithms = [
-              'Sommelier',
-            #   'INFaaS-Accuracy',
+              'INFaaS-Accuracy',
             #   'INFaaS-Accuracy 0.1 0.4',
             #   'INFaaS-Accuracy 0.1 0.5',
             #   'INFaaS-Accuracy 0.05 0.6',
@@ -126,12 +125,12 @@ algorithms = [
             #   'Clipper-HT-Nexus',
             #   'Clipper-HT-ASB',
             #   'Clipper-HT Optimized Start',
+              'Sommelier',
             #   'Sommelier-AIMD',
             #   'Sommelier-ASB',
             #   'Sommelier-ASB EWMA1.1',
             #   'Sommelier-AIMD EWMA1.1 Beta1.5',
             #   'Sommelier-ASB EWMA1.1 Beta1.5',
-              'INFaaS-Accuracy',
             #   'Sommelier-ASB Interval2',
             #   'Sommelier-Nexus'
             #   'Proteus-Clipper',
@@ -173,6 +172,9 @@ algorithms = [
               ]
 colors = ['#729ECE', '#FF9E4A', '#ED665D', '#AD8BC9', '#67BF5C', '#8C564B',
           '#E377C2', 'tab:olive', 'tab:cyan']
+
+logfile_list = [logfile_list[2], logfile_list[0], logfile_list[1], logfile_list[3], logfile_list[4]]
+algorithms = [algorithms[2], algorithms[0], algorithms[1], algorithms[3], algorithms[4]]
 
 fig, (ax1, ax2, ax3) = plt.subplots(3)
 color_idx = 0
@@ -291,12 +293,12 @@ ax1.legend(loc='upper center', bbox_to_anchor=(0.45, 1.75), ncol=3, fontsize=12)
 ax1.set_xticklabels([])
 ax1.set_xticks(np.arange(0, 25, 4), fontsize=15)
 ax1.set_yticks(np.arange(0, y_cutoff + 50, 300), fontsize=12)
-ax1.set_ylabel('Requests per\nsecond', fontsize=11)
+ax1.set_ylabel('Throughput', fontsize=11)
 
 ax2.set_xticks(np.arange(0, 25, 4), fontsize=15)
 ax2.set_xticklabels([])
 ax2.set_yticks(np.arange(80, 104, 5), fontsize=12)
-ax2.set_ylabel('Effective\nAccuracy', fontsize=11)
+ax2.set_ylabel('Effective Acc.', fontsize=11)
 
 ax3.set_xticks(np.arange(0, 25, 4), fontsize=15)
 # ax3.set_yticks(np.arange(0, 0.6, 0.1), fontsize=12)
