@@ -1385,7 +1385,7 @@ class Executor:
                 selected = None
                 weights = list(map(lambda x: x.peak_throughput, self.predictors.values()))
                 weights = np.ones(len(self.predictors))
-                print(f'weights: {weights}')
+                self.log.debug(f'weights: {weights}')
                 # time.sleep(1)
                 if not(any(x > 0 for x in weights)):
                     self.simulator.bump_failed_request_stats(event)

@@ -640,7 +640,7 @@ class Simulator:
         profiled = profiled.applymap(self.replace_profiled_strings)
         
         pd.set_option('display.max_columns', None)
-        self.log.info(f'profiled data: {profiled}')
+        self.log.debug(f'profiled data: {profiled}')
         
         return profiled
 

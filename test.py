@@ -6,14 +6,13 @@ import sys
 import logging
 import argparse
 import numpy as np
-from stable_baselines3 import PPO
 import core.utils as utils
+from core.exceptions import ConfigException
 from core.scheduling_env import SchedulingEnv
 from algorithms.clipper import Clipper
 from algorithms.ilp import Ilp
 from algorithms.ilp_alpha import IlpAlpha
 from algorithms.ilp_throughput import IlpThroughput
-from core.exceptions import ConfigException
 
 
 def getargs():
@@ -157,7 +156,6 @@ def validate_config(config: dict, filename: str):
 
 
 def main(args):
-    model_training_steps = 8000
     action_group_size = int(args.action_size)
     reward_window_length = args.reward_window_length
     allocation_window = int(args.allocation_window)
@@ -198,24 +196,12 @@ def main(args):
                         max_batch_size=max_batch_size, ewma_decay=ewma_decay,
                         infaas_slack=infaas_slack, infaas_downscale_slack=infaas_downscale_slack)
 
-    policy_kwargs = dict(net_arch=[128, 128, dict(pi=[128, 128, 128],
-                                        vf=[128, 128, 128])])
-    if 'rl' in model_assignment:
-        model_name = 'train_' + str(model_training_steps) + '_action_size_' + str(action_group_size) + \
-                        '_window_' + str(reward_window_length)
-        model = PPO.load('saved_models/' + model_name)
-        print(model)
-
     print()
     print('--------------------------')
     if model_assignment == 'random':
         print('Testing with random actions')
     elif model_assignment == 'static':
         print('Testing with static allocation of 1 predictor for each type')
-    elif model_assignment == 'rl':
-        print('Testing with trained RL model (cold start): {}'.format(model_name))
-    elif model_assignment == 'rl_warm':
-        print('Testing with trained RL model (warm start): {}'.format(model_name))
     elif model_assignment == 'lfu':
         print('Testing with LFU (Least Frequently Used) baseline')
     elif model_assignment == 'load_proportional':
@@ -569,11 +555,9 @@ def main(args):
     end = time.time()
 
     print()
-    print('---------------------------------')
-    print('Printing overall statistics below')
-    print('---------------------------------')
-    print(f'Reward from RL model: {rl_reward}')
-    print(f'Requests failed by RL model: {failed_requests}')
+    print('---------------------------')
+    print('Printing overall statistics')
+    print('---------------------------')
     print(f'Total requests: {total_requests}')
     print(
         f'Percentage of requests failed: {(failed_requests/total_requests*100)}%')
@@ -627,7 +611,7 @@ def main(args):
         print(f'AIMD increased batch size {env.simulator.aimd_stats["increased"]} times '
               f'and decreased batch size {env.simulator.aimd_stats["decreased"]} times')
         
-    print(f'Batch sizes used throughout: {env.simulator.batch_size_counters}')
+    print(f'Batch sizes used: {env.simulator.batch_size_counters}')
 
     # bumped_failed = env.simulator.failed_requests
     # bumped_succeeded = env.simulator.successful_requests

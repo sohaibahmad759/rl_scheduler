@@ -233,7 +233,7 @@ class Predictor:
     def enqueue_request(self, event, clock):
         ''' Add the request to the request queue of this predictor
         '''
-        self.predictor_log.info(f'enqueued,{clock}')
+        self.predictor_log.debug(f'enqueued,{clock}')
         self.request_dict[event.id] = 1
         self.request_queue.append(event)
         self.event_counter += 1
@@ -473,7 +473,7 @@ class Predictor:
         self.busy = True
         self.busy_till = finish_time
 
-        self.predictor_log.info(f'process_batch,{clock},{batch_size},{batch_finished_late}')
+        self.predictor_log.debug(f'process_batch,{clock},{batch_size},{batch_finished_late}')
 
         return
 
@@ -481,7 +481,7 @@ class Predictor:
     def finish_batch_callback(self, clock):
         ''' Callback to handle a FINISH_BATCH event
         '''
-        self.predictor_log.info(f'finish_batch_callback,{clock}')
+        self.predictor_log.debug(f'finish_batch_callback,{clock}')
 
         self.busy = False
         self.busy_till = None

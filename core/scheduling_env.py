@@ -9,7 +9,7 @@ from core.simulator import Simulator
 
 
 class SchedulingEnv(gym.Env):
-    """Scheduling Environment that follows gym interface"""
+    """Scheduling environment that uses the gym interface"""
     metadata = {'render.modes': ['human']}
 
     def __init__(self, trace_dir, job_sched_algo, action_group_size,

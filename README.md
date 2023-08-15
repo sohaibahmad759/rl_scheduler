@@ -2,7 +2,7 @@
 
 ## Installation instructions 
 
-1. `conda create --name scheduler python=3.7.7`
+1. `conda create --name scheduler python=3.7.7` (environment on Sohaib's MacBook Pro seems to be using python 3.10.6)
 
 2. `conda activate scheduler`
 
