@@ -49,6 +49,7 @@ class Simulator:
         self.failed_requests = 0
         self.total_failed = 0
         self.total_successful = 0
+        self.total_successful_per_model = {}
         self.failed_requests_arr = []
         self.successful_requests = 0
         self.successful_requests_arr = []
@@ -69,6 +70,7 @@ class Simulator:
         self.requests_added = 0
 
         self.total_accuracy = 0
+        self.total_accuracy_per_model = {}
 
         self.accelerator_types = ['CPU', 'GPU_AMPERE', 'VPU', 'GPU_PASCAL']
 
@@ -210,7 +212,8 @@ class Simulator:
 
         self.qos_stats = np.zeros((len(self.executors), n_qos_levels * 2))
         self.slo_timeouts = {'total': 0, 'succeeded': 0, 'timeouts': 0, 'late': 0}
-        self.slo_timeouts_per_executor = {}
+        self.slo_timeouts_per_executor = {'total': {}, 'succeeded': {}, 'timeouts': {},
+                                          'late': {}}
         self.requests_per_executor = {}
         self.aimd_stats = {'increased': 0, 'decreased': 0}
         self.batch_size_counters = self.initialize_batch_size_counters()
@@ -1505,11 +1508,13 @@ class Simulator:
         self.failed_per_model[isi] += 1
         self.slo_timeouts['timeouts'] += 1
         self.slo_timeouts['total'] += 1
-        if isi in self.slo_timeouts_per_executor:
-            self.slo_timeouts_per_executor[isi] += 1
+        if isi in self.slo_timeouts_per_executor['timeouts']:
+            self.slo_timeouts_per_executor['timeouts'][isi] += 1
+            self.slo_timeouts_per_executor['total'][isi] += 1
             self.requests_per_executor[isi] += 1
         else:
-            self.slo_timeouts_per_executor[isi] = 1
+            self.slo_timeouts_per_executor['timeouts'][isi] = 1
+            self.slo_timeouts_per_executor['total'][isi] = 1
             self.requests_per_executor[isi] = 1
         self.bump_qos_unmet_stats(event)
         return
@@ -1531,7 +1536,19 @@ class Simulator:
         self.successful_per_model[isi] += 1
         self.slo_timeouts['succeeded'] += 1
         self.total_successful += 1
+        if isi in self.total_accuracy_per_model:
+            self.total_successful_per_model[isi] += 1
+        else:
+            self.total_successful_per_model[isi] = 1
         self.total_accuracy += event.accuracy_seen
+        if isi in self.slo_timeouts_per_executor['succeeded']:
+            self.slo_timeouts_per_executor['succeeded'][isi] += 1
+        else:
+            self.slo_timeouts_per_executor['succeeded'][isi] = 1
+        if isi in self.total_accuracy_per_model:
+            self.total_accuracy_per_model[isi] += event.accuracy_seen
+        else:
+            self.total_accuracy_per_model[isi] = event.accuracy_seen
 
         if isi in self.requests_per_executor:
             self.requests_per_executor[isi] += 1
@@ -1541,6 +1558,11 @@ class Simulator:
         # print(f'start_time: {event.event_counter}, processing time: {processing_time}, clock: {self.clock}')
         if processing_time > event.deadline:
             self.slo_timeouts['late'] += 1
+
+            if isi in self.slo_timeouts_per_executor:
+                self.slo_timeouts_per_executor['late'][isi] += 1
+            else:
+                self.slo_timeouts_per_executor['late'][isi] = 1
         return
     
     # def bump_late_successful_request_stats(self, event):

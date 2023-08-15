@@ -1,4 +1,5 @@
 import os
+import copy
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -18,19 +19,26 @@ trace = 'medium-normal_load'
 path = '../logs/throughput/selected_asplos'
 # slo = '150ms'
 # slo = '1x'
-# slo = '300ms'
+slo = '300ms'
 # slo = '2.1x'
 # slo = '3x'
-slo = '300ms_cluster'
+# slo = '300ms_cluster'
 
 logfile_list = [
+                f'{path}/{trace}/{slo}/infaas_accuracy_300ms_0.05_0.6.csv', # 1x, 3x
+                f'{path}/{trace}/{slo}/clipper_ht_aimd_300ms.csv', # this
+                f'{path}/{trace}/{slo}/clipper_ha_aimd_300ms.csv', # this
+                f'{path}/{trace}/{slo}/sommelier_asb_ewma1.6_beta1.5_300ms.csv', # 300ms, 2.1x, 3x
+                f'{path}/{trace}/{slo}/proteus_ewma1.6_300ms.csv', # 300ms, 2.1x, 3x
+
+                # f'{path}/{trace}/{slo}/proteus.csv'
+
                 # f'{path}/{trace}/infaas_accuracy_300ms.csv',
                 # f'{path}/{trace}/infaas_accuracy_300ms_0.1_0.4.csv',
                 # f'{path}/{trace}/infaas_accuracy_300ms_0.1_0.5.csv',
                 # f'{path}/{trace}/infaas_accuracy_300ms_0.05_0.6.csv',
                 # f'{path}/{trace}/infaas_accuracy_300ms_0.05_0.8.csv',
                 # f'{path}/{trace}/{slo}/infaas_accuracy_300ms_0.01_0.6.csv', # 300ms
-                f'{path}/{trace}/{slo}/infaas_accuracy_300ms_0.05_0.6.csv', # 1x, 3x
                 # f'{path}/{trace}/{slo}/infaas_accuracy_300ms_0.05_0.8.csv', # 2.1x
                 # f'{path}/{trace}/{slo}/infaas_accuracy_300ms_0.05_0.5.csv',
                 # f'{path}/{trace}/{slo}/infaas_accuracy_300ms_0.05_0.3.csv',
@@ -45,9 +53,7 @@ logfile_list = [
                 # f'{path}/{trace}/infaas_accuracy_300ms_slack1.csv',
                 # f'{path}/{trace}/infaas_accuracy_300ms_slack1.5.csv',
                 # f'{path}/{trace}/infaas_accuracy_300ms_slack0.15.csv',
-                f'{path}/{trace}/{slo}/clipper_ht_aimd_300ms.csv', # this
                 # f'{path}/{trace}/clipper_ht_asb_300ms.csv', # this
-                f'{path}/{trace}/{slo}/clipper_ha_aimd_300ms.csv', # this
                 # f'{path}/{trace}/clipper_ht_aimd_lateallowed_300ms.csv',
                 # f'{path}/{trace}/clipper_ht_nexus_300ms.csv',
                 # f'{path}/{trace}/clipper_ht_asb_300ms.csv', # this
@@ -57,14 +63,12 @@ logfile_list = [
                 # f'{path}/{trace}/sommelier_asb_ewma1.1_300ms.csv',
                 # f'{path}/{trace}/sommelier_aimd_ewma1.1_beta1.5_300ms.csv',
                 # f'{path}/{trace}/sommelier_asb_ewma1.1_beta1.5_300ms.csv',
-                f'{path}/{trace}/{slo}/sommelier_asb_ewma1.6_beta1.5_300ms.csv', # 300ms, 2.1x, 3x
                 # f'{path}/{trace}/sommelier_asb_300ms_intervaladaptive2.csv',
                 # f'{path}/{trace}/sommelier_nexus_300ms.csv',
                 # '../logs/throughput/selected_asplos/proteus_aimd_300ms.csv',
                 # '../logs/throughput/selected_asplos/proteus_nexus_300ms.csv',
                 # f'{path}/{trace}/proteus_300ms.csv',
                 # f'{path}/{trace}/proteus_ewma1.1_300ms.csv',
-                f'{path}/{trace}/{slo}/proteus_ewma1.6_300ms.csv', # 300ms, 2.1x, 3x
                 # f'{path}/{trace}/proteus_ewma2.1_300ms.csv',
                 # f'{path}/{trace}/proteus_lessbatching_ewma1.1_earlydrop_300ms.csv',
                 # f'{path}/{trace}/50ms/proteus_50ms.csv',
@@ -217,10 +221,10 @@ for idx in range(len(logfile_list)):
 
     df = pd.read_csv(logfile)
 
-    original_df = df
+    original_df = copy.deepcopy(df)
 
-    aggregated = df.groupby(df.index // 10).sum()
-    aggregated = df.groupby(df.index // 10).mean()
+    aggregated = df.groupby(df.index // 10).sum(numeric_only=True)
+    aggregated = df.groupby(df.index // 10).mean(numeric_only=True)
     df = aggregated
     # print(f'df: {df}')
     # print(f'aggregated: {aggregated}')
@@ -279,10 +283,10 @@ for idx in range(len(logfile_list)):
 
     time = time
     time = [x - time[0] for x in time]
-    print(time[-1])
+    # print(time[-1])
     time = [x / time[-1] * 24 for x in time]
-    print(time[0])
-    print(time[-1])
+    # print(time[0])
+    # print(time[-1])
 
     if idx == 0:
         axs[0, 0].plot(time, demand, label='Demand', color=colors[color_idx],
@@ -324,17 +328,10 @@ axs[0, 0].grid()
 axs[1, 0].grid()
 axs[2, 0].grid()
 
-# plt.rcParams.update({'font.size': 30})
-# plt.rc('axes', titlesize=30)     # fontsize of the axes title
-# plt.rc('axes', labelsize=30)    # fontsize of the x and y labels
-# plt.rc('xtick', labelsize=30)    # fontsize of the tick labels
-# plt.rc('ytick', labelsize=30)    # fontsize of the tick labels
-# plt.rc('legend', fontsize=30)    # legend
 
 y_cutoff += 50
 # y_cutoff = 200
 
-# ax1.set_title(trace)
 
 axs[0, 0].legend(loc='upper center', bbox_to_anchor=(0.65, 1.65), ncol=3, fontsize=14)
 
@@ -379,23 +376,6 @@ print(f'proteus_y_intercept: {proteus_y_intercept}')
 print(f'Warning! We should not be using mean to aggregate, instead we should be using sum')
 print(f'Warning! There are some points where requests served are greater than incoming '
       f'demand. Fix this or find the cause')
-
-# slo_violation_ratios.pop()
-# slo_violation_ratios.append(0.028468647274080505)
-# del colors[0]
-
-print(slo_violation_ratios)
-
-if 'cluster' in slo:
-    del slo_violation_ratios[1]
-    slo_violation_ratios.insert(1, 0.1219)
-
-    del slo_violation_ratios[4]
-    slo_violation_ratios.insert(4, 0.03228)
-
-elif '300' in slo:
-    del slo_violation_ratios[1]
-    slo_violation_ratios.insert(1, 0.1134)
 
 
 print(f'slo_violation_ratios: {slo_violation_ratios}')

@@ -1,4 +1,5 @@
 import os
+import copy
 import glob
 import json
 import time
@@ -9,6 +10,7 @@ import numpy as np
 import core.utils as utils
 from core.exceptions import ConfigException
 from core.scheduling_env import SchedulingEnv
+from core.utils import dict_subtraction
 from algorithms.clipper import Clipper
 from algorithms.ilp import Ilp
 from algorithms.ilp_alpha import IlpAlpha
@@ -252,17 +254,20 @@ def main(args):
     rate_loggerfile = os.path.join('logs', 'throughput', str(time.time()) + '_' +  model_assignment + '.csv')
     rate_logger.addHandler(logging.FileHandler(rate_loggerfile, mode='w'))
     rate_logger.setLevel(file_log_level)
-    rate_logger.info('wallclock_time,simulation_time,demand,throughput,capacity,effective_accuracy,' +
-                     'total_accuracy,successful,dropped,late,estimated_throughput,estimated_effective_accuracy,' +
-                     'ilp_utilization,proportional_lb,ilp_demand,demand_ewma')
+    rate_logger.info(f'wallclock_time,simulation_time,demand,throughput,capacity,'
+                     f'effective_accuracy,total_accuracy,successful,dropped,late,'
+                     f'estimated_throughput,estimated_effective_accuracy,ilp_utilization,'
+                     f'proportional_lb,ilp_demand,demand_ewma')
 
     rate_logger_per_model = logging.getLogger('Rate logger per model')
     rate_logger_per_model_file = os.path.join('logs', 'throughput_per_model', str(time.time()) + '_' + model_assignment + '.csv')
     rate_logger_per_model.addHandler(
         logging.FileHandler(rate_logger_per_model_file, mode='w'))
     rate_logger_per_model.setLevel(file_log_level)
-    rate_logger_per_model.info(
-        'wallclock_time,simulation_time,demand_nth_model,throughput_nth_model,normalized_throughput_nth_model,accuracy_nth_model,,,,,,,,,,,,,,,,')
+    rate_logger_per_model.info(f'wallclock_time,simulation_time,model,demand,throughput,'
+                               f'capacity,effective_accuracy,total_accuracy,successful,'
+                               f'dropped,late')
+    # 'wallclock_time,simulation_time,demand_nth_model,throughput_nth_model,normalized_throughput_nth_model,accuracy_nth_model,,,,,,,,,,,,,,,,')
 
     rl_reward = 0
     observation = env.reset()
@@ -273,6 +278,10 @@ def main(args):
     total_accuracy = 0
     total_dropped = 0
     total_late = 0
+    total_successful_per_model = {}
+    total_accuracy_per_model = {}
+    total_dropped_per_model = {}
+    total_late_per_model = {}
     ilp_rounds = 0
     start = time.time()
     step_time = time.time()
@@ -518,8 +527,9 @@ def main(args):
             logfile.write(str(total_requests) + ',' +
                           str(failed_requests) + '\n')
             requests_per_model, failed_per_model, accuracy_per_model, successful_per_model = env.simulator.get_thput_accuracy_per_model()
-            utils.log_thput_accuracy_per_model(rate_logger_per_model, i, requests_per_model,
-                                               failed_per_model, accuracy_per_model)
+            # This function is now deprecated, use utils.log_throughput_per_model
+            # utils.log_thput_accuracy_per_model(rate_logger_per_model, i, requests_per_model,
+            #                                    failed_per_model, accuracy_per_model)
         if done:
             break
         rl_reward += reward
@@ -535,22 +545,50 @@ def main(args):
         ilp_demand = env.simulator.ilp_stats['demand']
         proportional_lb = env.simulator.use_proportional
         demand_ewma = sum(env.simulator.ewma_demand.ravel())
-        utils.log_throughput(rate_logger, observation, i, allocation_window,
-                             new_total_accuracy-total_accuracy,
-                             new_total_successful-total_successful,
-                             new_dropped-total_dropped,
-                             new_late-total_late,
-                             estimated_throughput,
-                             estimated_effective_accuracy,
-                             ilp_utilization,
-                             proportional_lb,
-                             ilp_demand,
-                             demand_ewma)
+        utils.log_throughput(logger=rate_logger, observation=observation,
+                             simulation_time=i, allocation_window=allocation_window,
+                             total_accuracy=new_total_accuracy-total_accuracy,
+                             total_successful=new_total_successful-total_successful,
+                             dropped=new_dropped-total_dropped,
+                             late=new_late-total_late,
+                             estimated_throughput=estimated_throughput,
+                             estimated_effective_accuracy=estimated_effective_accuracy,
+                             ilp_utilization=ilp_utilization,
+                             proportional_lb=proportional_lb,
+                             ilp_demand=ilp_demand,
+                             demand_ewma=demand_ewma)
         total_accuracy = new_total_accuracy
         total_successful = new_total_successful
         total_dropped = new_dropped
         total_late = new_late
-        # print('observation:', observation)
+
+        # Logging per-model_family stats
+        new_total_accuracy_per_model = env.simulator.total_accuracy_per_model
+        new_total_successful_per_model = env.simulator.total_successful_per_model
+        new_dropped_per_model = env.simulator.slo_timeouts_per_executor['timeouts']
+        new_late_per_model = env.simulator.slo_timeouts_per_executor['late']
+
+        window_total_accuracy_per_model = dict_subtraction(new_total_accuracy_per_model,
+                                                           total_accuracy_per_model)
+        window_total_successful_per_model = dict_subtraction(new_total_successful_per_model,
+                                                             total_successful_per_model)
+        window_dropped_per_model = dict_subtraction(new_dropped_per_model,
+                                                    total_dropped_per_model)
+        window_late_per_model = dict_subtraction(new_late_per_model, total_late_per_model)
+        utils.log_throughput_per_model(logger=rate_logger_per_model,
+                                       observation=observation,
+                                       simulation_time=i,
+                                       allocation_window=allocation_window,
+                                       total_accuracy_per_model=window_total_accuracy_per_model,
+                                       total_successful_per_model=window_total_successful_per_model,
+                                       dropped_per_model=window_dropped_per_model,
+                                       late_per_model=window_late_per_model,
+                                       executor_to_idx=env.simulator.isi_to_idx
+                                       )
+        total_successful_per_model = copy.deepcopy(new_total_successful_per_model)
+        total_accuracy_per_model = copy.deepcopy(new_total_accuracy_per_model)
+        total_dropped_per_model = copy.deepcopy(new_dropped_per_model)
+        total_late_per_model = copy.deepcopy(new_late_per_model)
 
     end = time.time()
 

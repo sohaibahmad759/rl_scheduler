@@ -4,6 +4,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 
+path = '../logs/throughput/selected_asplos'
+
 # trace = 'normal-high_load'
 # trace = 'normal_load'
 trace = 'medium-normal_load'
@@ -15,7 +17,6 @@ trace = 'medium-normal_load'
 # trace = 'equal_exponential'
 # trace = 'equal_gamma'
 
-path = '../logs/throughput/selected_asplos'
 # slo = '150ms'
 # slo = '1x'
 slo = '300ms'
@@ -24,13 +25,20 @@ slo = '300ms'
 # slo = '300ms_cluster'
 
 logfile_list = [
+                f'{path}/{trace}/{slo}/infaas_accuracy_300ms_0.05_0.6.csv', # 1x, 3x
+                f'{path}/{trace}/{slo}/clipper_ht_aimd_300ms.csv', # this
+                f'{path}/{trace}/{slo}/clipper_ha_aimd_300ms.csv', # this
+                f'{path}/{trace}/{slo}/sommelier_asb_ewma1.6_beta1.5_300ms.csv', # 300ms, 2.1x, 3x
+                f'{path}/{trace}/{slo}/proteus_ewma1.6_300ms.csv', # 300ms, 2.1x, 3x
+
+                # f'{path}/{trace}/{slo}/proteus.csv'
+
                 # f'{path}/{trace}/infaas_accuracy_300ms.csv',
                 # f'{path}/{trace}/infaas_accuracy_300ms_0.1_0.4.csv',
                 # f'{path}/{trace}/infaas_accuracy_300ms_0.1_0.5.csv',
                 # f'{path}/{trace}/infaas_accuracy_300ms_0.05_0.6.csv',
                 # f'{path}/{trace}/infaas_accuracy_300ms_0.05_0.8.csv',
                 # f'{path}/{trace}/{slo}/infaas_accuracy_300ms_0.01_0.6.csv', # 300ms
-                f'{path}/{trace}/{slo}/infaas_accuracy_300ms_0.05_0.6.csv', # 1x, 3x
                 # f'{path}/{trace}/{slo}/infaas_accuracy_300ms_0.05_0.8.csv', # 2.1x
                 # f'{path}/{trace}/{slo}/infaas_accuracy_300ms_0.05_0.5.csv',
                 # f'{path}/{trace}/{slo}/infaas_accuracy_300ms_0.05_0.3.csv',
@@ -45,9 +53,7 @@ logfile_list = [
                 # f'{path}/{trace}/infaas_accuracy_300ms_slack1.csv',
                 # f'{path}/{trace}/infaas_accuracy_300ms_slack1.5.csv',
                 # f'{path}/{trace}/infaas_accuracy_300ms_slack0.15.csv',
-                f'{path}/{trace}/{slo}/clipper_ht_aimd_300ms.csv', # this
                 # f'{path}/{trace}/clipper_ht_asb_300ms.csv', # this
-                f'{path}/{trace}/{slo}/clipper_ha_aimd_300ms.csv', # this
                 # f'{path}/{trace}/clipper_ht_aimd_lateallowed_300ms.csv',
                 # f'{path}/{trace}/clipper_ht_nexus_300ms.csv',
                 # f'{path}/{trace}/clipper_ht_asb_300ms.csv', # this
@@ -57,14 +63,12 @@ logfile_list = [
                 # f'{path}/{trace}/sommelier_asb_ewma1.1_300ms.csv',
                 # f'{path}/{trace}/sommelier_aimd_ewma1.1_beta1.5_300ms.csv',
                 # f'{path}/{trace}/sommelier_asb_ewma1.1_beta1.5_300ms.csv',
-                f'{path}/{trace}/{slo}/sommelier_asb_ewma1.6_beta1.5_300ms.csv', # 300ms, 2.1x, 3x
                 # f'{path}/{trace}/sommelier_asb_300ms_intervaladaptive2.csv',
                 # f'{path}/{trace}/sommelier_nexus_300ms.csv',
                 # '../logs/throughput/selected_asplos/proteus_aimd_300ms.csv',
                 # '../logs/throughput/selected_asplos/proteus_nexus_300ms.csv',
                 # f'{path}/{trace}/proteus_300ms.csv',
                 # f'{path}/{trace}/proteus_ewma1.1_300ms.csv',
-                f'{path}/{trace}/{slo}/proteus_ewma1.6_300ms.csv', # 300ms, 2.1x, 3x
                 # f'{path}/{trace}/proteus_ewma2.1_300ms.csv',
                 # f'{path}/{trace}/proteus_lessbatching_ewma1.1_earlydrop_300ms.csv',
                 # f'{path}/{trace}/50ms/proteus_50ms.csv',
