@@ -37,11 +37,6 @@ class Ilp(SchedulingAlgorithm):
         self.starting_allocation = starting_allocation
         self.static = static
 
-        # logging.basicConfig(filename='output.log',
-        #                     mode='w',
-        #                     format='%(asctime)s - %(message)s', datefmt='%d-%b-%y %H:%M:%S',
-        #                     level=logging.DEBUG)
-
     def is_simulator_set(self):
         if self.simulator is None:
             return False
@@ -166,9 +161,6 @@ class Ilp(SchedulingAlgorithm):
         return gurobiModel
 
     def run(self, observation, num_acc_types, num_max_acc):
-        # print('observation shape:', observation.shape)
-        # print('observation:', observation)
-
         num_isi = observation.shape[0] - 1
         # For simple use cases, the number of models = number of ISIs
         self.num_isi = num_isi
@@ -177,15 +169,14 @@ class Ilp(SchedulingAlgorithm):
 
         # Old way to get demand
         # demand_since_last = observation[0:num_isi, -2]
+
         # New way to get demand (EWMA over sliding window)
         demand_since_last = self.simulator.ewma_demand.ravel()
         # divide demand by time elapsed since last measurement to get demand in units of requests per second
         demand = demand_since_last / (self.allocation_window / 1000)
         self.log.info(f'demand: {sum(demand)}')
-        # time.sleep(10)
         missed_requests = observation[0:num_isi, -1]
 
-        # latencies = observation[0:num_isi, num_acc_types:2*num_acc_types]
         latencies = self.simulator.model_variant_runtimes
 
         # models = range(num_isi)
@@ -195,9 +186,6 @@ class Ilp(SchedulingAlgorithm):
 
         models = []
 
-        # Openvino only runs on CPUs with Intel AVX capability. All nodes are AVX capable
-        # CPUs for OnnxRuntime and OpenVino overlap 100%
-        # Just have a CPU type
         accelerators = []
         for acc in range(num_max_acc):
             accelerators.append('CPU-' + str(acc))
@@ -221,7 +209,6 @@ class Ilp(SchedulingAlgorithm):
 
         # b(j,k)
         # Whether request type k can be served by model variant j
-        # TODO: Initialize this
         b = {}
 
         # This is just for giving shape to z variable
@@ -241,13 +228,11 @@ class Ilp(SchedulingAlgorithm):
             for model_variant in model_variants:
                 models.append(model_variant)
 
-                # A[model_variant] = np.random.randint(50, 100)
                 A[model_variant] = self.simulator.model_variant_accuracies[(
                     isi_name, model_variant)]
 
                 for accelerator in accelerators:
                     accelerator_type = accelerator.split('-')[0]
-                    # latency = latencies[isi, self.accelerator_dict[accelerator_type]]
                     acc_latencies = {}
                     if accelerator_type == 'CPU':
                         acc_latencies = latencies[1]
@@ -269,7 +254,6 @@ class Ilp(SchedulingAlgorithm):
                         throughput = 0
                     else:
                         throughput = largest_batch_size * 1000 / latency
-                        # throughput = 1000 / latency
                     p[accelerator, model_variant] = math.floor(throughput)
 
                     ik_dict[accelerator, isi] = 1
@@ -294,14 +278,11 @@ class Ilp(SchedulingAlgorithm):
             m.setParam('NonConvex', 2)
             m.setParam('TimeLimit', 200)
             m.setParam('MIPGap', 0.5)
-            m.setParam('Threads', 8)
+            m.setParam('Threads', 12)
 
             # Add optimization variables
             w = m.addVars(rtypes, name='x')
             x = m.addVars(ij_pairs, vtype=GRB.BINARY, name='x')
-            # TODO: Both these variables need to be positive
-            # y = m.addVars(models, name='y', vtype=GRB.POSITIVE)
-            # z = m.addVars(jk_pairs, name='z', vtype=GRB.POSITIVE)
             y = m.addVars(accelerators, name='y')
             yp = m.addVars(accelerators, name='yp')
             ypp = m.addVars(accelerators, name='ypp')
@@ -395,8 +376,9 @@ class Ilp(SchedulingAlgorithm):
             # We only do this for AccScale/Proteus
             # if self.simulator.model_assignment == 'ilp' or self.simulator.batching_algo == 'accscale':
             # if self.simulator.model_assignment == 'ilp':
-            m = self.disallow_infeasible_variants(m, x, accelerators, sum(self.simulator.model_variants.values(), []),
-                                                    self.simulator.largest_batch_sizes)
+            m = self.disallow_infeasible_variants(m, x, accelerators,
+                                                  sum(self.simulator.model_variants.values(), []),
+                                                  self.simulator.largest_batch_sizes)
 
             # # ct4(j) .. y(j) =l= sum(i, x(i,j) * p(i,j));
             # m.addConstrs((y[j] <= sum(p[i, j]*x[i, j]
@@ -460,21 +442,15 @@ class Ilp(SchedulingAlgorithm):
                 self.simulator.ilp_stats['estimated_effective_accuracy'] = effective_accuracy
                 self.simulator.ilp_stats['estimated_throughput'] = throughput
                 self.simulator.ilp_stats['demand'] = sum(s.values())
-                # self.log.error(f'waiting 5 seconds before moving on..')
-                # time.sleep(5)
-                # self.log.error(f'now moving on..')
                 self.print_cached_solution()
                 actions = self.generate_actions(current_alloc=current_alloc, ilp_solution=x,
                                                 canary_solution=z, accelerators=accelerators,
                                                 models=models)
-                # time.sleep(10)
                 solution_found = True
                 self.beta = self.initial_beta
             else:
                 actions = np.zeros(current_alloc.shape)
                 # self.log.error('No solution')
-                # TODO: perhaps we should use cached solution in this case
-                #       what if cached solution is also empty?
                 if (self.beta > 1.5):
                     decrement = 0.1
                 else:
@@ -505,9 +481,6 @@ class Ilp(SchedulingAlgorithm):
                     accelerator_type = accelerator.split('-')[0]
                     # new_alloc[j, self.accelerator_dict[accelerator_type]] += 1
                     
-                    # TODO: How to remove predictors currently in the system?
-                    # TODO: We are going to add predictors manually
-                    #       Maybe similar to BLIS implementation, we can build a dictionary first
                     if (model_variant, accelerator_type) in required_predictors:
                         required_predictors[(model_variant, accelerator_type)] += 1
                     else:
@@ -528,9 +501,6 @@ class Ilp(SchedulingAlgorithm):
                 # if canary_pct > 0.0 and canary_pct <= 1.0:
                 #     self.log.error(f'accelerator: {accelerator}, isi: {isi}, canary pct: {canary_pct}')
 
-        # logging.info('required_predictors: {}'.format(required_predictors))
-        # logging.info('canary dict: {}'.format(canary_dict))
-        # time.sleep(1)
         self.simulator.apply_ilp_solution(required_predictors, canary_dict, ilp_x)
         self.log.debug(f'required_predictors:\n{required_predictors}\ncanary_dict:\n{canary_dict}')
 
