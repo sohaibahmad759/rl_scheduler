@@ -1185,7 +1185,7 @@ class Executor:
                             predictors_to_add.append((AccType.VPU, predictor.variant_name))
                         else:
                             self.log.error('infaas_v2_downscaling: neither CPU nor VPU is available!')
-                            time.sleep(10)
+                            time.sleep(1)
         
         # We can't add/remove predictors inside the above loop since it will
         # change the size of the loop
@@ -1305,7 +1305,7 @@ class Executor:
                             predictors_to_add.append((AccType.VPU, predictor.variant_name))
                         else:
                             self.log.error('infaas_v2_downscaling: neither CPU nor VPU is available!')
-                            time.sleep(10)
+                            time.sleep(1)
         
         # We can't add/remove predictors inside the above loop since it will
         # change the size of the loop
@@ -1339,8 +1339,8 @@ class Executor:
     def finish_request(self, event, clock):
         # print('self.assigned_requests: {}'.format(self.assigned_requests))
         if event.id not in self.assigned_requests:
-            self.log.error('ERROR: Could not find assigned request.')
-            time.sleep(10)
+            self.log.warn('ERROR: Could not find assigned request.')
+            time.sleep(1)
             return False
         
         predictor = self.assigned_requests[event.id]
@@ -1359,7 +1359,7 @@ class Executor:
         else:
             self.log.debug('WARN: Could not finish request at predictor {}, \
                     executor {}. (Time: {})'.format(predictor.id, self.id, clock))
-            time.sleep(5)
+            time.sleep(0.1)
             return False
 
     
@@ -1376,7 +1376,7 @@ class Executor:
         if self.task_assignment == TaskAssignment.CANARY:
             if len(self.canary_routing_table) == 0:
                 self.simulator.bump_failed_request_stats(event)
-                self.log.error('failed request because routing table is empty')
+                self.log.warn('failed request because routing table is empty')
                 return
             
             if self.simulator.model_assignment == 'ilp' and self.simulator.use_proportional == True:
@@ -1389,7 +1389,7 @@ class Executor:
                 # time.sleep(1)
                 if not(any(x > 0 for x in weights)):
                     self.simulator.bump_failed_request_stats(event)
-                    self.log.error('failed request because no predictor has throughput more than 0')
+                    self.log.warn('failed request because no predictor has throughput more than 0')
                     return
                 selected = random.choices(list(self.predictors.values()),
                                           weights=weights,
