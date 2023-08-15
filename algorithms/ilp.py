@@ -48,10 +48,9 @@ class Ilp(SchedulingAlgorithm):
 
         if self.starting_allocation is not None:
             predictor_dict, canary_dict, ilp_x = self.get_solution_from_file(self.starting_allocation)
-            self.log.error(f'ilp_x: {ilp_x}')
-            self.log.error(f'canary_dict: {canary_dict}')
-            self.log.error(f'predictor_dict: {predictor_dict}')
-            # time.sleep(10)
+            self.log.info(f'ilp_x: {ilp_x}')
+            self.log.info(f'canary_dict: {canary_dict}')
+            self.log.info(f'predictor_dict: {predictor_dict}')
             self.simulator.apply_ilp_solution(predictor_dict, canary_dict, ilp_x)
 
     def get_solution_from_file(self, file):
@@ -76,7 +75,6 @@ class Ilp(SchedulingAlgorithm):
         for isi_name in all_model_variants:
             model_variants = all_model_variants[isi_name]
             for model_variant in model_variants:
-                # isi_name = self.simulator.get_isi_from_variant_name(model_variant)
                 for acc_type in accelerators:
                     acc_latencies = {}
                     if acc_type == 'CPU':
@@ -98,7 +96,6 @@ class Ilp(SchedulingAlgorithm):
                     max_batch_size_dict[(acc_type, model_variant)] = max_batch_size
                     self.log.debug(f'({acc_type}, {model_variant}): {max_batch_size}')
         self.log.debug(f'len(max_batch_size_dict): {len(max_batch_size_dict)}')
-        time.sleep(10)
         return max_batch_size_dict
 
     def add_spec_acc_constraints(self, model, x, accelerators, required_predictors):
@@ -115,10 +112,8 @@ class Ilp(SchedulingAlgorithm):
             model_family = self.simulator.get_isi_from_variant_name(variant)
             model_variants = set(self.simulator.model_variants[model_family])
             all_variants = set(sum(self.simulator.model_variants.values(), []))
-            # print(f'all_variants: {len(all_variants)}')
 
             disallowed_variants = all_variants.difference(model_variants)
-            # print(f'disallowed_variants: {len(disallowed_variants)}')
 
             for inst in range(instances):
                 idx = indices.get(accelerator_type, 0)
@@ -126,22 +121,11 @@ class Ilp(SchedulingAlgorithm):
                 for disallowed_variant in disallowed_variants:
                     accelerator = f'{accelerator_type}-{idx}'
                     model.addConstr(x[accelerator, disallowed_variant] == 0, f'c_zero_{accelerator}_{disallowed_variant}')
-                    # print(f'x[{accelerator},{disallowed_variant}] == 0')
                     constraints_added += 1
-
-                    # if constraints_added > 1000:
-                    #     return model
 
                 idx += 1
                 indices[accelerator_type] = idx
 
-        # raise IlpException(f'required_predictors: {required_predictors}')
-        # for each predictor, fix the allowed model variants to only be from the family
-        # of the given variant
-        # why make sommelier_solution.txt so complicated? perhaps rename the model variant
-        # to model family
-        # print(f'constraints added: {constraints_added}')
-        # time.sleep(1)
         return model
     
     def disallow_infeasible_variants(self, gurobiModel, x, accelerators, model_variants,
@@ -162,7 +146,6 @@ class Ilp(SchedulingAlgorithm):
 
     def run(self, observation, num_acc_types, num_max_acc):
         num_isi = observation.shape[0] - 1
-        # For simple use cases, the number of models = number of ISIs
         self.num_isi = num_isi
         
         current_alloc = observation[0:num_isi, 0:num_acc_types]
@@ -178,8 +161,6 @@ class Ilp(SchedulingAlgorithm):
         missed_requests = observation[0:num_isi, -1]
 
         latencies = self.simulator.model_variant_runtimes
-
-        # models = range(num_isi)
 
         # First generate the parameter variables from the isi_dict
         rtypes = []
@@ -545,10 +526,6 @@ class Ilp(SchedulingAlgorithm):
         this function measures the expected overhead of the routing table with a large
         number of entries (order of thousands).
         '''
-        # request_assignment_dummy = {'resnet1': 0.3, 'resnet2': 0.2, 'resnet3': 0.3,
-        #                             'resnet4': 0.3, 'resnet5': 0.2, 'resnet6': 0.3,
-        #                             'resnet7': 0.3, 'resnet8': 0.2, 'resnet9': 0.3,
-        #                             'resnet50': 0.3, 'resnet18': 0.2, 'resnet34': 0.3}
         request_assignment_dummy = {}
         for dummy in range(5000):
             request_assignment_dummy[dummy] = dummy
@@ -556,12 +533,5 @@ class Ilp(SchedulingAlgorithm):
         request_assignment_dummy[50]
         end_time = time.time()
         lookup_overhead = end_time - start_time
-        print('Routing table lookup overhead:', lookup_overhead)
-
-
-if __name__ == "__main__":
-    # Test out if the inheritance works fine
-    x = Ilp()
-    x.print_algorithm()
-    y = SchedulingAlgorithm()
-    y.print_algorithm()
+        print(f'Routing table lookup overhead: {lookup_overhead}')
+        return lookup_overhead
