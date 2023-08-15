@@ -17,7 +17,7 @@ from algorithms.ilp_alpha import IlpAlpha
 from algorithms.ilp_throughput import IlpThroughput
 
 
-os.environ["GRB_LICENSE_FILE"] = "gurobi/gurobi.lic"
+# os.environ["GRB_LICENSE_FILE"] = "gurobi/gurobi.lic"
 
 def getargs():
     parser = argparse.ArgumentParser(description='Test scheduler on the simulated BLIS environment.')

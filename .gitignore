@@ -14,6 +14,7 @@
 *swp
 *vagrant*log
 *.jpg
+gurobi/gurobi.lic
 .DS_Store
 .coverage
 .env
