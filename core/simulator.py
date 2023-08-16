@@ -883,7 +883,7 @@ class Simulator:
         self.use_proportional = True
         # if self.batching_algo == 'nexus':
         #     self.use_proportional = False
-        self.log.info(f'Use proportional: {self.use_proportional}, changed '
+        self.log.debug(f'Use proportional: {self.use_proportional}, changed '
                       f'proportion: {changed/total}, ilp utilization: {ilp_utilization}')
         self.ilp_stats['ilp_utilization'] = ilp_utilization
 
@@ -1720,11 +1720,11 @@ class Simulator:
                                              f'peak throughput: {x.peak_throughput}',),
                                   predictors.values()))
             # self.log.info(f'isi: {key}, predictors: {predictors}')
-        self.log.info(f'Total queued requests: {total_queued}, system serving capacity: '
+        self.log.debug(f'Total queued requests: {total_queued}, system serving capacity: '
                       f'{total_capacity:.2f} reqs/sec, total served by predictors since last '
                       f'checked: {total_served}')
-        self.log.info(f'Total predictors: {total_predictors}')
-        self.log.info('------')
+        self.log.debug(f'Total predictors: {total_predictors}')
+        self.log.debug('------')
         # self.log.info('')
         # time.sleep(1)
 

@@ -1376,7 +1376,7 @@ class Executor:
         if self.task_assignment == TaskAssignment.CANARY:
             if len(self.canary_routing_table) == 0:
                 self.simulator.bump_failed_request_stats(event)
-                self.log.warn('failed request because routing table is empty')
+                self.log.debug('failed request because routing table is empty')
                 return
             
             if self.simulator.model_assignment == 'ilp' and self.simulator.use_proportional == True:

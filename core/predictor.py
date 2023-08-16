@@ -99,9 +99,9 @@ class Predictor:
         predictor_log.setLevel(logging.INFO)
         self.predictor_log = logging.getLogger(self.id)
         self.predictor_log.addHandler(predictor_log)
-        self.predictor_log.info(f'{self.variant_name},{self.acc_type},{self.max_batch_size},'
+        self.predictor_log.debug(f'{self.variant_name},{self.acc_type},{self.max_batch_size},'
                                 f'{self.executor.isi}')
-        self.predictor_log.info(self.profiled_latencies)
+        self.predictor_log.debug(self.profiled_latencies)
 
         return
 
