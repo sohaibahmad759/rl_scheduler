@@ -170,7 +170,7 @@ def main(args):
 
     validate_config(config=config, filename=args.config_file)
 
-    testing_steps = 291 if 'short_run' in config and config['short_run'] == True else 10000
+    testing_steps = 50 if 'short_run' in config and config['short_run'] == True else 10000
     solve_interval = config['solve_interval'] if 'solve_interval' in config else 0
     model_assignment = config['model_allocation']
     job_scheduling = config['job_scheduling']
@@ -631,6 +631,7 @@ def main(args):
 
     bumped_succeeded = env.simulator.slo_timeouts['succeeded']
     bumped_failed = env.simulator.slo_timeouts['timeouts']
+    total_bumped_failed_per_model = sum(list(env.simulator.slo_timeouts_per_executor['timeouts'].values()))
     bumped_total = bumped_failed + bumped_succeeded
     bumped_violation_ratio = bumped_failed / bumped_total
     bumped_late = env.simulator.slo_timeouts['late']
@@ -639,8 +640,10 @@ def main(args):
     slo_violation_ratio = total_slo_violations / bumped_total
     print(f'SLO violation ratio based on bumped stats: {bumped_violation_ratio}')
     # total_slo = env.simulator.slo_timeouts['total']
-    print(f'Total requests: {bumped_total}, dropped: {bumped_failed}, successful from '
-          f'SLO counter: {bumped_succeeded}, dropped ratio: {bumped_violation_ratio}')
+    print(f'Total requests: {bumped_total}, dropped: {bumped_failed} '
+          f'({total_bumped_failed_per_model} dropped recorded in per_model stats), '
+          f'successful from  SLO counter: {bumped_succeeded}, dropped ratio: '
+          f'{bumped_violation_ratio}')
     print(f'Late requests: {bumped_late}, late ratio: {bumped_late_ratio}')
     print(f'SLO violations (dropped + late): {total_slo_violations}, violation ratio: '
           f'{slo_violation_ratio}')

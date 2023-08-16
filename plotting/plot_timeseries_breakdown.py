@@ -86,6 +86,7 @@ for model in models:
     dropped = df['dropped'].values[start_cutoff:]
     late = df['late'].values[start_cutoff:]
     total_slo_violations = dropped + late
+    # total_slo_violations = late
     # total_slo_violations = dropped
 
     successful = df['successful'].values[start_cutoff:]
@@ -108,6 +109,8 @@ for model in models:
 
     slo_violation_ratio = (sum(original_df['demand']) - sum(original_df['successful']) \
                            + sum(original_df['late'])) / sum(original_df['demand'])
+    # slo_violation_ratio = 1 - (sum(original_df['successful']) - sum(original_df['late']) \
+    #                        - sum(original_df['dropped'])) / sum(original_df['successful'])
     slo_violation_ratios.append(slo_violation_ratio)
 
         # throughputs.append((sum(original_df['successful']) - sum(original_df['late'])) / len(original_df['successful']))
