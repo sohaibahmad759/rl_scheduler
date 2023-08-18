@@ -88,8 +88,10 @@ class Ilp(SchedulingAlgorithm):
                         acc_latencies = profiled_latencies[4]
 
                     max_batch_size = 0
-                    for batch_size in self.simulator.allowed_batch_sizes:
-                        latency = acc_latencies[(isi_name, model_variant, batch_size)]
+                    for batch_size in [1, 2, 4, 8, 16]:
+                        latency = np.random.random()*1000
+                    # for batch_size in self.simulator.allowed_batch_sizes:
+                    #     latency = acc_latencies[(isi_name, model_variant, batch_size)]
 
                         if batch_size > max_batch_size and latency < slo_dict[isi_name]:
                             max_batch_size = batch_size
@@ -145,30 +147,66 @@ class Ilp(SchedulingAlgorithm):
                     
         return gurobiModel
 
-    def run(self, observation, num_acc_types, num_max_acc):
-        num_isi = observation.shape[0] - 1
-        self.num_isi = num_isi
+    def run(self, observation, num_acc_types, num_max_acc, num_isi=9,
+            variants_per_model=6):
+        # num_isi = observation.shape[0] - 1
+        # self.num_isi = num_isi
         
-        current_alloc = observation[0:num_isi, 0:num_acc_types]
+        # current_alloc = observation[0:num_isi, 0:num_acc_types]
 
         # Old way to get demand
         # demand_since_last = observation[0:num_isi, -2]
 
-        # New way to get demand (EWMA over sliding window)
-        demand_since_last = self.simulator.ewma_demand.ravel()
-        # divide demand by time elapsed since last measurement to get demand in units of requests per second
-        demand = demand_since_last / (self.allocation_window / 1000)
-        self.log.info(f'demand: {sum(demand)}')
-        missed_requests = observation[0:num_isi, -1]
+        self.num_isi = num_isi
 
-        latencies = self.simulator.model_variant_runtimes
+        # New way to get demand (EWMA over sliding window)
+        # demand_since_last = self.simulator.ewma_demand.ravel()
+        # divide demand by time elapsed since last measurement to get demand in units of requests per second
+        # demand = demand_since_last / (self.allocation_window / 1000)
+        # self.log.info(f'demand: {sum(demand)}')
+        # missed_requests = observation[0:num_isi, -1]
+
+        allowed_batch_sizes = [1, 2, 4, 8, 16]
+
+        # models = []
+        models = []
+        model_families = []
+        idx_to_executor = {}
+        for dummy_model in range(num_isi):
+            dummy_model_name = f'bert_{dummy_model}'
+            model_families.append(dummy_model_name)
+            idx_to_executor[dummy_model] = dummy_model_name
+
+        # print(f'idx_to_executor: {idx_to_executor}')
+
+        sim_model_variants = {}
+        largest_batch_sizes = {}
+        variant_counter = 0
+        for model_family in model_families:
+            sim_model_variants[model_family] = []
+            for dummy_variant in range(variants_per_model):
+                variant_name = f'variant_{variant_counter}'
+                sim_model_variants[model_family].append(variant_name)
+                largest_batch_sizes[(model_family, variant_name)] = 1
+                variant_counter += 1
+            # sim_model_variants[model] = ['variant1'] * variants_per_model
+
+        # print(f'sim_model_variants: {sim_model_variants}')
+
+        # latencies = self.simulator.model_variant_runtimes
+        # TODO: have to set this for profiling
+        latencies = {}
+        for dummy_acc in range(4):
+            latencies[dummy_acc+1] = {}
+            for model_family in model_families:
+                for variants in sim_model_variants[model_family]:
+                    for batch_size in allowed_batch_sizes:
+                        latencies[dummy_acc+1][(model_family, variants, batch_size)] = np.random.random() * 100
+
         # print(f'latencies: {latencies}')
-        # time.sleep(10)
 
         # First generate the parameter variables from the isi_dict
         rtypes = []
-
-        models = []
 
         accelerators = []
         for acc in range(num_max_acc):
@@ -198,22 +236,29 @@ class Ilp(SchedulingAlgorithm):
         # This is just for giving shape to z variable
         ik_dict = {}
         
-        largest_batch_sizes = self.simulator.get_largest_batch_sizes()
+        # largest_batch_sizes = self.simulator.get_largest_batch_sizes()
+        # TODO: have to set this for profiling
+        # largest_batch_sizes = {('bert', 'variant1'): 1, ('bert', 'variant2'): 1}
+
 
         for isi in range(num_isi):
             rtypes.append(isi)
 
             # Initialize demand for each request type (ISI)
-            s[isi] = demand[isi]
+            # s[isi] = np.random.random()*10
+            s[isi] = 10
 
-            isi_name = self.simulator.idx_to_executor[isi]
-            model_variants = self.simulator.model_variants[isi_name]
+            # isi_name = self.simulator.idx_to_executor[isi]
+            # model_variants = self.simulator.model_variants[isi_name]
+            isi_name = idx_to_executor[isi]
+            model_variants = sim_model_variants[isi_name]
 
             for model_variant in model_variants:
                 models.append(model_variant)
 
-                A[model_variant] = self.simulator.model_variant_accuracies[(
-                    isi_name, model_variant)]
+                # A[model_variant] = self.simulator.model_variant_accuracies[(
+                #     isi_name, model_variant)]
+                A[model_variant] = np.random.random() * 100
 
                 for accelerator in accelerators:
                     accelerator_type = accelerator.split('-')[0]
@@ -227,11 +272,13 @@ class Ilp(SchedulingAlgorithm):
                     elif accelerator_type == 'GPU_PASCAL':
                         acc_latencies = latencies[4]
                     
-                    largest_batch_size = largest_batch_sizes[(accelerator_type, model_variant)]
+                    # largest_batch_size = largest_batch_sizes[(accelerator_type, model_variant)]
+                    largest_batch_size = 16
                     if largest_batch_size == 0:
                         latency = None
                     else:
-                        latency = acc_latencies[(isi_name, model_variant, largest_batch_size)] * LATENCY_GAP_FACTOR
+                        # latency = acc_latencies[(isi_name, model_variant, largest_batch_size)] * LATENCY_GAP_FACTOR
+                        latency = np.random.random()*10
 
                     if latency is None:
                         throughput = 0
@@ -242,11 +289,15 @@ class Ilp(SchedulingAlgorithm):
                     ik_dict[accelerator, isi] = 1
 
                 for isi in range(num_isi):
-                    if model_variant in self.simulator.model_variants[self.simulator.idx_to_executor[isi]]:
+                    if model_variant in sim_model_variants[idx_to_executor[isi]]:
                         b[model_variant, isi] = 1
                     else:
                         b[model_variant, isi] = 0
 
+        # print(f'b: {b}')
+        # print(f'models: {models}')
+
+        # print(f'p: {p}')
         # Helper variables for setting up the ILP
         ij_pairs, _ = gp.multidict(p)
         jk_pairs, _ = gp.multidict(b)
@@ -259,7 +310,8 @@ class Ilp(SchedulingAlgorithm):
             m.setParam("LogToConsole", 0)
 
             m.setParam('NonConvex', 2)
-            m.setParam('TimeLimit', 200)
+            # m.setParam('TimeLimit', 200)
+            m.setParam('TimeLimit', 2000)
             m.setParam('MIPGap', 0.5)
             m.setParam('Threads', 12)
 
@@ -274,13 +326,13 @@ class Ilp(SchedulingAlgorithm):
 
             # If there are no incoming requests, terminate ILP
             if sum(s.values()) == 0:
-                if self.profiling_mode is True:
-                    s = {}
-                    for isi in range(num_isi):
-                        s[isi] = 10
-                else:
-                    self.log.error('No requests received, terminating ILP.')
-                    return None
+                # if self.profiling_mode is True:
+                #     s = {}
+                #     for isi in range(num_isi):
+                #         s[isi] = 10
+                # else:
+                self.log.error('No requests received, terminating ILP.')
+                return None
             else:
                 self.log.debug('\nIncoming requests:' + str(sum(s.values())))
             
@@ -363,9 +415,9 @@ class Ilp(SchedulingAlgorithm):
             # We only do this for AccScale/Proteus
             # if self.simulator.model_assignment == 'ilp' or self.simulator.batching_algo == 'accscale':
             # if self.simulator.model_assignment == 'ilp':
-            m = self.disallow_infeasible_variants(m, x, accelerators,
-                                                  sum(self.simulator.model_variants.values(), []),
-                                                  self.simulator.largest_batch_sizes)
+            # m = self.disallow_infeasible_variants(m, x, accelerators,
+            #                                       sum(self.simulator.model_variants.values(), []),
+            #                                       self.simulator.largest_batch_sizes)
 
             # # ct4(j) .. y(j) =l= sum(i, x(i,j) * p(i,j));
             # m.addConstrs((y[j] <= sum(p[i, j]*x[i, j]
@@ -430,13 +482,14 @@ class Ilp(SchedulingAlgorithm):
                 self.simulator.ilp_stats['estimated_throughput'] = throughput
                 self.simulator.ilp_stats['demand'] = sum(s.values())
                 self.print_cached_solution()
-                actions = self.generate_actions(current_alloc=current_alloc, ilp_solution=x,
-                                                canary_solution=z, accelerators=accelerators,
-                                                models=models)
+                # actions = self.generate_actions(current_alloc=current_alloc, ilp_solution=x,
+                #                                 canary_solution=z, accelerators=accelerators,
+                #                                 models=models)
+                actions = None
                 solution_found = True
                 self.beta = self.initial_beta
             else:
-                actions = np.zeros(current_alloc.shape)
+                actions = np.zeros(10)
                 # self.log.error('No solution')
                 if (self.beta > 1.5):
                     decrement = 0.1
