@@ -2,27 +2,53 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
+from itertools import permutations
 
 
-df = pd.read_csv('fig1/data_new.csv')
+np_df = np.zeros((1, 5))
+
+variants = ['EfficientNet-b0', 'EfficientNet-b1', 'EfficientNet-b3',
+            'EfficientNet-b5', 'EfficientNet-b7']
+
+count = 0
+for v1 in variants:
+    for v2 in variants:
+        for v3 in variants:
+            # print(f'{v1}, {v2}, {v3}')
+            np_df = np.vstack((np_df, np.array([v1, v2, v3, 0, 0])))
+            count += 1
+print(f'\n\ncount: {count}\n\n')
+
+np_df = np_df[1:]
+df = pd.DataFrame(data=np_df, columns=['Device 1', 'Device 2', 'Device 3',
+                                       'Throughput', 'Accuracy'])
 print(df)
 
+# df = pd.read_csv('fig1/data_new.csv')
+# print(df)
+
 # fig, ax = plt.subplots()
-
-
 
 throughputs = {('EfficientNet-b0', 'Device 1'): 15.15840534,
                ('EfficientNet-b0', 'Device 2'): 53.05039788,
                ('EfficientNet-b0', 'Device 3'): 55.58643691,
+               ('EfficientNet-b1', 'Device 1'): 13.33333333,
+               ('EfficientNet-b1', 'Device 2'): 45.78754579,
+               ('EfficientNet-b1', 'Device 3'): 52.63157895,
                ('EfficientNet-b3', 'Device 1'): 10,
                ('EfficientNet-b3', 'Device 2'): 33.89830508,
                ('EfficientNet-b3', 'Device 3'): 47.55111745,
+               ('EfficientNet-b5', 'Device 1'): 5,
+               ('EfficientNet-b5', 'Device 2'): 22.97266253,
+               ('EfficientNet-b5', 'Device 3'): 32.55208333,
                ('EfficientNet-b7', 'Device 1'): 1.357625784,
                ('EfficientNet-b7', 'Device 2'): 16.28134158,
                ('EfficientNet-b7', 'Device 3'): 25.23340903}
 
 accuracies = {'EfficientNet-b0': 77.1,
+              'EfficientNet-b1': 79.1,
               'EfficientNet-b3': 81.6,
+              'EfficientNet-b5': 83.6,
               'EfficientNet-b7': 84.3}
 
 devices = ['Device 1', 'Device 2', 'Device 3']
