@@ -17,6 +17,9 @@ trace = 'medium-normal_load'
 
 path = '../logs/throughput/selected_asplos'
 
+plt.rcParams['pdf.fonttype'] = 42
+plt.rcParams['ps.fonttype'] = 42
+
 # slos = ['1x', '2.1x', '3x']
 slos = ['1x', '1.5x', '2x', '2.5x', '3x', '3.5x']
 

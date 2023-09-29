@@ -18,6 +18,9 @@ trace = 'zipf_flat_uniform'
 traces = ['zipf_flat_uniform', 'zipf_exponential', 'zipf_flat_bursty']
 xlabels = ['Uniform', 'Poisson', 'Gamma']
 
+plt.rcParams['pdf.fonttype'] = 42
+plt.rcParams['ps.fonttype'] = 42
+
 fig, (ax1, ax2, ax3) = plt.subplots(1, 3, sharey=True)
 axs = [ax1, ax2, ax3]
 
@@ -342,7 +345,7 @@ for trace in traces:
     ax.set_box_aspect(1)
     ax.set_xlabel(xlabels[trace_idx], fontsize=14)
     # ax.set_yticks(np.arange(0, 0.25, 0.05), fontsize=9)
-    ax.set_yticks(np.arange(0, 0.25, 0.05), fontsize=9)
+    ax.set_yticks(np.arange(0, 0.25, 0.05))
     # ratio = 10
     # x_left, x_right = ax.get_xlim()
     # y_low, y_high = ax.get_ylim()

@@ -5,6 +5,9 @@ import seaborn as sns
 from itertools import permutations
 
 
+plt.rcParams['pdf.fonttype'] = 42
+plt.rcParams['ps.fonttype'] = 42
+
 np_df = np.zeros((1, 7))
 
 variants = ['EfficientNet-b0', 'EfficientNet-b1', 'EfficientNet-b3',
@@ -162,6 +165,10 @@ print(df)
 fig = plt.figure(figsize=(4, 4))
 plt.scatter(x=df['Throughput'], y=df['Accuracy'], facecolors='None', edgecolors='gray')
 
+
+plt.rcParams['pdf.fonttype'] = 42
+plt.rcParams['ps.fonttype'] = 42
+
 plt.grid()
 # plt.legend(loc='upper center', bbox_to_anchor=(0.75, 1), ncol=1, fontsize=8)
 plt.xlabel('System Throughput Capacity (QPS)', fontsize=14)
@@ -195,11 +202,17 @@ pareto_frontier = np.array(pareto_frontier)
 plt.scatter(x=pareto_frontier[:, 0], y=pareto_frontier[:, 1], facecolors='r',
             edgecolors='r', label='Pareto Frontier')
 
+
+plt.rcParams['pdf.fonttype'] = 42
+plt.rcParams['ps.fonttype'] = 42
+
 plt.xticks(np.arange(40, 180, 20), fontsize=12)
 plt.yticks(np.arange(76, 86, 1), fontsize=12)
 
 # ax.scatter(x=df['Throughput'], y=df['Accuracy'])
 
+plt.rcParams['pdf.fonttype'] = 42
+plt.rcParams['ps.fonttype'] = 42
 
 # plt.show()
 plt.legend(loc='upper center', bbox_to_anchor=(0.63, 1), fontsize=14)

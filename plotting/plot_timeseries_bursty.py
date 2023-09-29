@@ -18,6 +18,9 @@ trace = 'zipf_exponential_bursty'
 path = '../logs/throughput/selected_asplos'
 slo = '300ms'
 
+plt.rcParams['pdf.fonttype'] = 42
+plt.rcParams['ps.fonttype'] = 42
+
 logfile_list = [
                 f'{path}/{trace}/infaas_accuracy_300ms.csv',
                 # f'{path}/{trace}/infaas_accuracy_300ms_0.1_0.4.csv',

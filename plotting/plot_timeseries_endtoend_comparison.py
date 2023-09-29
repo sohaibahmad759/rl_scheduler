@@ -19,10 +19,10 @@ trace = 'medium-normal_load'
 
 # slo = '150ms'
 # slo = '1x'
-slo = '300ms'
+# slo = '300ms'
 # slo = '2.1x'
 # slo = '3x'
-# slo = '300ms_cluster'
+slo = '300ms_cluster'
 
 logfile_list = [
                 f'{path}/{trace}/{slo}/infaas_accuracy_300ms_0.05_0.6.csv', # 1x, 3x

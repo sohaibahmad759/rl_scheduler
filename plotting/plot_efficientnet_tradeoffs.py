@@ -7,6 +7,9 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 
+plt.rcParams['pdf.fonttype'] = 42
+plt.rcParams['ps.fonttype'] = 42
+
 df = pd.read_csv('../profiling/aggregate_profiled.csv')
 accuracy_df = pd.read_csv('../profiling/accuracy.csv')
 

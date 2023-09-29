@@ -24,6 +24,9 @@ slo = '300ms'
 # slo = '3x'
 # slo = '300ms_cluster'
 
+plt.rcParams['pdf.fonttype'] = 42
+plt.rcParams['ps.fonttype'] = 42
+
 # logfile = f'{path}/{trace}/{slo}/proteus_zipf_exponential.csv'
 logfile = f'{path}/{trace}/{slo}/proteus.csv'
 reference_new_logfile = f'../logs/throughput/selected_asplos/{trace}/{slo}/proteus.csv'

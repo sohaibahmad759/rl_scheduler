@@ -19,10 +19,13 @@ trace = 'medium-normal_load'
 path = '../logs/throughput/selected_asplos'
 # slo = '150ms'
 # slo = '1x'
-slo = '300ms'
+# slo = '300ms'
 # slo = '2.1x'
 # slo = '3x'
-# slo = '300ms_cluster'
+slo = '300ms_cluster'
+
+plt.rcParams['pdf.fonttype'] = 42
+plt.rcParams['ps.fonttype'] = 42
 
 logfile_list = [
                 f'{path}/{trace}/{slo}/infaas_accuracy_300ms_0.05_0.6.csv', # 1x, 3x
@@ -433,3 +436,5 @@ axs[2, 1].set_xticks([])
 
 plt.savefig(os.path.join('..', 'figures', 'asplos', 'endtoend_comparison',
             f'{trace}.pdf'), dpi=500, bbox_inches='tight')
+plt.savefig(os.path.join('..', 'figures', 'asplos', 'endtoend_comparison',
+            f'something.pdf'), dpi=500, bbox_inches='tight')
